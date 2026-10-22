@@ -5,6 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const baHandle = document.querySelector('.ba-handle');
   const baBeforeImg = document.querySelector('.ba-before-img');
   const baAfterImg = document.querySelector('.ba-image');
+  const badgeBefore = document.querySelector('.ba-badge.before');
+  const badgeAfter = document.querySelector('.ba-badge.after');
 
   if (!baContainer || !baBefore || !baHandle || !baBeforeImg) return;
 
@@ -34,11 +36,32 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateSlider(clientX) {
     const rect = baContainer.getBoundingClientRect();
     let pos = ((clientX - rect.left) / rect.width) * 100;
-    if (pos < 5) pos = 5;
-    if (pos > 95) pos = 95;
+    if (pos < 0) pos = 0;
+    if (pos > 100) pos = 100;
 
     baBefore.style.width = `${pos}%`;
     baHandle.style.left = `${pos}%`;
+
+    // Smooth badge visibility handling
+    if (badgeBefore) {
+      if (pos < 18) {
+        badgeBefore.style.opacity = '0';
+        badgeBefore.style.transform = 'scale(0.9)';
+      } else {
+        badgeBefore.style.opacity = '1';
+        badgeBefore.style.transform = 'scale(1)';
+      }
+    }
+
+    if (badgeAfter) {
+      if (pos > 82) {
+        badgeAfter.style.opacity = '0';
+        badgeAfter.style.transform = 'scale(0.9)';
+      } else {
+        badgeAfter.style.opacity = '1';
+        badgeAfter.style.transform = 'scale(1)';
+      }
+    }
   }
 
   // Prevent native browser image drag
