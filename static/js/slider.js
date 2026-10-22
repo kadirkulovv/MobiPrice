@@ -41,8 +41,12 @@ document.addEventListener('DOMContentLoaded', () => {
     baHandle.style.left = `${pos}%`;
   }
 
+  // Prevent native browser image drag
+  baContainer.addEventListener('dragstart', (e) => e.preventDefault());
+
   // Mouse Events
   baContainer.addEventListener('mousedown', (e) => {
+    e.preventDefault();
     isDragging = true;
     updateSlider(e.clientX);
   });

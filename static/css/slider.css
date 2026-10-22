@@ -49,6 +49,10 @@
   height: 100%;
   object-fit: cover;
   object-position: center;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
 }
 
 .ba-before {
@@ -60,6 +64,7 @@
   bottom: 0;
   z-index: 2;
   border-right: 3px solid var(--neon-cyan);
+  pointer-events: none;
 }
 
 .ba-before-img {
@@ -71,6 +76,10 @@
   max-width: none;
   object-fit: cover;
   object-position: center;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
 }
 
 .ba-badge {
