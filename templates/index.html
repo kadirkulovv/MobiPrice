@@ -1,0 +1,291 @@
+{% load static i18n %}
+<!DOCTYPE html>
+<html lang="{{ current_lang }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MobiPrice — Smartfon Ehtiyot Qismlari va Professional Servis Narxlari</title>
+  <meta name="description" content="Telefoningiz buzildimi? iPhone, Samsung, Xiaomi modellarining original va dublikat zapchast narxlarini bozorga bormasdan bilib oling. 6 oygacha kafolat.">
+
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <link rel="icon" type="image/jpeg" href="{% static 'img/logo.jpg' %}">
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="container nav-container">
+      <a href="/" class="brand-logo">
+        <img src="{% static 'img/logo.jpg' %}" alt="MobiPrice Logo">
+        <span class="brand-text">MobiPrice</span>
+      </a>
+
+      <div class="nav-actions">
+        <!-- Language Switcher Form -->
+        <form action="{% url 'set_language' %}" method="post" id="lang-form" class="lang-selector">
+          {% csrf_token %}
+          <input name="next" type="hidden" value="{{ request.get_full_path }}">
+          <button type="submit" name="language" value="uz" class="lang-btn {% if current_lang == 'uz' %}active{% endif %}">UZ</button>
+          <button type="submit" name="language" value="ru" class="lang-btn {% if current_lang == 'ru' %}active{% endif %}">RU</button>
+          <button type="submit" name="language" value="en" class="lang-btn {% if current_lang == 'en' %}active{% endif %}">EN</button>
+        </form>
+
+        <a href="tel:+998901234567" class="btn-header-call">
+          <span>📞</span> +998 (90) 123-45-67
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-badge">
+        <span>⚡️</span> Shaffof narxlar & 100% Kafolat
+      </div>
+      <h1>
+        Telefoningiz buzildimi? <br>
+        Bozorga bormasdan <span>aniq narxini</span> 10 soniyada bilib oling!
+      </h1>
+      <p>
+        Bozor kezib sarson bo‘lmang. iPhone, Samsung, Xiaomi original va sifatli dublikat ehtiyot qismlari narxlari, usta haqqi va kafolati bilan tanishing.
+      </p>
+
+      <!-- Live Search Bar -->
+      <div class="search-box-wrapper">
+        <div class="search-input-group">
+          <span class="search-icon">🔍</span>
+          <input 
+            type="text" 
+            id="search-model-input" 
+            class="search-input" 
+            placeholder="Telefon modelingizni yozing (masalan: 16 Pro Max, S24 Ultra...)"
+            autocomplete="off"
+          >
+        </div>
+        <div id="search-dropdown" class="search-dropdown"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Calculator Wizard Section -->
+  <section class="container" id="calculator">
+    <div class="calc-card">
+      <!-- Steps Progress Bar -->
+      <div class="calc-steps-indicator">
+        <div class="step-item active" data-step="1">
+          <div class="step-num">1</div>
+          <div class="step-title">Brend</div>
+        </div>
+        <div class="step-item" data-step="2">
+          <div class="step-num">2</div>
+          <div class="step-title">Model</div>
+        </div>
+        <div class="step-item" data-step="3">
+          <div class="step-num">3</div>
+          <div class="step-title">Muammo</div>
+        </div>
+        <div class="step-item" data-step="4">
+          <div class="step-num">4</div>
+          <div class="step-title">Solishtirish</div>
+        </div>
+      </div>
+
+      <!-- Step 1: Brands -->
+      <div id="step-1-brands" class="step-content">
+        <h2 style="font-size: 20px; font-weight: 800; margin-bottom: 20px; text-align: center;">
+          1-Qadam: Telefoningiz brendini tanlang
+        </h2>
+        <div class="brands-grid">
+          {% for b in brands %}
+          <div class="brand-card" data-brand-id="{{ b.id }}" data-brand-name="{{ b.name }}">
+            <span class="brand-card-icon">
+              {% if b.slug == 'apple' %}🍏
+              {% elif b.slug == 'samsung' %}📱
+              {% elif b.slug == 'xiaomi' %}⚡️
+              {% else %}💎{% endif %}
+            </span>
+            <div class="brand-card-name">{{ b.name }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Step 2: Models -->
+      <div id="step-2-models" class="step-content hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="font-size: 20px; font-weight: 800;">2-Qadam: Modelni tanlang</h2>
+          <button id="back-to-step-1" class="back-btn">← Brendni o'zgartirish</button>
+        </div>
+        <div id="models-list" class="models-grid"></div>
+      </div>
+
+      <!-- Step 3: Parts / Problem -->
+      <div id="step-3-parts" class="step-content hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <div>
+            <span style="font-size: 13px; color: var(--neon-cyan); font-weight: 700;">Tanlangan model:</span>
+            <h2 id="selected-model-label" style="font-size: 20px; font-weight: 800;">-</h2>
+          </div>
+          <button id="back-to-step-2" class="back-btn">← Modelni o'zgartirish</button>
+        </div>
+
+        <p style="color: var(--text-sub); margin-bottom: 20px;">Qurilmangizning qaysi qismi shikastlangan yoki almashtirish talab qilinadi?</p>
+
+        <div class="parts-grid">
+          {% for c in categories %}
+          <div class="part-card" data-category-id="{{ c.id }}" data-category-name="{{ c.name }}">
+            <div class="part-card-icon">
+              {% if c.code == 'screen' %}🖥
+              {% elif c.code == 'back_glass' %}✨
+              {% elif c.code == 'battery' %}🔋
+              {% elif c.code == 'camera_glass' %}📷
+              {% else %}🔧{% endif %}
+            </div>
+            <div>
+              <div class="part-card-title">{{ c.name }}</div>
+              <span style="font-size: 12px; color: var(--text-dim);">Narxlarni solishtirish →</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Step 4: Comparison Results -->
+      <div id="step-4-results" class="step-content hidden">
+        <div class="results-header">
+          <div>
+            <span style="font-size: 13px; color: var(--neon-cyan); font-weight: 700;">Detal:</span>
+            <h2 id="selected-part-label" style="font-size: 22px; font-weight: 800;">-</h2>
+            <p style="color: var(--text-sub); font-size: 14px;">Quyida ushbu detalning original va dublikat variantlari taqqoslangan:</p>
+          </div>
+          <button id="back-to-step-3" class="back-btn">← Detalni o'zgartirish</button>
+        </div>
+
+        <div id="options-grid" class="options-comparison-grid"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive Before & After Section -->
+  <section class="container comparison-section">
+    <div class="section-header">
+      <h2>Bizning ishlarimiz: <span>Oldin va Keyin</span></h2>
+      <p>MobiPrice servis ustalarining aniq va zararsiz ta'mirlash natijalarini solishtirib ko'ring (slayderni suring)</p>
+    </div>
+
+    <div class="ba-slider-container">
+      <!-- After Image (Background) -->
+      <img src="https://images.unsplash.com/photo-1592750475338-74b7b21085ab?q=80&w=1000&auto=format&fit=crop" class="ba-image" alt="Ta'mirlangandan keyingi ideal holat">
+      <span class="ba-badge after">Keyin: 100% Yangi</span>
+
+      <!-- Before Image (Clipped) -->
+      <div class="ba-before">
+        <img src="https://images.unsplash.com/photo-1598327105666-5b89351aff97?q=80&w=1000&auto=format&fit=crop" alt="Singan telefon holati">
+        <span class="ba-badge before">Oldin: Singan</span>
+      </div>
+
+      <!-- Drag Handle -->
+      <div class="ba-handle">⟷</div>
+    </div>
+  </section>
+
+  <!-- FAQ Section (Ekspert maslahatlari) -->
+  <section class="container faq-section">
+    <div class="section-header">
+      <h2>Ekspert maslahati: <span>Eng ko'p beriladigan savollar</span></h2>
+      <p>Nega batareya shishadi? Nega original qimmat? Ustalarimiz ochiq tushuntirish beradi.</p>
+    </div>
+
+    <div class="faq-list">
+      {% for faq in faqs %}
+      <div class="faq-item {% if forloop.first %}open{% endif %}">
+        <div class="faq-question">
+          <span>{{ faq.question }}</span>
+          <span style="font-size: 20px;">▾</span>
+        </div>
+        <div class="faq-answer">
+          {{ faq.answer }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- Reviews Section -->
+  <section class="container" style="padding-bottom: 60px;">
+    <div class="section-header">
+      <h2>Mijozlarimiz <span>fikrlari</span></h2>
+      <p>Shaffof narxlar va tezkor servisimizdan foydalangan mijozlar sharhlari</p>
+    </div>
+
+    <div class="reviews-grid">
+      {% for rev in reviews %}
+      <div class="review-card">
+        <div class="review-header">
+          <div>
+            <div class="review-author">{{ rev.client_name }}</div>
+            <div class="review-service">{{ rev.device_model }} • {{ rev.service_type }}</div>
+          </div>
+          <div class="review-stars">★★★★★</div>
+        </div>
+        <p class="review-text">"{{ rev.comment }}"</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- Booking / Lead Modal -->
+  <div id="order-modal" class="modal-overlay">
+    <div class="modal-content">
+      <button id="modal-close" class="modal-close">&times;</button>
+      <h3 class="modal-title">Buyurtmani tasdiqlash</h3>
+      <p id="modal-model-detail" class="modal-desc">-</p>
+
+      <div id="modal-alert" class="hidden" style="padding: 10px; margin-bottom: 15px; border-radius: var(--radius-sm); background: rgba(239, 68, 68, 0.2); color: var(--neon-red); font-size: 13px;"></div>
+
+      <form id="order-form">
+        <div class="form-group">
+          <label class="form-label" for="client-name">Ismingiz *</label>
+          <input type="text" id="client-name" class="form-control" placeholder="Masalan: Sardor" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="phone-number">Telefon raqamingiz *</label>
+          <input type="tel" id="phone-number" class="form-control" placeholder="+998 90 123 45 67" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="service-type">Xizmat formati</label>
+          <select id="service-type" class="form-control" style="background: #131a2a;">
+            <option value="in_service">Servis markaziga boraman (30 daqiqada)</option>
+            <option value="call_master">Usta chaqirish (Manzilga usta boradi)</option>
+            <option value="courier">Kuryer orqali yuborish (Bepul olib ketish)</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn-book" style="margin-top: 10px;">
+          Tasdiqlash va Yuborish
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <p style="font-weight: 700; color: #fff; margin-bottom: 6px;">MobiPrice — Smartfonlar Ehtiyot Qismlari va Servis Narxlari Portali</p>
+      <p>© 2026 MobiPrice. Barcha huquqlar himoyalangan.</p>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="{% static 'js/app.js' %}"></script>
+</body>
+</html>
