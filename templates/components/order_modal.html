@@ -1,0 +1,35 @@
+<div id="order-modal" class="modal-overlay">
+  <div class="modal-content">
+    <button id="modal-close" class="modal-close">&times;</button>
+    <h3 class="modal-title">{{ t.modal_title }}</h3>
+    <p id="modal-model-detail" class="modal-desc">-</p>
+
+    <div id="modal-alert" class="hidden" style="padding: 10px; margin-bottom: 15px; border-radius: var(--radius-sm); background: rgba(239, 68, 68, 0.2); color: var(--neon-red); font-size: 13px;"></div>
+
+    <form id="order-form">
+      {% csrf_token %}
+      <div class="form-group">
+        <label class="form-label" for="client-name">{{ t.name_label }}</label>
+        <input type="text" id="client-name" class="form-control" placeholder="Masalan: Sardor" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="phone-number">{{ t.phone_label }}</label>
+        <input type="tel" id="phone-number" class="form-control" placeholder="+998 90 919 76 00" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="service-type">{{ t.format_label }}</label>
+        <select id="service-type" class="form-control" style="background: #131a2a;">
+          <option value="in_service">{{ t.format_opt_1 }}</option>
+          <option value="call_master">{{ t.format_opt_2 }}</option>
+          <option value="courier">{{ t.format_opt_3 }}</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn-book" style="margin-top: 10px;">
+        {{ t.btn_submit }}
+      </button>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,21 @@
+<section class="container" style="padding-bottom: 60px;">
+  <div class="section-header">
+    <h2>{{ t.reviews_title|safe }}</h2>
+    <p>{{ t.reviews_sub }}</p>
+  </div>
+
+  <div class="reviews-grid">
+    {% for rev in reviews %}
+    <div class="review-card">
+      <div class="review-header">
+        <div>
+          <div class="review-author">{{ rev.client_name }}</div>
+          <div class="review-service">{{ rev.device_model }} • {{ rev.service_type }}</div>
+        </div>
+        <div class="review-stars">★★★★★</div>
+      </div>
+      <p class="review-text">"{{ rev.comment }}"</p>
+    </div>
+    {% endfor %}
+  </div>
+</section>

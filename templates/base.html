@@ -1,0 +1,38 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="{{ current_lang }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MobiPrice — {% if current_lang == 'ru' %}Цены на ремонт и запчасти смартфонов{% elif current_lang == 'en' %}Smart Phone Repair & Spare Parts Pricing{% else %}Smartfon Ehtiyot Qismlari va Servis Narxlari{% endif %}</title>
+  <meta name="description" content="{% if current_lang == 'ru' %}Узнайте точные цены на замену экранов, стекла и батарей для iPhone, Samsung, Xiaomi с гарантией.{% elif current_lang == 'en' %}Check exact repair and spare part prices for iPhone, Samsung, Xiaomi with full warranty.{% else %}Telefoningiz buzildimi? iPhone, Samsung, Xiaomi zapchast narxlarini bozorga bormasdan bilib oling.{% endif %}">
+
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <link rel="icon" type="image/jpeg" href="{% static 'img/logo.jpg' %}">
+</head>
+<body>
+
+  {% include 'components/navbar.html' %}
+
+  <main>
+    {% block content %}
+    {% endblock %}
+  </main>
+
+  {% include 'components/footer.html' %}
+  {% include 'components/order_modal.html' %}
+
+  <!-- Modular Scripts -->
+  <script src="{% static 'js/slider.js' %}"></script>
+  <script src="{% static 'js/calculator.js' %}"></script>
+  <script src="{% static 'js/search.js' %}"></script>
+  <script src="{% static 'js/modal.js' %}"></script>
+  <script src="{% static 'js/app.js' %}"></script>
+</body>
+</html>

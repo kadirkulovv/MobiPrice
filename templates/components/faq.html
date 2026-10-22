@@ -1,0 +1,26 @@
+<section class="container faq-section">
+  <div class="section-header">
+    <h2>{{ t.faq_title|safe }}</h2>
+    <p>{{ t.faq_sub }}</p>
+  </div>
+
+  <div class="faq-list">
+    {% for faq in faqs %}
+    <div class="faq-item {% if forloop.first %}open{% endif %}">
+      <div class="faq-question">
+        <span>
+          {% if current_lang == 'ru' %}{{ faq.question_ru|default:faq.question }}
+          {% elif current_lang == 'en' %}{{ faq.question_en|default:faq.question }}
+          {% else %}{{ faq.question }}{% endif %}
+        </span>
+        <span style="font-size: 20px;">▾</span>
+      </div>
+      <div class="faq-answer">
+        {% if current_lang == 'ru' %}{{ faq.answer_ru|default:faq.answer }}
+        {% elif current_lang == 'en' %}{{ faq.answer_en|default:faq.answer }}
+        {% else %}{{ faq.answer }}{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>

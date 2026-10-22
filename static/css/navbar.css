@@ -1,0 +1,188 @@
+/* Header & Navbar Module */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(8, 11, 17, 0.85);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-color);
+  padding: 14px 0;
+}
+
+.nav-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.brand-logo img {
+  height: 44px;
+  width: 44px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  box-shadow: 0 0 20px rgba(0, 242, 254, 0.3);
+}
+
+.brand-text {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #ffffff 40%, var(--neon-cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Compact Language Select */
+.lang-select-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  padding: 5px 10px;
+  transition: var(--transition);
+}
+
+.lang-select-box:hover, .lang-select-box:focus-within {
+  border-color: var(--neon-cyan);
+  background: rgba(0, 242, 254, 0.08);
+}
+
+.lang-globe {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.lang-dropdown {
+  background: transparent;
+  color: var(--text-main);
+  border: none;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+  padding-right: 2px;
+}
+
+.lang-dropdown option {
+  background: #0e131f;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Telegram Desktop Button */
+.btn-header-tg {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(36, 161, 222, 0.15);
+  color: #24a1de;
+  border: 1px solid rgba(36, 161, 222, 0.3);
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 13px;
+  transition: var(--transition);
+}
+
+.btn-header-tg:hover {
+  background: #24a1de;
+  color: #fff;
+  box-shadow: 0 0 15px rgba(36, 161, 222, 0.5);
+  transform: translateY(-2px);
+}
+
+/* Phone Desktop Button */
+.btn-header-call {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-blue));
+  color: #080b11;
+  border: none;
+  padding: 8px 18px;
+  border-radius: var(--radius-full);
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 13px;
+  transition: var(--transition);
+}
+
+.btn-header-call:hover {
+  box-shadow: 0 0 20px rgba(0, 242, 254, 0.5);
+  transform: translateY(-2px);
+}
+
+/* Mobile Icon Buttons */
+.mobile-only {
+  display: none !important;
+}
+
+.desktop-only {
+  display: inline-flex !important;
+}
+
+@media (max-width: 640px) {
+  .desktop-only {
+    display: none !important;
+  }
+
+  .mobile-only {
+    display: inline-flex !important;
+  }
+
+  .navbar {
+    padding: 10px 0;
+  }
+
+  .brand-logo img {
+    height: 36px;
+    width: 36px;
+  }
+
+  .brand-text {
+    font-size: 18px;
+  }
+
+  .nav-actions {
+    gap: 8px;
+  }
+
+  .btn-icon-nav {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: var(--transition);
+  }
+
+  .btn-icon-tg {
+    background: rgba(36, 161, 222, 0.15);
+    color: #24a1de;
+    border: 1px solid rgba(36, 161, 222, 0.3);
+  }
+
+  .btn-icon-call {
+    background: linear-gradient(135deg, var(--neon-cyan), var(--neon-blue));
+    color: #080b11;
+  }
+}

@@ -1,0 +1,25 @@
+{% load static %}
+<section class="container comparison-section">
+  <div class="section-header">
+    <div style="display: inline-block; background: rgba(0, 242, 254, 0.1); border: 1px solid rgba(0, 242, 254, 0.25); color: var(--neon-cyan); padding: 4px 14px; border-radius: 9999px; font-size: 12px; font-weight: 700; margin-bottom: 12px;">
+      {{ t.ba_badge }}
+    </div>
+    <h2>{{ t.ba_title|safe }}</h2>
+    <p>{{ t.ba_sub }}</p>
+  </div>
+
+  <div class="ba-slider-container">
+    <!-- After Image (Background) -->
+    <img src="{% static 'img/repair_after.jpg' %}" class="ba-image" alt="Tuzalgan iPhone 15 Pro Max">
+    <span class="ba-badge after">{{ t.ba_after_badge }}</span>
+
+    <!-- Before Image (Clipped Overlay) -->
+    <div class="ba-before">
+      <img src="{% static 'img/repair_before.png' %}" class="ba-before-img" alt="Singan iPhone 15 Pro Max">
+      <span class="ba-badge before">{{ t.ba_before_badge }}</span>
+    </div>
+
+    <!-- Drag Handle -->
+    <div class="ba-handle">⟷</div>
+  </div>
+</section>

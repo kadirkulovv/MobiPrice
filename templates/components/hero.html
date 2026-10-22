@@ -1,0 +1,28 @@
+<section class="hero">
+  <div class="container">
+    <div class="hero-badge">
+      <span>⚡️</span> {{ t.hero_badge }}
+    </div>
+    <h1>
+      {{ t.hero_title|safe }}
+    </h1>
+    <p>
+      {{ t.hero_desc }}
+    </p>
+
+    <!-- Live Search Bar -->
+    <div class="search-box-wrapper">
+      <div class="search-input-group">
+        <span class="search-icon">🔍</span>
+        <input 
+          type="text" 
+          id="search-model-input" 
+          class="search-input" 
+          placeholder="{{ t.search_placeholder }}"
+          autocomplete="off"
+        >
+      </div>
+      <div id="search-dropdown" class="search-dropdown"></div>
+    </div>
+  </div>
+</section>
