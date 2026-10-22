@@ -1,11 +1,15 @@
 import json
+import os
 import requests
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_GET
 from django.conf import settings
 from django.utils.translation import get_language
-from .models import Brand, DeviceModel, PartCategory, PartOption, RepairFAQ, Review, ServiceOrder
+from .models import (
+    Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison,
+    RepairFAQ, Review, ServiceOrder
+)
 
 
 UI_TRANSLATIONS = {
@@ -16,15 +20,21 @@ UI_TRANSLATIONS = {
         'search_placeholder': "Telefon modelingizni yozing (masalan: 16 Pro Max, S24 Ultra...)",
         'step_1_title': "Brend",
         'step_2_title': "Model",
-        'step_3_title': "Muammo",
-        'step_4_title': "Solishtirish",
+        'step_3_title': "Telefon",
+        'step_4_title': "Muammo",
+        'step_5_title': "Solishtirish",
         'step_1_head': "1-Qadam: Telefoningiz brendini tanlang",
-        'step_2_head': "2-Qadam: Modelni tanlang",
-        'step_2_sub': "Quyidagi modellardan birini bosing:",
-        'step_3_prompt': "Qurilmangizning qaysi qismi shikastlangan yoki almashtirish talab qilinadi?",
+        'step_2_head': "2-Qadam: Model seriyasini tanlang",
+        'step_2_sub': "Quyidagi seriyalardan birini tanlang:",
+        'step_3_head': "3-Qadam: Telefoningizni tanlang",
+        'step_3_sub': "Aniq modelingiz ustiga bosing:",
+        'step_4_head': "4-Qadam: Shikastlangan qismni tanlang",
+        'step_4_prompt': "Qurilmangizning qaysi qismi ta'mirlash yoki almashtirishni talab qiladi?",
+        'step_5_head': "5-Qadam: Narxlarni solishtirish",
         'back_step_1': "← Brendni o'zgartirish",
-        'back_step_2': "← Modelni o'zgartirish",
-        'back_step_3': "← Detalni o'zgartirish",
+        'back_step_2': "← Model seriyasini o'zgartirish",
+        'back_step_3': "← Telefonni o'zgartirish",
+        'back_step_4': "← Muammoni o'zgartirish",
         'compare_prompt': "Narxlarni solishtirish →",
         'choose_prompt': "Tanlash →",
         'ba_badge': "iPhone 15 Pro Max — White Titanium",
@@ -52,15 +62,21 @@ UI_TRANSLATIONS = {
         'search_placeholder': "Введите модель телефона (например: 16 Pro Max, S24 Ultra...)",
         'step_1_title': "Бренд",
         'step_2_title': "Модель",
-        'step_3_title': "Деталь",
-        'step_4_title': "Сравнение",
+        'step_3_title': "Телефон",
+        'step_4_title': "Деталь",
+        'step_5_title': "Сравнение",
         'step_1_head': "Шаг 1: Выберите бренд вашего телефона",
-        'step_2_head': "Шаг 2: Выберите модель",
-        'step_2_sub': "Выберите одну из моделей ниже:",
-        'step_3_prompt': "Какая часть вашего устройства повреждена или требует замены?",
+        'step_2_head': "Шаг 2: Выберите серию модели",
+        'step_2_sub': "Выберите нужную серию ниже:",
+        'step_3_head': "Шаг 3: Выберите телефон",
+        'step_3_sub': "Нажмите на точную модель телефона:",
+        'step_4_head': "Шаг 4: Выберите поврежденную деталь",
+        'step_4_prompt': "Какая часть вашего устройства требует замены?",
+        'step_5_head': "Шаг 5: Сравнение цен и качества",
         'back_step_1': "← Изменить бренд",
-        'back_step_2': "← Изменить модель",
-        'back_step_3': "← Изменить деталь",
+        'back_step_2': "← Изменить серию",
+        'back_step_3': "← Изменить телефон",
+        'back_step_4': "← Изменить деталь",
         'compare_prompt': "Сравнить цены →",
         'choose_prompt': "Выбрать →",
         'ba_badge': "iPhone 15 Pro Max — White Titanium",
@@ -88,15 +104,21 @@ UI_TRANSLATIONS = {
         'search_placeholder': "Type your phone model (e.g. 16 Pro Max, S24 Ultra...)",
         'step_1_title': "Brand",
         'step_2_title': "Model",
-        'step_3_title': "Issue",
-        'step_4_title': "Compare",
+        'step_3_title': "Phone",
+        'step_4_title': "Issue",
+        'step_5_title': "Compare",
         'step_1_head': "Step 1: Select your phone brand",
-        'step_2_head': "Step 2: Select your model",
-        'step_2_sub': "Select one of the models below:",
-        'step_3_prompt': "Which part of your device is damaged or needs replacement?",
+        'step_2_head': "Step 2: Select model series",
+        'step_2_sub': "Choose one of the model series below:",
+        'step_3_head': "Step 3: Select your phone",
+        'step_3_sub': "Click on your exact device:",
+        'step_4_head': "Step 4: Select damaged part",
+        'step_4_prompt': "Which part of your device needs repair or replacement?",
+        'step_5_head': "Step 5: Price & Quality Comparison",
         'back_step_1': "← Change brand",
-        'back_step_2': "← Change model",
-        'back_step_3': "← Change part",
+        'back_step_2': "← Change series",
+        'back_step_3': "← Change phone",
+        'back_step_4': "← Change issue",
         'compare_prompt': "Compare Prices →",
         'choose_prompt': "Select →",
         'ba_badge': "iPhone 15 Pro Max — White Titanium",
@@ -126,7 +148,6 @@ def index_view(request):
         current_lang = 'uz'
 
     brands = Brand.objects.filter(is_active=True).order_by('order', 'name')
-    categories = PartCategory.objects.all().order_by('order')
     faqs = RepairFAQ.objects.all().order_by('order')
     reviews = Review.objects.filter(is_verified=True).order_by('-created_at')[:6]
 
@@ -134,7 +155,6 @@ def index_view(request):
 
     context = {
         'brands': brands,
-        'categories': categories,
         'faqs': faqs,
         'reviews': reviews,
         'current_lang': current_lang,
@@ -143,103 +163,140 @@ def index_view(request):
     return render(request, 'index.html', context)
 
 
+# --- 5-Step Dynamic APIs ---
+
 @require_GET
-def api_models_by_brand(request, brand_id):
-    models_qs = DeviceModel.objects.filter(brand_id=brand_id).order_by('order', 'name')
+def api_series_by_brand(request, brand_id):
+    """Step 2: Model seriyalari (Pro seriya, S seriya, va h.k.)"""
+    series_qs = DeviceSeries.objects.filter(brand_id=brand_id).order_by('order', 'name')
     data = []
-    for m in models_qs:
-        image_url = m.image.url if m.image else f"/static/img/models/{m.slug.replace('-', '_')}.jpg"
+    for s in series_qs:
         data.append({
-            'id': m.id,
-            'name': m.name,
-            'slug': m.slug,
-            'model_code': m.model_code,
-            'release_year': m.release_year,
-            'is_popular': m.is_popular,
-            'image_url': image_url,
+            'id': s.id,
+            'name': s.name,
+            'slug': s.slug,
+            'brand_id': s.brand.id,
+            'brand_name': s.brand.name,
+            'brand_slug': s.brand.slug,
         })
-    return JsonResponse({'models': data})
+    return JsonResponse({'series': data})
 
 
 @require_GET
-def api_search_models(request):
-    query = request.GET.get('q', '').strip()
-    if not query:
-        return JsonResponse({'models': []})
-
-    models_qs = DeviceModel.objects.filter(name__icontains=query).select_related('brand').order_by('order')[:10]
+def api_phones_by_series(request, series_id):
+    """Step 3: Aniq telefon modellari (iPhone 16 Pro Max va h.k.)"""
+    phones_qs = DevicePhone.objects.filter(series_id=series_id).select_related('series', 'series__brand').order_by('order', 'name')
     data = []
-    for m in models_qs:
-        image_url = m.image.url if m.image else f"/static/img/models/{m.slug.replace('-', '_')}.jpg"
+    for p in phones_qs:
+        image_url = p.image.url if p.image else f"/static/img/models/{p.slug.replace('-', '_')}.jpg"
         data.append({
-            'id': m.id,
-            'name': m.name,
-            'brand_id': m.brand.id,
-            'brand_name': m.brand.name,
-            'slug': m.slug,
+            'id': p.id,
+            'name': p.name,
+            'slug': p.slug,
+            'release_year': p.release_year,
             'image_url': image_url,
+            'series_id': p.series.id,
+            'series_name': p.series.name,
+            'brand_name': p.series.brand.name,
         })
-    return JsonResponse({'models': data})
+    return JsonResponse({'phones': data})
 
 
 @require_GET
-def api_part_options(request):
-    model_id = request.GET.get('model_id')
-    category_id = request.GET.get('category_id')
+def api_issues_by_phone(request, phone_id):
+    """Step 4: Muammolar / Detallar (30 ta ikonka bilan)"""
+    lang = request.GET.get('lang') or get_language() or 'uz'
+    issues_qs = DeviceIssue.objects.filter(phone_id=phone_id).order_by('order', 'title')
+    data = []
+    for issue in issues_qs:
+        title = issue.title
+        if lang == 'ru' and issue.title_ru:
+            title = issue.title_ru
+        elif lang == 'en' and issue.title_en:
+            title = issue.title_en
 
-    if not model_id or not category_id:
-        return JsonResponse({'error': 'model_id and category_id are required'}, status=400)
+        icon_svg_url = f"/static/img/icons/{issue.icon_number}.svg" if issue.icon_number else "/static/img/brands/apple.svg"
 
-    lang = request.GET.get('lang') or request.COOKIES.get('django_language') or get_language() or 'uz'
-    options_qs = PartOption.objects.filter(
-        device_model_id=model_id,
-        category_id=category_id
-    ).order_by('-quality_type')
+        data.append({
+            'id': issue.id,
+            'title': title,
+            'icon_number': issue.icon_number,
+            'icon_svg_url': icon_svg_url,
+        })
+    return JsonResponse({'issues': data})
+
+
+@require_GET
+def api_comparisons_by_issue(request, issue_id):
+    """Step 5: Narxlar va solishtirish kartalari"""
+    lang = request.GET.get('lang') or get_language() or 'uz'
+    comp_qs = IssueComparison.objects.filter(issue_id=issue_id).order_by('-quality_type')
 
     data = []
-    for opt in options_qs:
-        title = opt.title
-        desc = opt.description
-        warranty = opt.warranty
+    for c in comp_qs:
+        title = c.title
+        desc = c.description
+        warranty = c.warranty
 
         if lang == 'ru':
-            title = opt.title_ru or opt.title
-            desc = opt.description_ru or opt.description
-            warranty = opt.warranty_ru or opt.warranty
+            title = c.title_ru or c.title
+            desc = c.description_ru or c.description
+            warranty = c.warranty_ru or c.warranty
         elif lang == 'en':
-            title = opt.title_en or opt.title
-            desc = opt.description_en or opt.description
-            warranty = opt.warranty_en or opt.warranty
+            title = c.title_en or c.title
+            desc = c.description_en or c.description
+            warranty = c.warranty_en or c.warranty
 
         data.append({
-            'id': opt.id,
-            'quality_type': opt.quality_type,
-            'quality_display': opt.get_quality_type_display(),
+            'id': c.id,
+            'quality_type': c.quality_type,
+            'quality_display': c.get_quality_type_display(),
             'title': title,
-            'part_price_uzs': int(opt.part_price_uzs),
-            'service_fee_uzs': int(opt.service_fee_uzs),
-            'total_price_uzs': int(opt.total_price_uzs),
-            'price_usd': int(opt.price_usd),
+            'part_price_uzs': int(c.part_price_uzs),
+            'service_fee_uzs': int(c.service_fee_uzs),
+            'total_price_uzs': int(c.total_price_uzs),
+            'price_usd': int(c.price_usd),
             'warranty': warranty,
-            'repair_time': opt.repair_time,
-            'badge': opt.badge,
+            'repair_time': c.repair_time,
+            'badge': c.badge,
             'description': desc,
-            'features': opt.features if isinstance(opt.features, list) else [],
-            'stock_status': opt.stock_status,
-            'stock_display': opt.get_stock_status_display(),
+            'features': c.features if isinstance(c.features, list) else [],
         })
-
     return JsonResponse({'options': data})
+
+
+@require_GET
+def api_search_phones(request):
+    """Jonli qidiruv (Telefon nomi bo'yicha)"""
+    query = request.GET.get('q', '').strip()
+    if not query:
+        return JsonResponse({'phones': []})
+
+    phones_qs = DevicePhone.objects.filter(name__icontains=query).select_related('series', 'series__brand').order_by('order')[:10]
+    data = []
+    for p in phones_qs:
+        image_url = p.image.url if p.image else f"/static/img/models/{p.slug.replace('-', '_')}.jpg"
+        data.append({
+            'id': p.id,
+            'name': p.name,
+            'series_id': p.series.id,
+            'series_name': p.series.name,
+            'brand_id': p.series.brand.id,
+            'brand_name': p.series.brand.name,
+            'image_url': image_url,
+        })
+    return JsonResponse({'phones': data})
 
 
 @require_POST
 def api_submit_order(request):
+    """Ariza qabul qilish va Telegram admin(lar)ga xabar yuborish"""
     try:
         data = json.loads(request.body)
         client_name = data.get('client_name', '').strip()
         phone_number = data.get('phone_number', '').strip()
-        model_id = data.get('model_id')
-        option_id = data.get('option_id')
+        phone_id = data.get('phone_id')
+        comparison_id = data.get('comparison_id') or data.get('option_id')
         service_type = data.get('service_type', 'in_service')
 
         if not client_name or not phone_number:
@@ -248,35 +305,44 @@ def api_submit_order(request):
         order = ServiceOrder.objects.create(
             client_name=client_name,
             phone_number=phone_number,
-            device_model_id=model_id if model_id else None,
-            part_option_id=option_id if option_id else None,
+            phone_id=phone_id if phone_id else None,
+            comparison_id=comparison_id if comparison_id else None,
             service_type=service_type,
         )
 
-        # Telegram notification if configured
-        if settings.TELEGRAM_BOT_TOKEN and settings.TELEGRAM_ADMIN_CHAT_ID:
+        # Telegram notification to all configured admins
+        bot_token = settings.TELEGRAM_BOT_TOKEN
+        admin_chat_ids_raw = getattr(settings, 'TELEGRAM_ADMIN_CHAT_ID', '') or ''
+        admin_ids = [i.strip() for i in str(admin_chat_ids_raw).split(',') if i.strip()]
+
+        if bot_token and admin_ids:
             try:
-                model_str = order.device_model.name if order.device_model else "Ko'rsatilmagan"
-                part_str = order.part_option.title if order.part_option else "Umumiy konsultatsiya"
-                price_str = f"{order.part_option.total_price_uzs:,} so'm" if order.part_option else "-"
-                
+                phone_str = order.phone.name if order.phone else "Ko'rsatilmagan"
+                part_str = order.comparison.title if order.comparison else "Umumiy konsultatsiya"
+                price_str = f"{order.comparison.total_price_uzs:,} so'm" if order.comparison else "-"
+
                 text = (
                     f"🚨 <b>YANGI BUYURTMA! #{order.order_id}</b>\n\n"
                     f"👤 <b>Mijoz:</b> {client_name}\n"
                     f"📞 <b>Telefon:</b> {phone_number}\n"
-                    f"📱 <b>Model:</b> {model_str}\n"
+                    f"📱 <b>Telefon:</b> {phone_str}\n"
                     f"🔧 <b>Xizmat:</b> {part_str}\n"
                     f"💵 <b>Narx:</b> {price_str}\n"
                     f"📍 <b>Format:</b> {order.get_service_type_display()}"
                 )
-                url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
-                requests.post(url, json={
-                    'chat_id': settings.TELEGRAM_ADMIN_CHAT_ID,
-                    'text': text,
-                    'parse_mode': 'HTML'
-                }, timeout=5)
-            except Exception as e:
-                pass  # Do not block client response if Telegram fails
+                url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+
+                for aid in admin_ids:
+                    try:
+                        requests.post(url, json={
+                            'chat_id': aid,
+                            'text': text,
+                            'parse_mode': 'HTML'
+                        }, timeout=4)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
         return JsonResponse({
             'success': True,

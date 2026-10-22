@@ -31,10 +31,12 @@ db.sqlite3
 db.sqlite3-journal
 media/
 staticfiles/
+static/img/*
 
 # Environment variables
 .env
 !.env.example
+PROJECT_ROADMAP.md
 
 # IDEs
 .idea/

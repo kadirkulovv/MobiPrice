@@ -1,0 +1,44 @@
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+
+
+def get_main_menu() -> ReplyKeyboardMarkup:
+    """Asosiy admin paneli menyusi (1-qatorda 3 ta, 2-qatorda 2 ta)"""
+    keyboard = [
+        [
+            KeyboardButton(text="🏷 Brendlar"),
+            KeyboardButton(text="📂 Modellar"),
+            KeyboardButton(text="📱 Telefonlar"),
+        ],
+        [
+            KeyboardButton(text="🔧 Muammolar"),
+            KeyboardButton(text="⚖️ Solishtirish (Narxlar)"),
+        ],
+        [
+            KeyboardButton(text="📊 Statistika"),
+            KeyboardButton(text="🔄 Yangilash"),
+        ]
+    ]
+    return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
+
+
+def get_section_crud_menu(section_title: str) -> ReplyKeyboardMarkup:
+    """Har bir bo'lim ichidagi CRUD amallari"""
+    keyboard = [
+        [
+            KeyboardButton(text=f"📋 {section_title} ro‘yxati"),
+            KeyboardButton(text=f"➕ Yangi {section_title} qo‘shish"),
+        ],
+        [
+            KeyboardButton(text=f"🗑 {section_title} o‘chirish"),
+            KeyboardButton(text="🔙 Asosiy menyu"),
+        ]
+    ]
+    return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
+
+
+def get_cancel_menu() -> ReplyKeyboardMarkup:
+    """Jarayonni bekor qilish tugmasi"""
+    keyboard = [
+        [KeyboardButton(text="❌ Bekor qilish")]
+    ]
+    return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)

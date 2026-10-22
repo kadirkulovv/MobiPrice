@@ -524,6 +524,87 @@
   to { transform: rotate(360deg); }
 }
 
+/* Series Cards (Step 2) */
+.series-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.series-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 20px 18px;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.series-card:hover, .series-card.selected {
+  border-color: var(--neon-cyan);
+  background: rgba(0, 242, 254, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 242, 254, 0.15);
+}
+
+.series-card-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.series-arrow {
+  color: var(--neon-cyan);
+  font-size: 16px;
+  transition: var(--transition);
+}
+
+.series-card:hover .series-arrow {
+  transform: translateX(4px);
+}
+
+/* Issue Card (Step 4) */
+.issue-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.issue-card:hover, .issue-card.selected {
+  border-color: var(--neon-cyan);
+  background: rgba(0, 242, 254, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 242, 254, 0.15);
+}
+
+.issue-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 242, 254, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 242, 254, 0.2);
+}
+
+.issue-card-icon img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
 @media (max-width: 640px) {
   .calc-card {
     padding: 24px 16px;

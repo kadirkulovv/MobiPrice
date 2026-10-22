@@ -26,7 +26,7 @@
     function openModal() {
       if (!modal) return;
       const state = window.mobiState || {};
-      const detailStr = `${state.modelName || 'Tanlangan model'} — ${state.optionTitle || state.categoryName || 'Xizmat'}`;
+      const detailStr = `${state.phoneName || state.modelName || 'Tanlangan model'} — ${state.comparisonTitle || state.optionTitle || state.issueTitle || 'Xizmat'}`;
       if (modalModelDetail) modalModelDetail.textContent = detailStr;
 
       if (modalAlert) {
@@ -83,8 +83,8 @@
             body: JSON.stringify({
               client_name: clientName,
               phone_number: phoneNumber,
-              model_id: state.modelId,
-              option_id: state.optionId,
+              phone_id: state.phoneId || state.modelId,
+              comparison_id: state.comparisonId || state.optionId,
               service_type: serviceType,
             }),
           });

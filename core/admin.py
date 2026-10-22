@@ -1,37 +1,45 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Brand, DeviceModel, PartCategory, PartOption, RepairFAQ, Review, ServiceOrder
+from .models import Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison, RepairFAQ, Review, ServiceOrder
 
 
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin):
-    list_display = ('name', 'order', 'is_active')
+    list_display = ('name', 'slug', 'order', 'is_active')
     prepopulated_fields = {'slug': ('name',)}
     list_editable = ('order', 'is_active')
     search_fields = ('name',)
 
 
-@admin.register(DeviceModel)
-class DeviceModelAdmin(admin.ModelAdmin):
-    list_display = ('name', 'brand', 'release_year', 'is_popular', 'order')
-    list_filter = ('brand', 'is_popular', 'release_year')
-    prepopulated_fields = {'slug': ('name',)}
-    list_editable = ('is_popular', 'order')
-    search_fields = ('name', 'model_code')
-
-
-@admin.register(PartCategory)
-class PartCategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'name_ru', 'code', 'order')
+@admin.register(DeviceSeries)
+class DeviceSeriesAdmin(admin.ModelAdmin):
+    list_display = ('name', 'brand', 'order')
+    list_filter = ('brand',)
+    search_fields = ('name', 'brand__name')
     list_editable = ('order',)
-    search_fields = ('name', 'name_ru', 'code')
 
 
-@admin.register(PartOption)
-class PartOptionAdmin(admin.ModelAdmin):
-    list_display = ('device_model', 'category', 'quality_type', 'total_price_display', 'warranty', 'stock_status')
-    list_filter = ('category', 'quality_type', 'stock_status', 'device_model__brand')
-    search_fields = ('device_model__name', 'title', 'description')
+@admin.register(DevicePhone)
+class DevicePhoneAdmin(admin.ModelAdmin):
+    list_display = ('name', 'series', 'release_year', 'order')
+    list_filter = ('series__brand', 'series')
+    search_fields = ('name', 'series__name')
+    list_editable = ('order',)
+
+
+@admin.register(DeviceIssue)
+class DeviceIssueAdmin(admin.ModelAdmin):
+    list_display = ('title', 'phone', 'icon_number', 'order')
+    list_filter = ('phone__series__brand', 'phone')
+    search_fields = ('title', 'phone__name')
+    list_editable = ('order',)
+
+
+@admin.register(IssueComparison)
+class IssueComparisonAdmin(admin.ModelAdmin):
+    list_display = ('title', 'issue', 'quality_type', 'total_price_display', 'warranty', 'repair_time')
+    list_filter = ('quality_type', 'issue__phone__series__brand')
+    search_fields = ('title', 'issue__title', 'issue__phone__name')
 
     def total_price_display(self, obj):
         return f"{obj.total_price_uzs:,} so'm (${obj.price_usd})"
@@ -40,8 +48,7 @@ class PartOptionAdmin(admin.ModelAdmin):
 
 @admin.register(RepairFAQ)
 class RepairFAQAdmin(admin.ModelAdmin):
-    list_display = ('question', 'category', 'order')
-    list_filter = ('category',)
+    list_display = ('question', 'order')
     search_fields = ('question', 'answer')
 
 
@@ -59,7 +66,7 @@ class ReviewAdmin(admin.ModelAdmin):
 
 @admin.register(ServiceOrder)
 class ServiceOrderAdmin(admin.ModelAdmin):
-    list_display = ('order_id', 'client_name', 'phone_number', 'device_model', 'status_badge', 'created_at')
+    list_display = ('order_id', 'client_name', 'phone_number', 'phone', 'status_badge', 'created_at')
     list_filter = ('status', 'service_type', 'created_at')
     search_fields = ('order_id', 'client_name', 'phone_number', 'notes')
     readonly_fields = ('order_id', 'created_at')

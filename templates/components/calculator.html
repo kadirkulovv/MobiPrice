@@ -1,7 +1,7 @@
 {% load static %}
 <section class="container" id="calculator">
   <div class="calc-card">
-    <!-- Steps Progress Bar -->
+    <!-- Steps Progress Bar (5 Steps) -->
     <div class="calc-steps-indicator">
       <div class="step-item active" data-step="1">
         <div class="step-num">1</div>
@@ -19,6 +19,10 @@
         <div class="step-num">4</div>
         <div class="step-title">{{ t.step_4_title }}</div>
       </div>
+      <div class="step-item" data-step="5">
+        <div class="step-num">5</div>
+        <div class="step-title">{{ t.step_5_title }}</div>
+      </div>
     </div>
 
     <!-- Step 1: Brands -->
@@ -30,12 +34,11 @@
         {% for b in brands %}
         <div class="brand-card" data-brand-id="{{ b.id }}" data-brand-name="{{ b.name }}" data-brand-slug="{{ b.slug }}">
           <div class="brand-logo-icon">
-            <img 
-              src="{% static 'img/brands/' %}{{ b.slug }}.svg" 
-              alt="{{ b.name }} logo" 
-              class="brand-real-logo brand-logo-{{ b.slug }}"
-              loading="lazy"
-            >
+            {% if b.logo %}
+              <img src="{{ b.logo.url }}" alt="{{ b.name }} logo" class="brand-real-logo brand-logo-{{ b.slug }}" loading="lazy">
+            {% else %}
+              <img src="{% static 'img/brands/' %}{{ b.slug }}.svg" alt="{{ b.name }} logo" class="brand-real-logo brand-logo-{{ b.slug }}" loading="lazy">
+            {% endif %}
           </div>
           <div class="brand-card-name">{{ b.name }}</div>
         </div>
@@ -43,75 +46,71 @@
       </div>
     </div>
 
-    <!-- Step 2: Models -->
-    <div id="step-2-models" class="step-content hidden">
+    <!-- Step 2: Series (Model) -->
+    <div id="step-2-series" class="step-content hidden">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
         <div>
-          <h2 style="font-size: 20px; font-weight: 800;">{{ t.step_2_head }}</h2>
+          <span style="font-size: 13px; color: var(--neon-cyan); font-weight: 700;">
+            {% if current_lang == 'ru' %}Выбранный бренд:{% elif current_lang == 'en' %}Selected brand:{% else %}Tanlangan brend:{% endif %}
+          </span>
+          <h2 id="selected-brand-label" style="font-size: 20px; font-weight: 800;">-</h2>
           <p style="font-size: 13px; color: var(--text-sub);">{{ t.step_2_sub }}</p>
         </div>
         <button id="back-to-step-1" class="back-btn">{{ t.back_step_1 }}</button>
       </div>
-      <div id="models-list" class="models-grid"></div>
+      <div id="series-list" class="series-grid models-grid"></div>
     </div>
 
-    <!-- Step 3: Parts / Problem -->
-    <div id="step-3-parts" class="step-content hidden">
+    <!-- Step 3: Phone -->
+    <div id="step-3-phones" class="step-content hidden">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
         <div>
-          <span style="font-size: 13px; color: var(--neon-cyan); font-weight: 700;">{% if current_lang == 'ru' %}Выбранная модель:{% elif current_lang == 'en' %}Selected model:{% else %}Tanlangan model:{% endif %}</span>
-          <h2 id="selected-model-label" style="font-size: 20px; font-weight: 800;">-</h2>
+          <span style="font-size: 13px; color: var(--neon-cyan); font-weight: 700;">
+            {% if current_lang == 'ru' %}Выбранная серия:{% elif current_lang == 'en' %}Selected series:{% else %}Tanlangan seriya:{% endif %}
+          </span>
+          <h2 id="selected-series-label" style="font-size: 20px; font-weight: 800;">-</h2>
+          <p style="font-size: 13px; color: var(--text-sub);">{{ t.step_3_sub }}</p>
         </div>
         <button id="back-to-step-2" class="back-btn">{{ t.back_step_2 }}</button>
       </div>
-
-      <p style="color: var(--text-sub); margin-bottom: 20px;">{{ t.step_3_prompt }}</p>
-
-      <div class="parts-grid">
-        {% for c in categories %}
-        <div class="part-card" data-category-id="{{ c.id }}" data-category-name="{% if current_lang == 'ru' %}{{ c.name_ru|default:c.name }}{% elif current_lang == 'en' %}{{ c.name_en|default:c.name }}{% else %}{{ c.name }}{% endif %}" data-category-code="{{ c.code }}">
-          <div class="part-card-icon">
-            {% if c.code == 'screen' %}
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 18h.01"/></svg>
-            {% elif c.code == 'back_glass' %}
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-            {% elif c.code == 'battery' %}
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="16" height="10" rx="2"/><line x1="22" y1="11" x2="22" y2="13"/></svg>
-            {% elif c.code == 'camera_glass' %}
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="4"/></svg>
-            {% else %}
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-            {% endif %}
-          </div>
-          <div>
-            <div class="part-card-title">
-              {% if current_lang == 'ru' %}{{ c.name_ru|default:c.name }}
-              {% elif current_lang == 'en' %}{{ c.name_en|default:c.name }}
-              {% else %}{{ c.name }}{% endif %}
-            </div>
-            <span style="font-size: 12px; color: var(--text-dim);">{{ t.compare_prompt }}</span>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
+      <div id="phones-list" class="phones-grid models-grid"></div>
     </div>
 
-    <!-- Step 4: Comparison Results -->
-    <div id="step-4-results" class="step-content hidden">
-      <div class="results-header">
+    <!-- Step 4: Issues (Muammo) -->
+    <div id="step-4-issues" class="step-content hidden">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
         <div>
-          <span style="font-size: 13px; color: var(--neon-cyan); font-weight: 700;">{% if current_lang == 'ru' %}Деталь:{% elif current_lang == 'en' %}Part:{% else %}Detal:{% endif %}</span>
-          <h2 id="selected-part-label" style="font-size: 22px; font-weight: 800;">-</h2>
-          <p style="color: var(--text-sub); font-size: 14px;">
-            {% if current_lang == 'ru' %}Ниже приведено сравнение оригинальных запчастей и качественных копий:
-            {% elif current_lang == 'en' %}Below is the side-by-side comparison of original and quality copy parts:
-            {% else %}Quyida ushbu detalning original va dublikat variantlari taqqoslangan:{% endif %}
-          </p>
+          <span style="font-size: 13px; color: var(--neon-cyan); font-weight: 700;">
+            {% if current_lang == 'ru' %}Выбранный телефон:{% elif current_lang == 'en' %}Selected phone:{% else %}Tanlangan telefon:{% endif %}
+          </span>
+          <h2 id="selected-phone-label" style="font-size: 20px; font-weight: 800;">-</h2>
         </div>
         <button id="back-to-step-3" class="back-btn">{{ t.back_step_3 }}</button>
       </div>
 
-      <div id="options-grid" class="options-comparison-grid"></div>
+      <p style="color: var(--text-sub); margin-bottom: 20px;">{{ t.step_4_prompt }}</p>
+
+      <div id="issues-list" class="issues-grid parts-grid"></div>
+    </div>
+
+    <!-- Step 5: Comparison Results (Solishtirish) -->
+    <div id="step-5-results" class="step-content hidden">
+      <div class="results-header">
+        <div>
+          <span style="font-size: 13px; color: var(--neon-cyan); font-weight: 700;">
+            {% if current_lang == 'ru' %}Деталь / Проблема:{% elif current_lang == 'en' %}Part / Issue:{% else %}Detal / Muammo:{% endif %}
+          </span>
+          <h2 id="selected-issue-label" style="font-size: 22px; font-weight: 800;">-</h2>
+          <p style="color: var(--text-sub); font-size: 14px;">
+            {% if current_lang == 'ru' %}Ниже приведено сравнение оригинальных запчастей и качественных копий:
+            {% elif current_lang == 'en' %}Below is the side-by-side comparison of original and quality copy parts:
+            {% else %}Quyida ushbu detalning original va sifatli nusxa variantlari taqqoslangan:{% endif %}
+          </p>
+        </div>
+        <button id="back-to-step-4" class="back-btn">{{ t.back_step_4 }}</button>
+      </div>
+
+      <div id="comparisons-grid" class="options-comparison-grid"></div>
     </div>
   </div>
 </section>
