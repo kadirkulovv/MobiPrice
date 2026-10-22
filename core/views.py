@@ -28,17 +28,18 @@ def index_view(request):
 @require_GET
 def api_models_by_brand(request, brand_id):
     models_qs = DeviceModel.objects.filter(brand_id=brand_id).order_by('order', 'name')
-    data = [
-        {
+    data = []
+    for m in models_qs:
+        image_url = m.image.url if m.image else f"/static/img/models/{m.slug.replace('-', '_')}.jpg"
+        data.append({
             'id': m.id,
             'name': m.name,
             'slug': m.slug,
             'model_code': m.model_code,
             'release_year': m.release_year,
             'is_popular': m.is_popular,
-        }
-        for m in models_qs
-    ]
+            'image_url': image_url,
+        })
     return JsonResponse({'models': data})
 
 
@@ -49,16 +50,17 @@ def api_search_models(request):
         return JsonResponse({'models': []})
 
     models_qs = DeviceModel.objects.filter(name__icontains=query).select_related('brand').order_by('order')[:10]
-    data = [
-        {
+    data = []
+    for m in models_qs:
+        image_url = m.image.url if m.image else f"/static/img/models/{m.slug.replace('-', '_')}.jpg"
+        data.append({
             'id': m.id,
             'name': m.name,
             'brand_id': m.brand.id,
             'brand_name': m.brand.name,
             'slug': m.slug,
-        }
-        for m in models_qs
-    ]
+            'image_url': image_url,
+        })
     return JsonResponse({'models': data})
 
 

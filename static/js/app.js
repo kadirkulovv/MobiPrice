@@ -72,8 +72,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const cardEl = document.createElement('div');
             cardEl.className = 'model-card';
             cardEl.innerHTML = `
-              <div class="model-card-name">${m.name}</div>
-              <div class="model-card-year">${m.release_year} yil</div>
+              <img src="${m.image_url}" alt="${m.name}" class="model-card-bg" onerror="this.src='/static/img/models/iphone_16_pro_max.jpg'">
+              <div class="model-card-overlay"></div>
+              <div class="model-card-brand-badge">${state.brandName}</div>
+              <div class="model-card-info">
+                <div class="model-card-name">${m.name}</div>
+                <div class="model-card-meta">
+                  <span class="model-card-year">${m.release_year} yil</span>
+                  <span class="model-card-cta">Tanlash →</span>
+                </div>
+              </div>
             `;
             cardEl.addEventListener('click', () => {
               state.modelId = m.id;
@@ -310,9 +318,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const baContainer = document.querySelector('.ba-slider-container');
   const baBefore = document.querySelector('.ba-before');
   const baHandle = document.querySelector('.ba-handle');
+  const baBeforeImg = document.querySelector('.ba-before-img');
 
-  if (baContainer && baBefore && baHandle) {
+  if (baContainer && baBefore && baHandle && baBeforeImg) {
     let isDragging = false;
+
+    function syncImageWidth() {
+      if (baContainer && baBeforeImg) {
+        baBeforeImg.style.width = `${baContainer.offsetWidth}px`;
+      }
+    }
+    syncImageWidth();
+    window.addEventListener('resize', syncImageWidth);
 
     function updateSlider(clientX) {
       const rect = baContainer.getBoundingClientRect();

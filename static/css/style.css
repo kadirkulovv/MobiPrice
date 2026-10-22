@@ -327,72 +327,144 @@ body {
 /* Brands Grid */
 .brands-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 15px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
 }
 
 .brand-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 20px 15px;
+  padding: 22px 16px;
   text-align: center;
   cursor: pointer;
   transition: var(--transition);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
 }
 
 .brand-card:hover, .brand-card.selected {
   border-color: var(--neon-cyan);
-  background: rgba(0, 242, 254, 0.06);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 242, 254, 0.15);
+  background: rgba(0, 242, 254, 0.08);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px rgba(0, 242, 254, 0.2);
 }
 
-.brand-card-icon {
-  font-size: 28px;
-  margin-bottom: 8px;
-  display: block;
+.brand-logo-icon {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  transition: var(--transition);
+}
+
+.brand-card:hover .brand-logo-icon {
+  transform: scale(1.08);
 }
 
 .brand-card-name {
   font-weight: 700;
   font-size: 15px;
+  color: var(--text-main);
 }
 
-/* Models Grid */
+/* Models Grid (Showroom Duo Phone Layout) */
 .models-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
 }
 
 .model-card {
+  position: relative;
+  height: 280px;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 16px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
   cursor: pointer;
   transition: var(--transition);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
 }
 
 .model-card:hover, .model-card.selected {
   border-color: var(--neon-cyan);
-  background: rgba(0, 242, 254, 0.08);
-  transform: translateY(-2px);
+  box-shadow: 0 12px 35px rgba(0, 242, 254, 0.25);
+  transform: translateY(-4px);
+}
+
+.model-card-bg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.model-card:hover .model-card-bg {
+  transform: scale(1.06);
+}
+
+.model-card-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(8, 11, 17, 0.1) 0%, rgba(8, 11, 17, 0.4) 50%, rgba(8, 11, 17, 0.95) 100%);
+  pointer-events: none;
+}
+
+.model-card-brand-badge {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--neon-cyan);
+  letter-spacing: 0.5px;
+  z-index: 2;
+}
+
+.model-card-info {
+  position: absolute;
+  bottom: 16px;
+  left: 18px;
+  right: 18px;
+  z-index: 2;
 }
 
 .model-card-name {
-  font-weight: 700;
-  font-size: 15px;
-  margin-bottom: 6px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 4px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+}
+
+.model-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .model-card-year {
+  font-size: 13px;
+  color: var(--neon-cyan);
+  font-weight: 600;
+}
+
+.model-card-cta {
   font-size: 12px;
-  color: var(--text-dim);
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 242, 254, 0.2);
+  padding: 3px 8px;
+  border-radius: 4px;
 }
 
 /* Parts Grid */
@@ -605,14 +677,14 @@ body {
 }
 
 .ba-slider-container {
-  max-width: 800px;
+  max-width: 460px;
+  height: 560px;
   margin: 0 auto;
   position: relative;
-  height: 420px;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 1px solid var(--border-color);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  border: 2px solid rgba(0, 242, 254, 0.3);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 242, 254, 0.15);
   user-select: none;
 }
 
@@ -623,6 +695,7 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
 }
 
 .ba-before {
@@ -633,39 +706,44 @@ body {
   left: 0;
   bottom: 0;
   z-index: 2;
-  border-right: 2px solid var(--neon-cyan);
+  border-right: 3px solid var(--neon-cyan);
 }
 
-.ba-before img {
+.ba-before-img {
   position: absolute;
   top: 0;
   left: 0;
   height: 100%;
-  width: 800px;
+  width: 100%;
   max-width: none;
   object-fit: cover;
+  object-position: center;
 }
 
 .ba-badge {
   position: absolute;
-  top: 20px;
+  top: 18px;
   padding: 6px 14px;
   border-radius: var(--radius-full);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 800;
   z-index: 3;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
 }
 
 .ba-badge.before {
-  left: 20px;
-  background: rgba(239, 68, 68, 0.85);
+  left: 18px;
+  background: rgba(239, 68, 68, 0.9);
   color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .ba-badge.after {
-  right: 20px;
-  background: rgba(16, 185, 129, 0.85);
+  right: 18px;
+  background: rgba(16, 185, 129, 0.9);
   color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .ba-handle {
