@@ -1,6 +1,127 @@
-document.addEventListener('DOMContentLoaded', () => {
+  // Translations Dictionary
+  const translations = {
+    uz: {
+      heroBadge: "⚡️ Shaffof narxlar & 100% Kafolat",
+      heroTitle: "Telefoningiz buzildimi? <br>Bozorga bormasdan <span>aniq narxini</span> 10 soniyada bilib oling!",
+      heroDesc: "Bozor kezib sarson bo‘lmang. iPhone, Samsung, Xiaomi original va sifatli dublikat ehtiyot qismlari narxlari, usta haqqi va kafolati bilan tanishing.",
+      searchPlaceholder: "Telefon modelingizni yozing (masalan: 16 Pro Max, S24 Ultra...)",
+      step1Title: "Brend",
+      step2Title: "Model",
+      step3Title: "Muammo",
+      step4Title: "Solishtirish",
+      step1Head: "1-Qadam: Telefoningiz brendini tanlang",
+      step2Head: "2-Qadam: Modelni tanlang",
+      step2Sub: "Quyidagi modellardan birini bosing:",
+      backStep1: "← Brendni o'zgartirish",
+      backStep2: "← Modelni o'zgartirish",
+      backStep3: "← Detalni o'zgartirish",
+      step3Prompt: "Qurilmangizning qaysi qismi shikastlangan yoki almashtirish talab qilinadi?",
+      selectedModelTxt: "Tanlangan model:",
+      selectedPartTxt: "Detal:",
+      compareIntro: "Quyida ushbu detalning original va dublikat variantlari taqqoslangan:",
+      baTitle: "Bizning ishlarimiz: <span>Oldin va Keyin</span>",
+      baSubtitle: "Orqa oynasi singan iPhone 15 Pro Max'ni ochmasdan lazer texnologiyasi bilan 100% tiklash jarayoni",
+      baBeforeBadge: "Oldin: Singan holati",
+      baAfterBadge: "Keyin: 100% Zavod holati",
+      faqTitle: "Ekspert maslahati: <span>Eng ko'p beriladigan savollar</span>",
+      faqSubtitle: "Nega batareya shishadi? Nega original qimmat? Ustalarimiz ochiq tushuntirish beradi.",
+      reviewsTitle: "Mijozlarimiz <span>fikrlari</span>",
+      reviewsSubtitle: "Shaffof narxlar va tezkor servisimizdan foydalangan mijozlar sharhlari",
+      btnBookText: "Buyurtma berish / Usta band qilish",
+      modalTitle: "Buyurtmani tasdiqlash",
+      nameLabel: "Ismingiz *",
+      phoneLabel: "Telefon raqamingiz *",
+      formatLabel: "Xizmat formati",
+      formatOpt1: "Servis markaziga boraman (30 daqiqada)",
+      formatOpt2: "Usta chaqirish (Manzilga usta boradi)",
+      formatOpt3: "Kuryer orqali yuborish (Bepul olib ketish)",
+      modalSubmit: "Tasdiqlash va Yuborish",
+      comparePrompt: "Narxlarni solishtirish →",
+      choosePrompt: "Tanlash →",
+    },
+    ru: {
+      heroBadge: "⚡️ Прозрачные цены и 100% Гарантия",
+      heroTitle: "Сломался телефон? <br>Узнайте <span>точную цену</span> ремонта за 10 секунд без поездки на базар!",
+      heroDesc: "Не тратьте время на поездки на рынок. Узнайте цены на оригинальные запчасти и качественные копии для iPhone, Samsung, Xiaomi с гарантией.",
+      searchPlaceholder: "Введите модель телефона (например: 16 Pro Max, S24 Ultra...)",
+      step1Title: "Бренд",
+      step2Title: "Модель",
+      step3Title: "Деталь",
+      step4Title: "Сравнение",
+      step1Head: "Шаг 1: Выберите бренд вашего телефона",
+      step2Head: "Шаг 2: Выберите модель",
+      step2Sub: "Нажмите на нужную модель ниже:",
+      backStep1: "← Изменить бренд",
+      backStep2: "← Изменить модель",
+      backStep3: "← Изменить деталь",
+      step3Prompt: "Какая часть вашего устройства повреждена или требует замены?",
+      selectedModelTxt: "Выбранная модель:",
+      selectedPartTxt: "Деталь:",
+      compareIntro: "Ниже приведено сравнение оригинальных деталей и качественных копий:",
+      baTitle: "Наши работы: <span>До и После</span>",
+      baSubtitle: "Лазерная замена разбитого заднего стекла iPhone 15 Pro Max без разборки корпуса",
+      baBeforeBadge: "До: Разбитое стекло",
+      baAfterBadge: "После: 100% Заводской вид",
+      faqTitle: "Советы экспертов: <span>Частые вопросы</span>",
+      faqSubtitle: "Почему вздувается батарея? Почему оригинал дороже? Мастера дают открытый ответ.",
+      reviewsTitle: "Отзывы <span>наших клиентов</span>",
+      reviewsSubtitle: "Отзывы клиентов, выбравших прозрачные цены и быстрый ремонт",
+      btnBookText: "Записаться на ремонт / Заказать",
+      modalTitle: "Подтверждение заявки",
+      nameLabel: "Ваше имя *",
+      phoneLabel: "Номер телефона *",
+      formatLabel: "Формат услуги",
+      formatOpt1: "Приеду в сервис (ремонт за 30 минут)",
+      formatOpt2: "Вызов мастера (мастер приедет по адресу)",
+      formatOpt3: "Курьерская доставка (заберем бесплатно)",
+      modalSubmit: "Подтвердить и отправить",
+      comparePrompt: "Сравнить цены →",
+      choosePrompt: "Выбрать →",
+    },
+    en: {
+      heroBadge: "⚡️ Transparent Pricing & 100% Warranty",
+      heroTitle: "Broken phone? <br>Find out the <span>exact price</span> in 10 seconds without going to the market!",
+      heroDesc: "Don't waste time visiting markets. Check original and high-quality replacement parts pricing for iPhone, Samsung, Xiaomi with full warranty.",
+      searchPlaceholder: "Type your phone model (e.g. 16 Pro Max, S24 Ultra...)",
+      step1Title: "Brand",
+      step2Title: "Model",
+      step3Title: "Issue",
+      step4Title: "Compare",
+      step1Head: "Step 1: Select your phone brand",
+      step2Head: "Step 2: Select your model",
+      step2Sub: "Click on one of the models below:",
+      backStep1: "← Change brand",
+      backStep2: "← Change model",
+      backStep3: "← Change part",
+      step3Prompt: "Which part of your device is damaged or needs replacement?",
+      selectedModelTxt: "Selected model:",
+      selectedPartTxt: "Part:",
+      compareIntro: "Below is a side-by-side comparison of genuine and high-grade duplicate parts:",
+      baTitle: "Our Work: <span>Before & After</span>",
+      baSubtitle: "Laser rear glass restoration on iPhone 15 Pro Max without disassembling the device",
+      baBeforeBadge: "Before: Shattered glass",
+      baAfterBadge: "After: 100% Factory pristine",
+      faqTitle: "Expert Advice: <span>Frequently Asked Questions</span>",
+      faqSubtitle: "Why do batteries swell? Why are genuine screens costly? Our technicians explain.",
+      reviewsTitle: "Customer <span>Reviews</span>",
+      reviewsSubtitle: "Verified customer feedback about our transparent pricing and rapid service",
+      btnBookText: "Book Repair / Reserve Part",
+      modalTitle: "Confirm Request",
+      nameLabel: "Your Name *",
+      phoneLabel: "Phone Number *",
+      formatLabel: "Service Format",
+      formatOpt1: "Visit service center (ready in 30 mins)",
+      formatOpt2: "Call a technician (on-site repair)",
+      formatOpt3: "Free courier pickup and return",
+      modalSubmit: "Confirm and Send",
+      comparePrompt: "Compare Prices →",
+      choosePrompt: "Select →",
+    }
+  };
+
   // State
   const state = {
+    currentLang: localStorage.getItem('mobiprice_lang') || 'uz',
     brandId: null,
     brandName: '',
     modelId: null,
@@ -12,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // DOM Elements
+  const langSelect = document.getElementById('lang-select');
   const stepItems = document.querySelectorAll('.step-item');
   const stepContainers = {
     1: document.getElementById('step-1-brands'),
@@ -24,6 +146,135 @@ document.addEventListener('DOMContentLoaded', () => {
   const optionsGrid = document.getElementById('options-grid');
   const selectedModelLabel = document.getElementById('selected-model-label');
   const selectedPartLabel = document.getElementById('selected-part-label');
+
+  // Apply Language function
+  function applyLanguage(lang) {
+    state.currentLang = lang;
+    localStorage.setItem('mobiprice_lang', lang);
+    if (langSelect) langSelect.value = lang;
+
+    const t = translations[lang] || translations.uz;
+
+    // Hero
+    const heroBadge = document.querySelector('.hero-badge');
+    if (heroBadge) heroBadge.innerHTML = `<span>⚡️</span> ${t.heroBadge.replace('⚡️ ', '')}`;
+    const heroTitle = document.querySelector('.hero h1');
+    if (heroTitle) heroTitle.innerHTML = t.heroTitle;
+    const heroDesc = document.querySelector('.hero p');
+    if (heroDesc) heroDesc.textContent = t.heroDesc;
+    const searchInput = document.getElementById('search-model-input');
+    if (searchInput) searchInput.placeholder = t.searchPlaceholder;
+
+    // Steps
+    const stepTitles = [t.step1Title, t.step2Title, t.step3Title, t.step4Title];
+    stepItems.forEach((item, idx) => {
+      const titleEl = item.querySelector('.step-title');
+      if (titleEl && stepTitles[idx]) titleEl.textContent = stepTitles[idx];
+    });
+
+    // Step Headings
+    const s1Head = document.querySelector('#step-1-brands h2');
+    if (s1Head) s1Head.textContent = t.step1Head;
+    const s2Head = document.querySelector('#step-2-models h2');
+    if (s2Head) s2Head.textContent = t.step2Head;
+    const s2Sub = document.querySelector('#step-2-models p');
+    if (s2Sub) s2Sub.textContent = t.step2Sub;
+    const s3Prompt = document.querySelector('#step-3-parts p');
+    if (s3Prompt) s3Prompt.textContent = t.step3Prompt;
+
+    // Back buttons
+    const b1 = document.getElementById('back-to-step-1');
+    if (b1) b1.textContent = t.backStep1;
+    const b2 = document.getElementById('back-to-step-2');
+    if (b2) b2.textContent = t.backStep2;
+    const b3 = document.getElementById('back-to-step-3');
+    if (b3) b3.textContent = t.backStep3;
+
+    // Before / After
+    const baTitle = document.querySelector('.comparison-section .section-header h2');
+    if (baTitle) baTitle.innerHTML = t.baTitle;
+    const baSub = document.querySelector('.comparison-section .section-header p');
+    if (baSub) baSub.textContent = t.baSubtitle;
+    const baBeforeB = document.querySelector('.ba-badge.before');
+    if (baBeforeB) baBeforeB.textContent = t.baBeforeBadge;
+    const baAfterB = document.querySelector('.ba-badge.after');
+    if (baAfterB) baAfterB.textContent = t.baAfterBadge;
+
+    // Categories translation
+    const catTitles = {
+      uz: { screen: "Ekran (Displey)", back_glass: "Orqa shisha (Krishka)", battery: "Batareya (Akkumulyator)", camera_glass: "Kamera oynasi" },
+      ru: { screen: "Экран (Дисплей)", back_glass: "Заднее стекло (Крышка)", battery: "Аккумулятор (Батарея)", camera_glass: "Стекло камеры" },
+      en: { screen: "Screen (Display)", back_glass: "Back Glass (Cover)", battery: "Battery Replacement", camera_glass: "Camera Glass" }
+    };
+    document.querySelectorAll('.part-card').forEach(card => {
+      const code = card.dataset.categoryCode;
+      const titleEl = card.querySelector('.part-card-title');
+      const promptEl = card.querySelector('.part-card span');
+      if (titleEl && catTitles[lang] && catTitles[lang][code]) {
+        titleEl.textContent = catTitles[lang][code];
+      }
+      if (promptEl) promptEl.textContent = t.comparePrompt;
+    });
+
+    // Modal translation
+    const modalTitleEl = document.querySelector('.modal-title');
+    if (modalTitleEl) modalTitleEl.textContent = t.modalTitle;
+    const nameLbl = document.querySelector('label[for="client-name"]');
+    if (nameLbl) nameLbl.textContent = t.nameLabel;
+    const phoneLbl = document.querySelector('label[for="phone-number"]');
+    if (phoneLbl) phoneLbl.textContent = t.phoneLabel;
+    const formatLbl = document.querySelector('label[for="service-type"]');
+    if (formatLbl) formatLbl.textContent = t.formatLabel;
+    const sType = document.getElementById('service-type');
+    if (sType && sType.options.length >= 3) {
+      sType.options[0].text = t.formatOpt1;
+      sType.options[1].text = t.formatOpt2;
+      sType.options[2].text = t.formatOpt3;
+    }
+    const modalSubBtn = document.querySelector('#order-form button[type="submit"]');
+    if (modalSubBtn) modalSubBtn.textContent = t.modalSubmit;
+
+    // FAQ dynamic translation
+    document.querySelectorAll('.faq-q-text').forEach(el => {
+      if (el.dataset[lang]) el.textContent = el.dataset[lang];
+    });
+    document.querySelectorAll('.faq-a-text').forEach(el => {
+      if (el.dataset[lang]) el.textContent = el.dataset[lang];
+    });
+
+    // FAQ & Reviews headings
+    const faqTitle = document.querySelector('.faq-section .section-header h2');
+    if (faqTitle) faqTitle.innerHTML = t.faqTitle;
+    const faqSub = document.querySelector('.faq-section .section-header p');
+    if (faqSub) faqSub.textContent = t.faqSubtitle;
+    const revTitle = document.querySelectorAll('.section-header h2')[2];
+    if (revTitle) revTitle.innerHTML = t.reviewsTitle;
+    const revSub = document.querySelectorAll('.section-header p')[2];
+    if (revSub) revSub.textContent = t.reviewsSubtitle;
+
+    // Send async to Django set_language in background
+    try {
+      const formData = new FormData();
+      formData.append('language', lang);
+      fetch('/i18n/setlang/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        body: formData,
+      });
+    } catch (e) {}
+
+    // If options are already loaded in Step 4, reload them in new language
+    if (state.modelId && state.categoryId && !stepContainers[4].classList.contains('hidden')) {
+      loadPartOptions();
+    }
+  }
+
+  // Language dropdown change
+  if (langSelect) {
+    langSelect.addEventListener('change', (e) => {
+      applyLanguage(e.target.value);
+    });
+  }
 
   // Set Step
   function setStep(stepNum) {
@@ -105,9 +356,84 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('back-to-step-2')?.addEventListener('click', () => setStep(2));
   document.getElementById('back-to-step-3')?.addEventListener('click', () => setStep(3));
 
+  // Part options loader
+  async function loadPartOptions() {
+    if (!state.modelId || !state.categoryId) return;
+    const t = translations[state.currentLang] || translations.uz;
+    optionsGrid.innerHTML = '<div style="color: var(--text-dim); padding: 30px; text-align: center;">...</div>';
+
+    try {
+      const res = await fetch(`/api/parts/options/?model_id=${state.modelId}&category_id=${state.categoryId}&lang=${state.currentLang}`);
+      const data = await res.json();
+
+      if (data.options && data.options.length > 0) {
+        optionsGrid.innerHTML = '';
+        data.options.forEach((opt) => {
+          const isOriginal = opt.quality_type.includes('original');
+          const cardEl = document.createElement('div');
+          cardEl.className = `option-card ${isOriginal ? 'featured' : ''}`;
+
+          let badgeHtml = '';
+          if (opt.badge) {
+            const badgeClass = isOriginal ? 'badge-original' : (opt.badge.includes('Optimal') ? 'badge-optimal' : 'badge-budget');
+            badgeHtml = `<span class="option-badge ${badgeClass}">${opt.badge}</span>`;
+          }
+
+          const featuresList = opt.features.map(f => `<li>${f}</li>`).join('');
+
+          cardEl.innerHTML = `
+            ${badgeHtml}
+            <div>
+              <h3 class="option-title">${opt.title}</h3>
+              <div class="option-meta">
+                <span class="option-meta-item">⏱ ${opt.repair_time}</span>
+                <span class="option-meta-item">🛡 ${opt.warranty}</span>
+              </div>
+              <div class="option-price-box">
+                <div class="option-price-main">${opt.total_price_uzs.toLocaleString()} so'm</div>
+                <div class="option-price-sub">${opt.part_price_uzs.toLocaleString()} + ${opt.service_fee_uzs.toLocaleString()} ($${opt.price_usd})</div>
+              </div>
+              <p class="option-desc">${opt.description}</p>
+              <ul class="option-features">${featuresList}</ul>
+            </div>
+            <button class="btn-book" data-opt-id="${opt.id}" data-opt-title="${opt.title}">
+              ${t.btnBookText}
+            </button>
+          `;
+          optionsGrid.appendChild(cardEl);
+        });
+
+        // Bind book buttons
+        optionsGrid.querySelectorAll('.btn-book').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            state.optionId = btn.dataset.optId;
+            state.optionTitle = btn.dataset.optTitle;
+            openModal();
+          });
+        });
+      } else {
+        const emptyMsg = state.currentLang === 'ru' 
+          ? 'Цены для этой модели скоро будут добавлены.<br>Свяжитесь с мастером для точной стоимости.' 
+          : (state.currentLang === 'en' 
+            ? 'Prices for this model will be added soon.<br>Consult our master for exact details.' 
+            : 'Ushbu model uchun narxlar tez kunda kiritiladi.<br>Aniq narxni bilish uchun ustadan konsultatsiya oling.');
+        optionsGrid.innerHTML = `
+          <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-sub);">
+            ${emptyMsg}
+            <br><br>
+            <button class="btn-book" style="max-width: 250px; margin: 0 auto;" id="btn-empty-consult">${t.btnBookText}</button>
+          </div>
+        `;
+        document.getElementById('btn-empty-consult')?.addEventListener('click', openModal);
+      }
+    } catch (err) {
+      optionsGrid.innerHTML = '<div style="color: var(--neon-red); text-align: center;">Xatolik yuz berdi. Qayta urinib ko‘ring.</div>';
+    }
+  }
+
   // Step 3: Part Selection
   document.querySelectorAll('.part-card').forEach((card) => {
-    card.addEventListener('click', async () => {
+    card.addEventListener('click', () => {
       state.categoryId = card.dataset.categoryId;
       state.categoryName = card.dataset.categoryName;
       selectedPartLabel.textContent = state.categoryName;
@@ -115,74 +441,13 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('.part-card').forEach((c) => c.classList.remove('selected'));
       card.classList.add('selected');
 
-      optionsGrid.innerHTML = '<div style="color: var(--text-dim); padding: 30px; text-align: center;">Narxlar hisoblanmoqda...</div>';
       setStep(4);
-
-      try {
-        const res = await fetch(`/api/parts/options/?model_id=${state.modelId}&category_id=${state.categoryId}`);
-        const data = await res.json();
-
-        if (data.options && data.options.length > 0) {
-          optionsGrid.innerHTML = '';
-          data.options.forEach((opt, idx) => {
-            const isOriginal = opt.quality_type.includes('original');
-            const cardEl = document.createElement('div');
-            cardEl.className = `option-card ${isOriginal ? 'featured' : ''}`;
-
-            let badgeHtml = '';
-            if (opt.badge) {
-              const badgeClass = isOriginal ? 'badge-original' : (opt.badge.includes('Optimal') ? 'badge-optimal' : 'badge-budget');
-              badgeHtml = `<span class="option-badge ${badgeClass}">${opt.badge}</span>`;
-            }
-
-            const featuresList = opt.features.map(f => `<li>${f}</li>`).join('');
-
-            cardEl.innerHTML = `
-              ${badgeHtml}
-              <div>
-                <h3 class="option-title">${opt.title}</h3>
-                <div class="option-meta">
-                  <span class="option-meta-item">⏱ ${opt.repair_time}</span>
-                  <span class="option-meta-item">🛡 ${opt.warranty}</span>
-                </div>
-                <div class="option-price-box">
-                  <div class="option-price-main">${opt.total_price_uzs.toLocaleString()} so'm</div>
-                  <div class="option-price-sub">Zapchast: ${opt.part_price_uzs.toLocaleString()} + Usta: ${opt.service_fee_uzs.toLocaleString()} ($${opt.price_usd})</div>
-                </div>
-                <p class="option-desc">${opt.description}</p>
-                <ul class="option-features">${featuresList}</ul>
-              </div>
-              <button class="btn-book" data-opt-id="${opt.id}" data-opt-title="${opt.title}">
-                Buyurtma berish / Usta band qilish
-              </button>
-            `;
-            optionsGrid.appendChild(cardEl);
-          });
-
-          // Bind book buttons
-          optionsGrid.querySelectorAll('.btn-book').forEach((btn) => {
-            btn.addEventListener('click', () => {
-              state.optionId = btn.dataset.optId;
-              state.optionTitle = btn.dataset.optTitle;
-              openModal();
-            });
-          });
-        } else {
-          optionsGrid.innerHTML = `
-            <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-sub);">
-              Ushbu model uchun narxlar tez kunda kiritiladi. <br>
-              Aniq narxni bilish uchun ustadan konsultatsiya oling.
-              <br><br>
-              <button class="btn-book" style="max-width: 250px; margin: 0 auto;" id="btn-empty-consult">Ustadan maslahat olish</button>
-            </div>
-          `;
-          document.getElementById('btn-empty-consult')?.addEventListener('click', openModal);
-        }
-      } catch (err) {
-        optionsGrid.innerHTML = '<div style="color: var(--neon-red); text-align: center;">Narxlarni yuklashda xatolik yuz berdi.</div>';
-      }
+      loadPartOptions();
     });
   });
+
+  // Initialize Language on Page Load
+  applyLanguage(state.currentLang);
 
   // Live Search
   const searchInput = document.getElementById('search-model-input');

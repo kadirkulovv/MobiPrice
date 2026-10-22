@@ -72,7 +72,7 @@ def api_part_options(request):
     if not model_id or not category_id:
         return JsonResponse({'error': 'model_id and category_id are required'}, status=400)
 
-    lang = get_language() or 'uz'
+    lang = request.GET.get('lang') or request.COOKIES.get('django_language') or get_language() or 'uz'
     options_qs = PartOption.objects.filter(
         device_model_id=model_id,
         category_id=category_id
