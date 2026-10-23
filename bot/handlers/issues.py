@@ -7,6 +7,7 @@ from bot.keyboards.common import build_3_row_reply_kb, build_3_row_inline_kb
 from bot.states.admin_states import IssueAddStates
 from bot.database import Brand, DeviceSeries, DevicePhone, DeviceIssue, sync_to_async
 from bot.config import CHEATSHEET_IMG, ICONS_DIR
+from bot.utils.translator import auto_translate_issue_title
 
 router = Router()
 
@@ -151,27 +152,39 @@ async def process_issue_title(message: Message, state: FSMContext):
         await message.answer("Nom juda qisqa. Qaytadan kiriting:")
         return
 
-    await state.update_data(issue_title=title)
+    # Automatically translate to Russian and English in background
+    title_ru, title_en = await auto_translate_issue_title(title)
+
+    await state.update_data(
+        issue_title=title,
+        issue_title_ru=title_ru,
+        issue_title_en=title_en,
+    )
     await state.set_state(IssueAddStates.waiting_for_icon)
 
     # Send 30-icon cheatsheet image to the admin!
+    caption = (
+        f"📸 <b>30 ta tayyor ikonka katalogi</b>\n\n"
+        f"🇺🇿 Detal nomi (UZ): <b>{title}</b>\n"
+        f"🇷🇺 Ruscha (RU): <i>{title_ru}</i>\n"
+        f"🇬🇧 Inglizcha (EN): <i>{title_en}</i>\n\n"
+        f"5️⃣ Ushbu detal uchun rasmda ko‘rsatilgan mos ikonka raqamini yuboring:\n"
+        f"<b>(1 dan 30 gacha raqam yozing)</b>"
+    )
+
     if os.path.exists(CHEATSHEET_IMG):
         photo = FSInputFile(CHEATSHEET_IMG)
         await message.answer_photo(
             photo=photo,
-            caption=(
-                f"📸 <b>30 ta tayyor ikonka katalogi</b>\n\n"
-                f"Tanlangan detal: <b>{title}</b>\n\n"
-                f"5️⃣ Ushbu detal uchun rasmda ko‘rsatilgan mos ikonka raqamini yuboring:\n"
-                f"<b>(1 dan 30 gacha raqam yozing)</b>"
-            ),
+            caption=caption,
             reply_markup=get_cancel_menu(),
             parse_mode="HTML"
         )
     else:
         await message.answer(
-            f"5️⃣ Detal uchun 1 dan 30 gacha bo‘lgan ikonka raqamini kiriting:",
-            reply_markup=get_cancel_menu()
+            caption,
+            reply_markup=get_cancel_menu(),
+            parse_mode="HTML"
         )
 
 
@@ -187,6 +200,8 @@ async def process_issue_icon(message: Message, state: FSMContext):
     phone_id = data.get('phone_id')
     phone_name = data.get('phone_name')
     issue_title = data.get('issue_title')
+    issue_title_ru = data.get('issue_title_ru', '')
+    issue_title_en = data.get('issue_title_en', '')
 
     # Read SVG code from bot/assets/icons/{icon_num}.svg if present
     icon_svg_path = ICONS_DIR / f"{icon_num}.svg"
@@ -198,6 +213,8 @@ async def process_issue_icon(message: Message, state: FSMContext):
     issue = await sync_to_async(DeviceIssue.objects.create)(
         phone_id=phone_id,
         title=issue_title,
+        title_ru=issue_title_ru,
+        title_en=issue_title_en,
         icon_number=icon_num,
         icon_svg=svg_code
     )
@@ -206,8 +223,10 @@ async def process_issue_icon(message: Message, state: FSMContext):
     await message.answer(
         f"🎉 <b>Yangi muammo / detal muvaffaqiyatli saqlandi!</b>\n\n"
         f"📱 Telefon: <b>{phone_name}</b>\n"
-        f"🔧 Muammo: <b>{issue.title}</b>\n"
-        f"🔢 Ikonka raqami: <b>#{icon_num}</b>",
+        f"🇺🇿 O‘zbekcha (UZ): <b>{issue.title}</b>\n"
+        f"🇷🇺 Ruscha (RU): <i>{issue.title_ru}</i>\n"
+        f"🇬🇧 Inglizcha (EN): <i>{issue.title_en}</i>\n"
+        f"🔢 Ikonka: <b>#{icon_num}</b>",
         reply_markup=get_section_crud_menu("Muammo"),
         parse_mode="HTML"
     )

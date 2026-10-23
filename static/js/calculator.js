@@ -383,43 +383,19 @@
           const cardClass = isOriginal ? 'option-card card-original-highlight' : 'option-card';
           const badgeClass = isOriginal ? 'option-badge badge-orig' : 'option-badge';
 
-          const featuresHtml = (opt.features && opt.features.length)
-            ? `<ul class="option-features-list">
-                ${opt.features.map(f => `<li><span class="feat-check">✓</span> ${f}</li>`).join('')}
-              </ul>`
-            : '';
-
           return `
-            <div class="${cardClass}" data-option-id="${opt.id}" data-option-title="${opt.title}" data-option-price="${opt.total_price_uzs}">
+            <div class="${cardClass}" data-option-id="${opt.id}" data-option-title="${opt.title}" data-option-price="${opt.total_price_uzs || opt.part_price_uzs}">
               <div class="option-header">
-                <span class="${badgeClass}">${opt.badge || opt.quality_display}</span>
+                <span class="${badgeClass}">${opt.badge || (isOriginal ? 'Original' : 'Kopiya')}</span>
                 <span class="option-stock">${t.inStock}</span>
               </div>
 
               <h3 class="option-title">${opt.title}</h3>
 
-              <div class="option-price-box">
-                <div class="price-uzs">${Number(opt.total_price_uzs).toLocaleString('uz-UZ')} so'm</div>
+              <div class="option-price-box" style="margin-bottom: 24px; border-bottom: none;">
+                <div class="price-uzs">${Number(opt.part_price_uzs || opt.total_price_uzs).toLocaleString('uz-UZ')} so'm</div>
                 <div class="price-usd">~$${opt.price_usd} USD</div>
               </div>
-
-              <div class="option-specs">
-                <div class="spec-row">
-                  <span class="spec-label">${t.serviceFee}</span>
-                  <span class="spec-val">${opt.service_fee_uzs ? Number(opt.service_fee_uzs).toLocaleString('uz-UZ') + " so'm" : t.included}</span>
-                </div>
-                <div class="spec-row">
-                  <span class="spec-label">${t.warranty}</span>
-                  <span class="spec-val highlight-warranty">🛡 ${opt.warranty}</span>
-                </div>
-                <div class="spec-row">
-                  <span class="spec-label">${t.repairTime}</span>
-                  <span class="spec-val">⏱ ${opt.repair_time}</span>
-                </div>
-              </div>
-
-              ${opt.description ? `<p class="option-desc">${opt.description}</p>` : ''}
-              ${featuresHtml}
 
               <button class="btn-book-option btn-primary">${t.btnBook}</button>
             </div>

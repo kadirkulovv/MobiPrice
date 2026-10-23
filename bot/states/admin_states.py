@@ -32,12 +32,7 @@ class ComparisonAddStates(StatesGroup):
     waiting_for_phone = State()
     waiting_for_issue = State()
     waiting_for_quality = State()
-    waiting_for_title = State()
-    waiting_for_part_price = State()
-    waiting_for_service_fee = State()
-    waiting_for_warranty = State()
-    waiting_for_repair_time = State()
-    waiting_for_desc = State()
+    waiting_for_price = State()
 
 
 class DeleteStates(StatesGroup):

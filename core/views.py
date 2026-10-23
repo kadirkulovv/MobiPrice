@@ -235,17 +235,17 @@ def api_comparisons_by_issue(request, issue_id):
     data = []
     for c in comp_qs:
         title = c.title
-        desc = c.description
-        warranty = c.warranty
+        is_original = (c.quality_type == 'original_service_pack')
 
         if lang == 'ru':
-            title = c.title_ru or c.title
-            desc = c.description_ru or c.description
-            warranty = c.warranty_ru or c.warranty
+            title = c.title_ru or ("Оригинал Завод" if is_original else "Качественная Копия")
+            badge = "Оригинал" if is_original else "Копия"
         elif lang == 'en':
-            title = c.title_en or c.title
-            desc = c.description_en or c.description
-            warranty = c.warranty_en or c.warranty
+            title = c.title_en or ("Original Factory" if is_original else "High-Quality Copy")
+            badge = "Original" if is_original else "Copy"
+        else:
+            title = c.title or ("Original Zavod" if is_original else "Sifatli Kopiya")
+            badge = "Original" if is_original else "Kopiya"
 
         data.append({
             'id': c.id,
