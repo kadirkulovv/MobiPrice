@@ -20,7 +20,11 @@
    - **Klaviatura ergonomikasi:** Har bir qatorda maksimal **3 tadan** tugma (`build_3_row_reply_kb`, `build_3_row_inline_kb`).
    - To‘liq CRUD (Yaratish, Ko‘rish, Tahrirlash, O‘chirish) barcha 5 ta bo‘lim uchun.
 
-3. **3 Tilli Tizim (i18n):**
+3. **Infratuzilma Soddaligi (No Docker, No PostgreSQL):**
+   - **Baza:** Barcha muhitlar uchun yagona, qulay va yengil **`db.sqlite3`** (WAL rejimi bilan).
+   - **Serverda ishga tushirish:** Linux'ning o‘zida oddiy va barqaror **`systemd` servislari** (`.service`) orqali fon jarayonlarida boshqarish.
+
+4. **3 Tilli Tizim (i18n):**
    - Sayt va API 3 tilda ishlaydi: O‘zbekcha (`/uz/`), Ruscha (`/ru/`), Inglizcha (`/en/`).
    - Admin botda faqat 1 ta — O‘zbek tilida kiritadi, muammo nomlari avtomatik tarjima qilinadi.
 
@@ -30,11 +34,10 @@
 
 - **Backend:** Python 3.12+ / Django 5.1+ (ORM, Asinxron funksiyalar, i18n).
 - **Telegram Bot:** Aiogram 3.17+ (FSM, Polling/Webhook, Custom Keyboards).
-- **Frontend:** Vanilla CSS / JavaScript (No bulky frameworks), Dark Mode, Glassmorphism, Responsive Mobile-First.
-- **Ma'lumotlar Bazasi:** PostgreSQL 16 (Production) / SQLite3 (Mahalliy ishlab chiqish).
-- **Kesh & Xabarlar:** Redis + Celery.
-- **Konteynerlashtirish:** Docker & Docker Compose (web, db, bot).
-- **Web Server:** Nginx + Gunicorn + Certbot SSL.
+- **Frontend:** Vanilla CSS / JavaScript (Ortiqcha og‘ir freymvorklarsiz), Dark Mode, Glassmorphism, Responsive Mobile-First.
+- **Ma'lumotlar Bazasi:** **SQLite3 (`db.sqlite3`)** — tezkor, ortiqcha server resursini yemaydigan, bitta faylli qulay baza.
+- **Serverda Yurgizish (Daemon/Process Manager):** Linux **`systemd` servislari** (`mobiprice_web.service` va `mobiprice_bot.service`).
+- **Web Server & Reverse Proxy:** Gunicorn (WSGI) + Nginx (Statik fayllar keshi va SSL terminatsiyasi) + Let's Encrypt Certbot.
 
 ---
 
@@ -42,10 +45,10 @@
 
 ### 1-BOSQICH: TIZIM ARXITEKTURASI VA INFRATUZILMA
 - [x] Django loyihasi yaratildi, app strukturasi (`core`, `bot`) sozlandi.
-- [x] Ko‘p tillilik sozlamalari (`uz`, `ru`, `en`) va `django-modeltranslation` / i18n arxitekturasi ulandi.
+- [x] Ko‘p tillilik sozlamalari (`uz`, `ru`, `en`) va i18n arxitekturasi ulandi.
 - [x] Statik fayllar va media fayllar yo‘llari (`media/brands/`, `media/phones/`, `static/img/icons/`) sozlandi.
-- [x] `Dockerfile` va `docker-compose.yml` (PostgreSQL 16, Django Web, Telegram Bot servislar bilan) tayyorlandi.
-- [x] Makefile va muhit boshqaruv skriptlari yaratildi.
+- [x] Virtualenv (`.venv`) va mustaqil ishga tushirish skriptlari sozlandi.
+- [x] SQLite3 bazasi sozlandi va optimallashtirildi.
 
 ---
 
@@ -141,10 +144,10 @@
 ---
 
 ### 7-BOSQICH: YUQORI YUKLAMA (HIGH-LOAD 10,000+), KESH VA XAVFSIZLIK
-- [ ] **Redis Kesh:**
-  - Katalog ma'lumotlarini (Brendlar, Seriyalar, Telefonlar va Narxlar) Redis xotirasida saqlash (so‘rovlar tezligini < 5ms darajasiga yetkazish).
-- [ ] **PostgreSQL Indexing & Optimization:**
-  - Qidiruv va tanlovlar bo‘yicha indekslarni chuqur optimallashtirish (`db_index=True`, `select_related`).
+- [ ] **SQLite3 WAL (Write-Ahead Logging) rejimi:**
+  - Bir vaqtda yuzlab o‘qish (read) so‘rovlarini bloklanmasdan o‘ta tez ishlashini ta'minlash (`PRAGMA journal_mode=WAL;`).
+- [ ] **Tezkor xotira keshi (In-Memory / File Caching):**
+  - Brendlar, Seriyalar, Telefonlar va Narxlar API javoblarini keshda saqlash (so‘rovlar tezligini < 5ms darajasiga tushirish).
 - [ ] **Spam va Hujumlardan Himoya (Rate Limiting):**
   - Buyurtma formasiga 1 ta IP manzildan daqiqasiga 2 tadan ortiq so‘rov yuborishni cheklash (Anti-spam protection).
   - CSRF va XSS himoyasi.
@@ -158,19 +161,18 @@
 
 ---
 
-### 9-BOSQICH: DOCKER PRODUCTION DEPLOY VA MONITORING
-- [ ] **Production Docker Compose:**
-  - `web` konteyneri (Gunicorn production serveri).
-  - `db` konteyneri (PostgreSQL 16 doimiy docker volumes bilan).
-  - `redis` konteyneri.
-  - `bot` konteyneri (Aiogram fon jarayoni).
-  - `nginx` konteyneri (Statik fayllar keshlanishi, Gzip kompressiya, SSL terminatsiyasi).
+### 9-BOSQICH: LINUX SYSTEMD SERVUSLARI VA SERVERGA JOYLASH (DEPLOY)
+- [ ] **Gunicorn sozlamalari:** Veb-saytni barqaror ko‘p ishchi oqimlar (workers) bilan yurgizish.
+- [ ] **`mobiprice_web.service` yaratish:**
+  - Linux `systemd` servisi orqali Gunicorn'ni fonda doimiy ishlatish (`systemctl enable --now mobiprice_web`).
+- [ ] **`mobiprice_bot.service` yaratish:**
+  - Telegram botni fonda uzluksiz ishlatish va server o‘chib yonganda avtomatik qayta tiklanishi (`Restart=always`).
+- [ ] **Nginx Reverse Proxy:**
+  - Saytni 80-port (HTTP) va 443-port (HTTPS) orqali Gunicorn'ga ulash, barcha statik va media fayllarni Nginx orqali maksimal tezlikda tarqatish.
 - [ ] **Let's Encrypt SSL/HTTPS:**
-  - Domen uchun Certbot orqali avtomatik yangilanuvchi bepul xavfsiz SSL sertifikati.
-- [ ] **Avtomatik Backup (Zaxiralash):**
-  - Har kechasi PostgreSQL ma'lumotlar bazasining to‘liq nusxasini (dump) olib, maxfiy zaxira joyiga saqlash cron skripti.
-- [ ] **Avtomatik qayta tiklanish (Healthcheck & Restart policies):**
-  - Server o‘chib yonganda barcha konteynerlarning avtomatik ishga tushishi (`restart: unless-stopped`).
+  - Bepul xavfsiz yashil qulf (SSL sertifikati) va avtomatik yangilanishi (`certbot --nginx`).
+- [ ] **Avtomatik Backup (Zaxiralash) skripti:**
+  - Har kechasi `db.sqlite3` va `media/` papkasini zaxira arxiviga nusxalab qo‘yish cron skripti.
 
 ---
 
@@ -178,11 +180,11 @@
 
 | Bo‘lim | Holati | Izoh |
 | :--- | :--- | :--- |
-| **5-Bosqichli Baza Modeli** | ✅ **Bajarildi (100%)** | `Brand` -> `Series` -> `Phone` -> `Issue` -> `Comparison` to‘liq tayyor |
-| **Aiogram 3 Admin Bot** | ✅ **Bajarildi (100%)** | 5 ta bo‘lim uchun to‘liq CRUD, 30 ta SVG ikonka, avto-tarjima, 3-tugmali menyu |
-| **Kalkulyator UI (Web)** | ✅ **Bajarildi (95%)** | 5 ta bosqich, Before/After slider, Dark UI, 3 ta til faol |
-| **Telegram Xabarnomalar** | ⏳ **Keyingi navbatda** | Saytdan tushgan buyurtmani botga / guruhga uzatish |
-| **Trek Tekshirish (Track Order)** | ⏳ **Keyingi navbatda** | Saytda `#ORD-XXXX` kodi bilan status ko‘rish |
-| **Excel Import / Export** | ⏳ **Rejada** | Ommaviy ma'lumot kiritish |
-| **Redis Kesh & High-Load** | ⏳ **Rejada** | 10,000+ so‘rovlar uchun optimizatsiya |
-| **Production Deploy** | ⏳ **Rejada** | Nginx, SSL, Postgres Volume va Serverga o‘rnatish |
+| **5-Bosqichli Baza Modeli** | ✅ **Bajarildi (`[x]`)** | `Brand` -> `Series` -> `Phone` -> `Issue` -> `Comparison` to‘liq tayyor |
+| **Aiogram 3 Admin Bot** | ✅ **Bajarildi (`[x]`)** | 5 ta bo‘lim uchun to‘liq CRUD, 30 ta SVG ikonka, avto-tarjima, 3-tugmali menyu |
+| **Kalkulyator UI (Web)** | ✅ **Bajarildi (`[x]`)** | 5 ta bosqich, Before/After slider, Dark UI, 3 ta til faol |
+| **Telegram Xabarnomalar** | ⏳ **Keyingi navbatda (`[ ]`)** | Saytdan tushgan buyurtmani botga / guruhga lahzada uzatish |
+| **Trek Tekshirish (Track Order)** | ⏳ **Keyingi navbatda (`[ ]`)** | Saytda `#ORD-XXXX` kodi bilan status ko‘rish |
+| **Excel Import / Export** | ⏳ **Rejada (`[ ]`)** | Ommaviy ma'lumot kiritish |
+| **Tezkor Kesh & Anti-Spam** | ⏳ **Rejada (`[ ]`)** | SQLite WAL rejimi, xotira keshi va cheklovlar |
+| **Serverga Joylash (Deploy)** | ⏳ **Rejada (`[ ]`)** | Linux systemd (`.service`), Gunicorn, Nginx, SSL, SQLite3 |
