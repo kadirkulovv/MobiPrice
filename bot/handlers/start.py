@@ -4,7 +4,7 @@ from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from bot.config import ADMIN_IDS
 from bot.keyboards.main_menu import get_main_menu, get_section_crud_menu
-from bot.database import Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison, sync_to_async
+from bot.database import Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison, ServiceOrder, sync_to_async
 
 router = Router()
 
@@ -70,6 +70,7 @@ async def show_stats(message: Message):
     p_count = await sync_to_async(DevicePhone.objects.count)()
     i_count = await sync_to_async(DeviceIssue.objects.count)()
     c_count = await sync_to_async(IssueComparison.objects.count)()
+    o_count = await sync_to_async(ServiceOrder.objects.count)()
 
     await message.answer(
         f"📊 <b>MobiPrice Ma'lumotlar Bazasi Statistikasi:</b>\n\n"
@@ -77,6 +78,7 @@ async def show_stats(message: Message):
         f"📂 <b>Model seriyalari:</b> {s_count} ta\n"
         f"📱 <b>Telefonlar:</b> {p_count} ta\n"
         f"🔧 <b>Muammolar / Detallar:</b> {i_count} ta\n"
-        f"⚖️ <b>Solishtirish variantlari:</b> {c_count} ta\n",
+        f"⚖️ <b>Solishtirish variantlari:</b> {c_count} ta\n"
+        f"📦 <b>Kelib tushgan arizalar:</b> {o_count} ta\n",
         parse_mode="HTML"
     )
