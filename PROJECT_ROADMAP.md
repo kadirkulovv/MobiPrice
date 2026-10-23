@@ -44,69 +44,71 @@
 ## 📋 BOSQICHLAR VA AMALGA OSHIRISH REJASI
 
 ### 1-BOSQICH: TIZIM ARXITEKTURASI VA INFRATUZILMA
-- [x] Django loyihasi yaratildi, app strukturasi (`core`, `bot`) sozlandi.
-- [x] Ko‘p tillilik sozlamalari (`uz`, `ru`, `en`) va i18n arxitekturasi ulandi.
-- [x] Statik fayllar va media fayllar yo‘llari (`media/brands/`, `media/phones/`, `static/img/icons/`) sozlandi.
-- [x] Virtualenv (`.venv`) va Makefile orqali dasturchi buyruqlari (`run`, `bot`, `migrate`, `shell`) sozlandi.
-- [x] SQLite3 bazasi sozlandi, WAL (Write-Ahead Logging) va 5000ms busy timeout yuqori yuklamalar uchun ulandi.
+- [✅] Django loyihasi yaratildi, app strukturasi (`core`, `bot`) sozlandi.
+- [✅] Ko‘p tillilik sozlamalari (`uz`, `ru`, `en`) va i18n arxitekturasi ulandi.
+- [✅] Statik fayllar va media fayllar yo‘llari (`media/brands/`, `media/phones/`, `static/img/icons/`) sozlandi.
+- [✅] Virtualenv (`.venv`) va Makefile orqali dasturchi buyruqlari (`run`, `bot`, `migrate`, `shell`) sozlandi.
+- [✅] SQLite3 bazasi sozlandi, WAL (Write-Ahead Logging) va 5000ms busy timeout yuqori yuklamalar uchun ulandi.
 
 ---
 
 ### 2-BOSQICH: 5-QADAMLI MA'LUMOTLAR BAZASI STRUKTURASI
-- [x] **1. Brendlar modeli (`Brand`):** Nomi, slug, SVG logo kodi, rasm, tartib raqami, aktivlik holati.
-- [x] **2. Model Seriyalari modeli (`DeviceSeries`):** `ForeignKey -> Brand`, seriya nomi, slug, tartibi (`unique_together=('brand', 'name')`).
-- [x] **3. Telefonlar modeli (`DevicePhone`):** `ForeignKey -> DeviceSeries`, telefon nomi, unikal avto-slug (to‘qnashuvlarni `name-1`, `name-2` qilib hal qiluvchi), rasm maydoni (`phones/`), chiqqan yili.
-- [x] **4. Muammolar modeli (`DeviceIssue`):** `ForeignKey -> DevicePhone`, o‘zbekcha nomi (`title`), ruscha nomi (`title_ru`), inglizcha nomi (`title_en`), 30 ta ikonka raqami (`icon_number`), SVG ikonka kodi (`icon_svg`).
-- [x] **5. Sifat va Narxlar modeli (`IssueComparison`):** `ForeignKey -> DeviceIssue`, sifati (`original` / `kopiya`), sarlavha, narxi so‘mda (`part_price_uzs`), USD ekvivalenti (`price_usd`), ombordagi soni (`quantity`), ombor holati (`is_in_stock`).
-- [x] **Yordamchi modellar:**
+- [✅] **1. Brendlar modeli (`Brand`):** Nomi, slug, SVG logo kodi, rasm, tartib raqami, aktivlik holati.
+- [✅] **2. Model Seriyalari modeli (`DeviceSeries`):** `ForeignKey -> Brand`, seriya nomi, slug, tartibi (`unique_together=('brand', 'name')`).
+- [✅] **3. Telefonlar modeli (`DevicePhone`):** `ForeignKey -> DeviceSeries`, telefon nomi, unikal avto-slug (to‘qnashuvlarni `name-1`, `name-2` qilib hal qiluvchi), rasm maydoni (`phones/`), chiqqan yili.
+- [✅] **4. Muammolar modeli (`DeviceIssue`):** `ForeignKey -> DevicePhone`, o‘zbekcha nomi (`title`), ruscha nomi (`title_ru`), inglizcha nomi (`title_en`), 30 ta ikonka raqami (`icon_number`), SVG ikonka kodi (`icon_svg`).
+- [✅] **5. Sifat va Narxlar modeli (`IssueComparison`):** `ForeignKey -> DeviceIssue`, sifati (`original` / `kopiya`), sarlavha, narxi so‘mda (`part_price_uzs`), USD ekvivalenti (`price_usd`), ombordagi soni (`quantity`), ombor holati (`is_in_stock`).
+- [✅] **Yordamchi modellar:**
   - `RepairFAQ`: Ko‘p beriladigan savol-javoblar (3 tilda).
   - `Review`: Mijoz sharhlari va ta'mirdan "Oldin / Keyin" (`before_image`, `after_image`) fotolari.
   - `ServiceOrder`: Unikal `#ORD-XXXX` trek-kodli buyurtmalar modeli.
-- [x] Django Admin boshqaruvi: barcha modellar uchun qidiruv, filtrlar, tartiblash va ombordagi sonini tezkor tahrirlash (`list_editable`) sozlandi.
-- [x] Barcha modellar uchun Django migratsiyalari yaratildi va bazaga muvaffaqiyatli tatbiq qilindi (`0001_initial`, `0002_...`, `0003_...`).
+- [✅] Django Admin boshqaruvi: barcha modellar uchun qidiruv, filtrlar, tartiblash va ombordagi sonini tezkor tahrirlash (`list_editable`) sozlandi.
+- [✅] Barcha modellar uchun Django migratsiyalari yaratildi va bazaga muvaffaqiyatli tatbiq qilindi (`0001_initial`, `0002_...`, `0003_...`).
 
 ---
 
 ### 3-BOSQICH: AIOGRAM 3 TELEGRAM ADMIN BOT PANELI
-- [x] Admin avtorizatsiyasi: faqat ruxsat etilgan Admin IDlar (`ADMIN_IDS`) orqali boshqaruv.
-- [x] Qulay Dashboard klaviaturasi: `📂 Brendlar`, `📁 Modellar`, `📱 Telefonlar`, `🔧 Muammolar`, `💰 Narxlar`, `📊 Statistika`.
-- [x] **Qatorda maksimal 3 ta tugma** ergonomika qoidasi barcha Reply va Inline tugmalarga joriy etildi.
-- [x] **1-Bo‘lim: Brendlar CRUD:**
+- [✅] Admin avtorizatsiyasi: faqat ruxsat etilgan Admin IDlar (`ADMIN_IDS`) orqali boshqaruv.
+- [✅] Qulay Dashboard klaviaturasi: `📂 Brendlar`, `📁 Modellar`, `📱 Telefonlar`, `🔧 Muammolar`, `💰 Narxlar`, `📊 Statistika`.
+- [✅] **Qatorda maksimal 3 ta tugma** ergonomika qoidasi barcha Reply va Inline tugmalarga joriy etildi.
+- [✅] **1-Bo‘lim: Brendlar CRUD:**
   - Ro‘yxat ko‘rish, yangi brend qo‘shish (nomi + `.svg` logotip fayli), tahrirlash (nom va logo), o‘chirish.
-- [x] **2-Bo‘lim: Modellar (Seriyalar) CRUD:**
+- [✅] **2-Bo‘lim: Modellar (Seriyalar) CRUD:**
   - Brend tanlash -> Seriya nomini kiritish, ro‘yxat, tahrirlash, o‘chirish.
-- [x] **3-Bo‘lim: Telefonlar CRUD:**
+- [✅] **3-Bo‘lim: Telefonlar CRUD:**
   - Brend tanlash -> Seriya tanlash -> Telefon nomini kiritish -> JPG/PNG rasmini yuklash (rasm yoki fayl ko‘rinishida).
   - Ro‘yxat ko‘rish, nomini va rasmini alohida tahrirlash, o‘chirish.
   - Asinxron xavfsiz DB yuklanishi (`select_related`) va rasmlar xavfsiz saqlanishi.
-- [x] **4-Bo‘lim: Muammolar CRUD va Avtomatik Tarjima:**
+- [✅] **4-Bo‘lim: Muammolar CRUD va Avtomatik Tarjima:**
   - Brend -> Seriya -> Telefon tanlash.
   - O‘zbekcha nom kiritilganda avtomatik Ruscha va Inglizcha tarjimalarni yaratish (`bot/utils/translator.py`).
   - 30 ta vektorli SVG ikonka generatsiyasi va botda ko‘rsatiladigan 6x5 neonli cheatsheet infografika rasmi (`bot/assets/icons_cheatsheet.png`).
   - Ikonka raqamini (1-30) tanlash va SVG kodini bazaga yozish, tahrirlash, o‘chirish.
-- [x] **5-Bo‘lim: Soddalashtirilgan Narxlar CRUD:**
+- [✅] **5-Bo‘lim: Soddalashtirilgan Narxlar CRUD:**
   - Brend -> Seriya -> Telefon -> Muammoni tanlash.
   - Sifat turini tanlash: `🟢 Original` yoki `🟡 Sifatli Kopiya`.
   - Narxini kiritish (so‘mda).
   - Ombordagi qoldiq miqdorini kiritish (`quantity` — masalan: 5 yoki 0).
   - Narx va miqdorni tahrirlash, o‘chirish.
+- [✅] **Statistika va Buyurtmalar hisoblagichi:**
+  - Bosh menyudagi `📊 Statistika` tugmasi orqali bazadagi barcha brendlar, seriyalar, telefonlar, muammolar, narxlar va kelib tushgan arizalar soni real vaqtda ko‘rinadi.
 
 ---
 
 ### 4-BOSQICH: MIJOZ INTERFEYSI (UI/UX) VA 5-QADAMLI KALKULYATOR
-- [x] **Premium Dark Mode Dizayn:** Glassmorphism neon aksentlar, yuqori kontrastli zamonaviy tipografika, 100% mobil moslashuvchanlik.
-- [x] **Interaktiv 5-Bosqichli Kalkulyator:**
+- [✅] **Premium Dark Mode Dizayn:** Glassmorphism neon aksentlar, yuqori kontrastli zamonaviy tipografika, 100% mobil moslashuvchanlik.
+- [✅] **Interaktiv 5-Bosqichli Kalkulyator:**
   - 1-Qadam: Brend tanlash (Apple, Samsung, Xiaomi...).
   - 2-Qadam: Model Seriyasi tanlash (S seriya, A seriya, Pro seriya...).
   - 3-Qadam: Aniq telefonni tanlash (suratlari bilan).
   - 4-Qadam: Muammoni tanlash (30 ta aniq SVG ikonkalari bilan).
   - 5-Qadam: Solishtirish natijasi: Original vs Kopiya, Narxi, Omborda mavjudlik holati (`🟢 Omborda: X ta` yoki `🔴 Mavjud emas (Kutilmoqda)`).
-- [x] **Interaktiv "Oldin va Keyin" (Before / After Slider):**
+- [✅] **Interaktiv "Oldin va Keyin" (Before / After Slider):**
   - Foydalanuvchi sensorli ekranda yoki sichqoncha bilan siljitib ta'mirdan oldingi va keyingi holatni taqqoslay oladi.
-- [x] **FAQ va Mijoz Sharhlari:**
+- [✅] **FAQ va Mijoz Sharhlari:**
   - Dinamik tez-tez beriladigan savollar akkordeoni va mijozlar fikrlari bloki.
-- [x] **Til almashtirish interfeysi:** Sayt sarlavhasida `UZ | RU | EN` tillarini bir zumda almashtirish.
-- [x] **Buyurtma berish modali:**
+- [✅] **Til almashtirish interfeysi:** Sayt sarlavhasida `UZ | RU | EN` tillarini bir zumda almashtirish.
+- [✅] **Buyurtma berish modali:**
   - Mijoz o‘z ismi va telefon raqamini kiritib ariza qoldirishi mumkin bo‘lgan tezkor forma.
 - [ ] **Jonli Model Qidiruvi (Live Search):**
   - Qidiruv qatoriga yozish bilan bir zumda telefon modellarini topib, to‘g‘ridan-to‘g‘ri kalkulyatorga yo‘naltirish.
@@ -181,11 +183,11 @@
 
 | Bo‘lim | Holati | Izoh |
 | :--- | :--- | :--- |
-| **5-Bosqichli Baza Modeli** | ✅ **Bajarildi (`[x]`)** | `Brand` -> `Series` -> `Phone` -> `Issue` -> `Comparison` to‘liq tayyor |
-| **Aiogram 3 Admin Bot** | ✅ **Bajarildi (`[x]`)** | 5 ta bo‘lim uchun to‘liq CRUD, 30 ta SVG ikonka, avto-tarjima, 3-tugmali menyu |
-| **Kalkulyator UI (Web)** | ✅ **Bajarildi (`[x]`)** | 5 ta bosqich, Before/After slider, Dark UI, 3 ta til faol |
-| **Telegram Xabarnomalar** | ⏳ **Keyingi navbatda (`[ ]`)** | Saytdan tushgan buyurtmani botga / guruhga lahzada uzatish |
-| **Trek Tekshirish (Track Order)** | ⏳ **Keyingi navbatda (`[ ]`)** | Saytda `#ORD-XXXX` kodi bilan status ko‘rish |
-| **Excel Import / Export** | ⏳ **Rejada (`[ ]`)** | Ommaviy ma'lumot kiritish |
-| **Tezkor Kesh & Anti-Spam** | ⏳ **Rejada (`[ ]`)** | SQLite WAL rejimi, xotira keshi va cheklovlar |
-| **Serverga Joylash (Deploy)** | ⏳ **Rejada (`[ ]`)** | Linux systemd (`.service`), Gunicorn, Nginx, SSL, SQLite3 |
+| **5-Bosqichli Baza Modeli** | ✅ **Bajarildi** | `Brand` -> `Series` -> `Phone` -> `Issue` -> `Comparison` to‘liq tayyor |
+| **Aiogram 3 Admin Bot** | ✅ **Bajarildi** | 5 ta bo‘lim uchun to‘liq CRUD, 30 ta SVG ikonka, avto-tarjima, 3-tugmali menyu |
+| **Kalkulyator UI (Web)** | ✅ **Bajarildi** | 5 ta bosqich, Before/After slider, Dark UI, 3 ta til faol |
+| **Telegram Xabarnomalar** | ⏳ **Keyingi navbatda** | Saytdan tushgan buyurtmani botga / guruhga lahzada uzatish |
+| **Trek Tekshirish (Track Order)** | ⏳ **Keyingi navbatda** | Saytda `#ORD-XXXX` kodi bilan status ko‘rish |
+| **Excel Import / Export** | ⏳ **Rejada** | Ommaviy ma'lumot kiritish |
+| **Tezkor Kesh & Anti-Spam** | ⏳ **Rejada** | SQLite WAL rejimi, xotira keshi va cheklovlar |
+| **Serverga Joylash (Deploy)** | ⏳ **Rejada** | Linux systemd (`.service`), Gunicorn, Nginx, SSL, SQLite3 |
