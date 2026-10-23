@@ -37,8 +37,9 @@ class DeviceIssueAdmin(admin.ModelAdmin):
 
 @admin.register(IssueComparison)
 class IssueComparisonAdmin(admin.ModelAdmin):
-    list_display = ('title', 'issue', 'quality_type', 'total_price_display', 'warranty', 'repair_time')
-    list_filter = ('quality_type', 'issue__phone__series__brand')
+    list_display = ('title', 'issue', 'quality_type', 'total_price_display', 'quantity', 'is_in_stock')
+    list_editable = ('quantity', 'is_in_stock')
+    list_filter = ('quality_type', 'is_in_stock', 'issue__phone__series__brand')
     search_fields = ('title', 'issue__title', 'issue__phone__name')
 
     def total_price_display(self, obj):
