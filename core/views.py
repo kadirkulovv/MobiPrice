@@ -1,5 +1,4 @@
 import json
-import os
 import requests
 from django.shortcuts import render
 from django.http import JsonResponse
@@ -240,12 +239,18 @@ def api_comparisons_by_issue(request, issue_id):
         if lang == 'ru':
             title = c.title_ru or ("Оригинал Завод" if is_original else "Качественная Копия")
             badge = "Оригинал" if is_original else "Копия"
+            warranty = c.warranty_ru or c.warranty or ""
+            desc = c.description_ru or c.description or ""
         elif lang == 'en':
             title = c.title_en or ("Original Factory" if is_original else "High-Quality Copy")
             badge = "Original" if is_original else "Copy"
+            warranty = c.warranty_en or c.warranty or ""
+            desc = c.description_en or c.description or ""
         else:
             title = c.title or ("Original Zavod" if is_original else "Sifatli Kopiya")
             badge = "Original" if is_original else "Kopiya"
+            warranty = c.warranty or ""
+            desc = c.description or ""
 
         is_available = bool(c.is_in_stock and (c.quantity > 0))
         if lang == 'ru':
