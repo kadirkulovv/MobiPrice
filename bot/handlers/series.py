@@ -3,7 +3,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from bot.keyboards.main_menu import get_section_crud_menu, get_cancel_menu
 from bot.keyboards.common import build_3_row_reply_kb, build_3_row_inline_kb
-from bot.states.admin_states import SeriesAddStates
+from bot.states.admin_states import SeriesAddStates, SeriesEditStates
 from bot.database import Brand, DeviceSeries, sync_to_async
 
 router = Router()
@@ -142,3 +142,69 @@ async def process_delete_series(call: CallbackQuery):
     except Exception as e:
         await call.message.edit_text(f"Xatolik: {e}")
     await call.answer()
+
+
+@router.message(F.text == "✏️ Model tahrirlash")
+async def edit_series_start(message: Message):
+    series_list = await sync_to_async(list)(DeviceSeries.objects.select_related('brand').all().order_by('brand__name', 'name'))
+    if not series_list:
+        await message.answer("Tahrirlash uchun modellar mavjud emas.")
+        return
+
+    items = [(f"{s.brand.name} - {s.name}", f"edit_series_{s.id}") for s in series_list]
+    kb = build_3_row_inline_kb(items, back_callback="", add_cancel=True)
+
+    await message.answer(
+        "✏️ <b>Tahrirlamoqchi bo‘lgan model seriyangizni tanlang:</b>",
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data.startswith("edit_series_"))
+async def process_select_series_for_edit(call: CallbackQuery, state: FSMContext):
+    series_id = int(call.data.replace("edit_series_", ""))
+    try:
+        series = await sync_to_async(DeviceSeries.objects.get)(id=series_id)
+        await state.update_data(edit_series_id=series.id, edit_series_name=series.name)
+        await state.set_state(SeriesEditStates.waiting_for_new_name)
+
+        await call.message.edit_text(
+            f"✏️ <b>'{series.brand.name} - {series.name}' seriyasini tahrirlash</b>\n\n"
+            f"Yangi nomini yuboring:",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await call.message.edit_text(f"Xatolik: {e}")
+    await call.answer()
+
+
+@router.message(SeriesEditStates.waiting_for_new_name, F.text)
+async def process_edit_series_name(message: Message, state: FSMContext):
+    new_name = message.text.strip()
+    if len(new_name) < 2:
+        await message.answer("Nom juda qisqa. Qaytadan kiriting:")
+        return
+
+    data = await state.get_data()
+    series_id = data.get('edit_series_id')
+
+    try:
+        series = await sync_to_async(DeviceSeries.objects.get)(id=series_id)
+        old_name = series.name
+        series.name = new_name
+        from django.utils.text import slugify
+        series.slug = slugify(new_name)
+        await sync_to_async(series.save)()
+
+        await state.clear()
+        await message.answer(
+            f"✅ <b>Model seriyasi muvaffaqiyatli yangilandi!</b>\n\n"
+            f"Eski: <i>{old_name}</i>\n"
+            f"Yangi: <b>{new_name}</b>",
+            reply_markup=get_section_crud_menu("Model"),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await message.answer(f"Xatolik: {e}")
+

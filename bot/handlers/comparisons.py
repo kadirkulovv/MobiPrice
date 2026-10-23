@@ -3,7 +3,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from bot.keyboards.main_menu import get_section_crud_menu, get_cancel_menu
 from bot.keyboards.common import build_3_row_reply_kb, build_3_row_inline_kb
-from bot.states.admin_states import ComparisonAddStates
+from bot.states.admin_states import ComparisonAddStates, ComparisonEditStates
 from bot.database import Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison, sync_to_async
 
 router = Router()
@@ -14,8 +14,8 @@ async def comparisons_menu(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(
         "⚖️ <b>Solishtirish va Narxlar bo‘limi</b>\n\n"
-        "Bu yerda har bir muammo uchun faqat <b>Original</b> yoki <b>Kopiya</b> narxi kiritiladi.\n"
-        "Ortiqcha kafolat va tafsilotlar so‘ralmaydi, narx darhol saytda aks etadi.",
+        "Bu yerda har bir muammo uchun faqat <b>Original</b> yoki <b>Kopiya</b> narxi va <b>ombordagi soni</b> kiritiladi.\n"
+        "Ortiqcha kafolat so‘ralmaydi, narx va mavjudlik darhol saytda aks etadi.",
         reply_markup=get_section_crud_menu("Narx"),
         parse_mode="HTML"
     )
@@ -31,13 +31,14 @@ async def list_comparisons(message: Message):
         await message.answer("Bazada hozircha narxlar kiritilmagan.")
         return
 
-    text = "📋 <b>Oxirgi kiritilgan narxlar ro‘yxati:</b>\n\n"
+    text = "📋 <b>Mavjud narxlar va qoldiq ro‘yxati:</b>\n\n"
     for idx, c in enumerate(comp_list, 1):
         phone_name = c.issue.phone.name
         issue_title = c.issue.title
         total = f"{c.part_price_uzs:,} so'm"
+        stock = f"✅ {c.quantity} ta" if (c.is_in_stock and c.quantity > 0) else "❌ Tugagan"
         text += f"{idx}. <b>{phone_name}</b> → {issue_title}\n"
-        text += f"   🏷 {c.title} — <b>{total}</b>\n"
+        text += f"   🏷 {c.title} — <b>{total}</b> ({stock})\n"
 
     await message.answer(text, parse_mode="HTML")
 
@@ -228,6 +229,29 @@ async def process_comp_price(message: Message, state: FSMContext):
         await message.answer("Narx 0 dan katta bo‘lishi kerak. Qaytadan kiriting:")
         return
 
+    price_usd = max(1, price // 12800)
+    await state.update_data(part_price_uzs=price, price_usd=price_usd)
+    await state.set_state(ComparisonAddStates.waiting_for_quantity)
+
+    await message.answer(
+        f"✅ Narx: <b>{price:,} so‘m</b>\n\n"
+        f"7️⃣ <b>Ombordagi soni (miqdori) nechta?</b>\n"
+        f"<i>(Masalan: 5 yoki 10. Hozirda omborda bo‘lmasa 0 deb yozing)</i>",
+        reply_markup=get_cancel_menu(),
+        parse_mode="HTML"
+    )
+
+
+@router.message(ComparisonAddStates.waiting_for_quantity, F.text)
+async def process_comp_quantity(message: Message, state: FSMContext):
+    val = message.text.strip()
+    if not val.isdigit():
+        await message.answer("⚠️ Iltimos faqat son kiriting (masalan: 5 yoki 0):")
+        return
+
+    qty = int(val)
+    is_in_stock = (qty > 0)
+
     data = await state.get_data()
     issue_id = data.get('issue_id')
     issue_title = data.get('issue_title')
@@ -237,11 +261,10 @@ async def process_comp_price(message: Message, state: FSMContext):
     title_ru = data.get('title_ru')
     title_en = data.get('title_en')
     badge = data.get('badge')
+    price = data.get('part_price_uzs')
+    price_usd = data.get('price_usd')
 
-    # Convert approx USD
-    price_usd = max(1, price // 12800)
-
-    # Save or update comparison
+    # Save comparison
     comparison = await sync_to_async(IssueComparison.objects.create)(
         issue_id=issue_id,
         quality_type=quality_type,
@@ -251,6 +274,8 @@ async def process_comp_price(message: Message, state: FSMContext):
         part_price_uzs=price,
         service_fee_uzs=0,
         price_usd=price_usd,
+        quantity=qty,
+        is_in_stock=is_in_stock,
         warranty="Kafolat mavjud",
         warranty_ru="С гарантией",
         warranty_en="With warranty",
@@ -259,18 +284,119 @@ async def process_comp_price(message: Message, state: FSMContext):
         description=""
     )
 
+    stock_text = f"✅ Mavjud (Omborda: {qty} ta)" if is_in_stock else "❌ Tugagan (Mavjud emas)"
+
     await state.clear()
     await message.answer(
-        f"🎉 <b>Narx muvaffaqiyatli saqlandi!</b>\n\n"
+        f"🎉 <b>Narx va miqdor muvaffaqiyatli saqlandi!</b>\n\n"
         f"📱 Telefon: <b>{phone_name}</b>\n"
         f"🔧 Muammo: <b>{issue_title}</b>\n"
         f"🏷 Turi: <b>{comparison.title}</b> ({comparison.badge})\n"
-        f"💵 Narxi: <b>{price:,} so‘m</b> (~${price_usd} USD)\n\n"
-        f"<i>Saytda darhol barcha 3 ta tilda to‘g‘ri aks etadi!</i>",
+        f"💵 Narxi: <b>{price:,} so‘m</b> (~${price_usd} USD)\n"
+        f"📦 Qoldiq: <b>{stock_text}</b>",
         reply_markup=get_section_crud_menu("Narx"),
         parse_mode="HTML"
     )
 
+
+# --- EDIT (UPDATE) ---
+
+@router.message(F.text == "✏️ Narx tahrirlash")
+async def edit_comparison_start(message: Message):
+    comp_list = await sync_to_async(list)(
+        IssueComparison.objects.select_related('issue', 'issue__phone').all().order_by('-id')[:24]
+    )
+    if not comp_list:
+        await message.answer("Tahrirlash uchun narxlar mavjud emas.")
+        return
+
+    items = [(f"{c.issue.phone.name} {c.issue.title} ({c.badge})", f"edit_comp_{c.id}") for c in comp_list]
+    kb = build_3_row_inline_kb(items, back_callback="", add_cancel=True)
+
+    await message.answer(
+        "✏️ <b>Tahrirlamoqchi bo‘lgan narx variantini tanlang:</b>",
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data.startswith("edit_comp_"))
+async def process_select_comp_for_edit(call: CallbackQuery, state: FSMContext):
+    comp_id = int(call.data.replace("edit_comp_", ""))
+    try:
+        comp = await sync_to_async(IssueComparison.objects.select_related('issue', 'issue__phone').get)(id=comp_id)
+        await state.update_data(edit_comp_id=comp.id)
+        await state.set_state(ComparisonEditStates.waiting_for_new_price)
+
+        stock_str = f"{comp.quantity} ta" if comp.is_in_stock else "Tugagan"
+
+        await call.message.edit_text(
+            f"✏️ <b>{comp.issue.phone.name} → {comp.issue.title} ({comp.title})</b>\n\n"
+            f"Hozirgi narxi: <b>{comp.part_price_uzs:,} so‘m</b>\n"
+            f"Ombordagi qoldiq: <b>{stock_str}</b>\n\n"
+            f"1️⃣ Yangi narxini kiriting (so‘mda, o‘zgarmasa avvalgisini yozing):",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await call.message.edit_text(f"Xatolik: {e}")
+    await call.answer()
+
+
+@router.message(ComparisonEditStates.waiting_for_new_price, F.text)
+async def process_edit_comp_price(message: Message, state: FSMContext):
+    val = message.text.replace(' ', '').replace(',', '').strip()
+    if not val.isdigit():
+        await message.answer("⚠️ Iltimos faqat raqam kiriting (masalan: 1200000):")
+        return
+
+    new_price = int(val)
+    await state.update_data(edit_new_price=new_price)
+    await state.set_state(ComparisonEditStates.waiting_for_new_qty)
+
+    await message.answer(
+        f"✅ Yangi narx: <b>{new_price:,} so‘m</b>\n\n"
+        f"2️⃣ Endi ombordagi yangi sonini kiriting (masalan: 5 yoki 0):",
+        reply_markup=get_cancel_menu(),
+        parse_mode="HTML"
+    )
+
+
+@router.message(ComparisonEditStates.waiting_for_new_qty, F.text)
+async def process_edit_comp_qty(message: Message, state: FSMContext):
+    val = message.text.strip()
+    if not val.isdigit():
+        await message.answer("⚠️ Iltimos faqat son kiriting (masalan: 5 yoki 0):")
+        return
+
+    new_qty = int(val)
+    data = await state.get_data()
+    comp_id = data.get('edit_comp_id')
+    new_price = data.get('edit_new_price')
+
+    try:
+        comp = await sync_to_async(IssueComparison.objects.get)(id=comp_id)
+        comp.part_price_uzs = new_price
+        comp.price_usd = max(1, new_price // 12800)
+        comp.quantity = new_qty
+        comp.is_in_stock = (new_qty > 0)
+        await sync_to_async(comp.save)()
+
+        stock_text = f"✅ Mavjud ({new_qty} ta)" if comp.is_in_stock else "❌ Tugagan (Mavjud emas)"
+
+        await state.clear()
+        await message.answer(
+            f"✅ <b>Narx va miqdor muvaffaqiyatli yangilandi!</b>\n\n"
+            f"🏷 {comp.title}\n"
+            f"💵 Yangi narxi: <b>{new_price:,} so‘m</b>\n"
+            f"📦 Qoldiq: <b>{stock_text}</b>",
+            reply_markup=get_section_crud_menu("Narx"),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await message.answer(f"Xatolik: {e}")
+
+
+# --- DELETE ---
 
 @router.message(F.text == "🗑 Narx o‘chirish")
 async def delete_comparison_start(message: Message):

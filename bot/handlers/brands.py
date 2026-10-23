@@ -4,7 +4,7 @@ from aiogram.types import Message, CallbackQuery, Document
 from aiogram.fsm.context import FSMContext
 from bot.keyboards.main_menu import get_section_crud_menu, get_cancel_menu
 from bot.keyboards.common import build_3_row_inline_kb
-from bot.states.admin_states import BrandAddStates
+from bot.states.admin_states import BrandAddStates, BrandEditStates
 from bot.database import Brand, sync_to_async
 from bot.config import MEDIA_BRANDS_DIR, BASE_DIR
 
@@ -140,8 +140,105 @@ async def process_delete_brand(call: CallbackQuery):
     await call.answer()
 
 
+@router.message(F.text == "✏️ Brend tahrirlash")
+async def edit_brand_start(message: Message):
+    brands = await sync_to_async(list)(Brand.objects.all().order_by('name'))
+    if not brands:
+        await message.answer("Tahrirlash uchun brendlar mavjud emas.")
+        return
+
+    items = [(b.name, f"edit_brand_{b.id}") for b in brands]
+    kb = build_3_row_inline_kb(items, back_callback="", add_cancel=True)
+
+    await message.answer(
+        "✏️ <b>Tahrirlamoqchi bo‘lgan brendni tanlang:</b>",
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data.startswith("edit_brand_"))
+async def process_select_brand_for_edit(call: CallbackQuery, state: FSMContext):
+    brand_id = int(call.data.replace("edit_brand_", ""))
+    try:
+        brand = await sync_to_async(Brand.objects.get)(id=brand_id)
+        await state.update_data(edit_brand_id=brand.id, edit_brand_name=brand.name)
+        await state.set_state(BrandEditStates.waiting_for_new_data)
+
+        await call.message.edit_text(
+            f"✏️ <b>'{brand.name}' brendini tahrirlash</b>\n\n"
+            f"Yangi nomini matn sifatida yuboring (yoki yangi <b>.svg</b> logotip faylini yuboring):",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await call.message.edit_text(f"Xatolik: {e}")
+    await call.answer()
+
+
+@router.message(BrandEditStates.waiting_for_new_data, F.text)
+async def process_edit_brand_name(message: Message, state: FSMContext):
+    new_name = message.text.strip()
+    if len(new_name) < 2:
+        await message.answer("Nom kamida 2 ta harfdan iborat bo‘lishi kerak:")
+        return
+
+    data = await state.get_data()
+    brand_id = data.get('edit_brand_id')
+
+    try:
+        brand = await sync_to_async(Brand.objects.get)(id=brand_id)
+        old_name = brand.name
+        brand.name = new_name
+        from django.utils.text import slugify
+        brand.slug = slugify(new_name)
+        await sync_to_async(brand.save)()
+
+        await state.clear()
+        await message.answer(
+            f"✅ <b>Brend nomi muvaffaqiyatli yangilandi!</b>\n\n"
+            f"Eski: <i>{old_name}</i>\n"
+            f"Yangi: <b>{new_name}</b>",
+            reply_markup=get_section_crud_menu("Brend"),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await message.answer(f"Xatolik: {e}")
+
+
+@router.message(BrandEditStates.waiting_for_new_data, F.document)
+async def process_edit_brand_logo(message: Message, state: FSMContext, bot: Bot):
+    doc: Document = message.document
+    if not doc.file_name.lower().endswith(('.svg', '.png', '.jpg')):
+        await message.answer("Iltimos faqat .svg formatdagi logotip yuboring:")
+        return
+
+    data = await state.get_data()
+    brand_id = data.get('edit_brand_id')
+
+    try:
+        brand = await sync_to_async(Brand.objects.get)(id=brand_id)
+        file = await bot.get_file(doc.file_id)
+        ext = os.path.splitext(doc.file_name)[1].lower() or '.svg'
+        save_filename = f"{brand.slug}{ext}"
+        dest_path = MEDIA_BRANDS_DIR / save_filename
+        await bot.download_file(file.file_path, destination=dest_path)
+
+        brand.logo = f"brands/{save_filename}"
+        await sync_to_async(brand.save)()
+
+        await state.clear()
+        await message.answer(
+            f"✅ <b>'{brand.name}' logotipi yangilandi!</b>",
+            reply_markup=get_section_crud_menu("Brend"),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await message.answer(f"Xatolik: {e}")
+
+
 @router.callback_query(F.data == "cancel_action")
 async def cancel_inline(call: CallbackQuery, state: FSMContext):
     await state.clear()
     await call.message.edit_text("❌ Amal bekor qilindi.")
     await call.answer()
+

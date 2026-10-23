@@ -22,14 +22,17 @@ def get_main_menu() -> ReplyKeyboardMarkup:
 
 
 def get_section_crud_menu(section_title: str) -> ReplyKeyboardMarkup:
-    """Har bir bo'lim ichidagi CRUD amallari"""
+    """Har bir bo'lim ichidagi to'liq CRUD amallari (Create, Read, Update, Delete)"""
     keyboard = [
         [
             KeyboardButton(text=f"📋 {section_title} ro‘yxati"),
             KeyboardButton(text=f"➕ Yangi {section_title} qo‘shish"),
         ],
         [
+            KeyboardButton(text=f"✏️ {section_title} tahrirlash"),
             KeyboardButton(text=f"🗑 {section_title} o‘chirish"),
+        ],
+        [
             KeyboardButton(text="🔙 Asosiy menyu"),
         ]
     ]

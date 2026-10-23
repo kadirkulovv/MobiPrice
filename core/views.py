@@ -247,6 +247,14 @@ def api_comparisons_by_issue(request, issue_id):
             title = c.title or ("Original Zavod" if is_original else "Sifatli Kopiya")
             badge = "Original" if is_original else "Kopiya"
 
+        is_available = bool(c.is_in_stock and (c.quantity > 0))
+        if lang == 'ru':
+            stock_display = f"В наличии: {c.quantity} шт." if is_available else "Нет в наличии (Под заказ)"
+        elif lang == 'en':
+            stock_display = f"In Stock: {c.quantity} pcs" if is_available else "Out of stock (On order)"
+        else:
+            stock_display = f"Omborda: {c.quantity} ta" if is_available else "Mavjud emas (Kutilmoqda)"
+
         data.append({
             'id': c.id,
             'quality_type': c.quality_type,
@@ -256,9 +264,12 @@ def api_comparisons_by_issue(request, issue_id):
             'service_fee_uzs': int(c.service_fee_uzs),
             'total_price_uzs': int(c.total_price_uzs),
             'price_usd': int(c.price_usd),
+            'quantity': c.quantity,
+            'is_in_stock': is_available,
+            'stock_display': stock_display,
             'warranty': warranty,
             'repair_time': c.repair_time,
-            'badge': c.badge,
+            'badge': badge,
             'description': desc,
             'features': c.features if isinstance(c.features, list) else [],
         })

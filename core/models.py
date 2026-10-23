@@ -109,6 +109,9 @@ class IssueComparison(models.Model):
     service_fee_uzs = models.DecimalField(_("Usta haqqi (so'm)"), max_digits=12, decimal_places=0, default=0)
     price_usd = models.DecimalField(_("Narxi (USD)"), max_digits=8, decimal_places=0, default=0)
 
+    quantity = models.PositiveIntegerField(_("Ombordagi soni"), default=5)
+    is_in_stock = models.BooleanField(_("Mavjud"), default=True)
+
     warranty = models.CharField(_("Kafolat (UZ)"), max_length=100, default="6 oy kafolat")
     warranty_ru = models.CharField(_("Kafolat (RU)"), max_length=100, default="6 месяцев гарантии")
     warranty_en = models.CharField(_("Kafolat (EN)"), max_length=100, default="6 months warranty")

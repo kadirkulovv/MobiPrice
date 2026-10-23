@@ -4,7 +4,7 @@ from aiogram.types import Message, CallbackQuery, PhotoSize, Document
 from aiogram.fsm.context import FSMContext
 from bot.keyboards.main_menu import get_section_crud_menu, get_cancel_menu
 from bot.keyboards.common import build_3_row_reply_kb, build_3_row_inline_kb
-from bot.states.admin_states import PhoneAddStates
+from bot.states.admin_states import PhoneAddStates, PhoneEditStates
 from bot.database import Brand, DeviceSeries, DevicePhone, sync_to_async
 from bot.config import MEDIA_PHONES_DIR
 
@@ -238,3 +238,95 @@ async def process_delete_phone(call: CallbackQuery):
     except Exception as e:
         await call.message.edit_text(f"Xatolik: {e}")
     await call.answer()
+
+
+@router.message(F.text == "✏️ Telefon tahrirlash")
+async def edit_phone_start(message: Message):
+    phones = await sync_to_async(list)(DevicePhone.objects.select_related('series', 'series__brand').all().order_by('name'))
+    if not phones:
+        await message.answer("Tahrirlash uchun telefonlar mavjud emas.")
+        return
+
+    items = [(f"{p.name}", f"edit_phone_{p.id}") for p in phones[:24]]
+    kb = build_3_row_inline_kb(items, back_callback="", add_cancel=True)
+
+    await message.answer(
+        "✏️ <b>Tahrirlamoqchi bo‘lgan telefonni tanlang:</b>",
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data.startswith("edit_phone_"))
+async def process_select_phone_for_edit(call: CallbackQuery, state: FSMContext):
+    phone_id = int(call.data.replace("edit_phone_", ""))
+    try:
+        phone = await sync_to_async(DevicePhone.objects.get)(id=phone_id)
+        await state.update_data(edit_phone_id=phone.id, edit_phone_name=phone.name)
+        await state.set_state(PhoneEditStates.waiting_for_new_data)
+
+        await call.message.edit_text(
+            f"✏️ <b>'{phone.name}' telefonini tahrirlash</b>\n\n"
+            f"Yangi nomini matn sifatida yozing (yoki yangi rasmini JPG/PNG sifatida yuboring):",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await call.message.edit_text(f"Xatolik: {e}")
+    await call.answer()
+
+
+@router.message(PhoneEditStates.waiting_for_new_data, F.text)
+async def process_edit_phone_name(message: Message, state: FSMContext):
+    new_name = message.text.strip()
+    if len(new_name) < 2:
+        await message.answer("Nom juda qisqa. Qaytadan kiriting:")
+        return
+
+    data = await state.get_data()
+    phone_id = data.get('edit_phone_id')
+
+    try:
+        phone = await sync_to_async(DevicePhone.objects.get)(id=phone_id)
+        old_name = phone.name
+        phone.name = new_name
+        from django.utils.text import slugify
+        phone.slug = slugify(new_name)
+        await sync_to_async(phone.save)()
+
+        await state.clear()
+        await message.answer(
+            f"✅ <b>Telefon nomi yangilandi!</b>\n\n"
+            f"Eski: <i>{old_name}</i>\n"
+            f"Yangi: <b>{new_name}</b>",
+            reply_markup=get_section_crud_menu("Telefon"),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await message.answer(f"Xatolik: {e}")
+
+
+@router.message(PhoneEditStates.waiting_for_new_data, F.photo)
+async def process_edit_phone_photo(message: Message, state: FSMContext, bot: Bot):
+    photo: PhotoSize = message.photo[-1]
+    data = await state.get_data()
+    phone_id = data.get('edit_phone_id')
+
+    try:
+        phone = await sync_to_async(DevicePhone.objects.get)(id=phone_id)
+        file = await bot.get_file(photo.file_id)
+        save_filename = f"{phone.slug}.jpg"
+        dest_path = MEDIA_PHONES_DIR / save_filename
+        await bot.download_file(file.file_path, destination=dest_path)
+
+        phone.image = f"phones/{save_filename}"
+        await sync_to_async(phone.save)()
+
+        await state.clear()
+        await message.answer(
+            f"✅ <b>'{phone.name}' rasmi muvaffaqiyatli yangilandi!</b>",
+            reply_markup=get_section_crud_menu("Telefon"),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await message.answer(f"Xatolik: {e}")
+

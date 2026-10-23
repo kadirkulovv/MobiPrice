@@ -382,12 +382,15 @@
           const isOriginal = opt.quality_type === 'original_service_pack';
           const cardClass = isOriginal ? 'option-card card-original-highlight' : 'option-card';
           const badgeClass = isOriginal ? 'option-badge badge-orig' : 'option-badge';
+          const isAvailable = opt.is_in_stock !== false && (opt.quantity === undefined || opt.quantity > 0);
+          const stockClass = isAvailable ? 'option-stock in-stock' : 'option-stock out-of-stock';
+          const btnText = isAvailable ? t.btnBook : (currentLang === 'ru' ? 'Под заказ (Ожидается)' : (currentLang === 'en' ? 'Pre-order (Pending)' : 'Buyurtma qilish (Kutilmoqda)'));
 
           return `
             <div class="${cardClass}" data-option-id="${opt.id}" data-option-title="${opt.title}" data-option-price="${opt.total_price_uzs || opt.part_price_uzs}">
               <div class="option-header">
                 <span class="${badgeClass}">${opt.badge || (isOriginal ? 'Original' : 'Kopiya')}</span>
-                <span class="option-stock">${t.inStock}</span>
+                <span class="${stockClass}">${opt.stock_display || (isAvailable ? 'Omborda mavjud' : 'Mavjud emas')}</span>
               </div>
 
               <h3 class="option-title">${opt.title}</h3>
@@ -397,7 +400,7 @@
                 <div class="price-usd">~$${opt.price_usd} USD</div>
               </div>
 
-              <button class="btn-book-option btn-primary">${t.btnBook}</button>
+              <button class="btn-book-option btn-primary ${isAvailable ? '' : 'btn-out-stock'}">${btnText}</button>
             </div>
           `;
         }).join('');

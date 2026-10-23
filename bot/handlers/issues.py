@@ -4,7 +4,7 @@ from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.fsm.context import FSMContext
 from bot.keyboards.main_menu import get_section_crud_menu, get_cancel_menu
 from bot.keyboards.common import build_3_row_reply_kb, build_3_row_inline_kb
-from bot.states.admin_states import IssueAddStates
+from bot.states.admin_states import IssueAddStates, IssueEditStates
 from bot.database import Brand, DeviceSeries, DevicePhone, DeviceIssue, sync_to_async
 from bot.config import CHEATSHEET_IMG, ICONS_DIR
 from bot.utils.translator import auto_translate_issue_title
@@ -261,3 +261,88 @@ async def process_delete_issue(call: CallbackQuery):
     except Exception as e:
         await call.message.edit_text(f"Xatolik: {e}")
     await call.answer()
+
+
+@router.message(F.text == "✏️ Muammo tahrirlash")
+async def edit_issue_start(message: Message):
+    issues = await sync_to_async(list)(DeviceIssue.objects.select_related('phone').all().order_by('-id')[:24])
+    if not issues:
+        await message.answer("Tahrirlash uchun muammolar mavjud emas.")
+        return
+
+    items = [(f"{iss.phone.name} - {iss.title}", f"edit_issue_{iss.id}") for iss in issues]
+    kb = build_3_row_inline_kb(items, back_callback="", add_cancel=True)
+
+    await message.answer(
+        "✏️ <b>Tahrirlamoqchi bo‘lgan muammoni tanlang:</b>",
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data.startswith("edit_issue_"))
+async def process_select_issue_for_edit(call: CallbackQuery, state: FSMContext):
+    issue_id = int(call.data.replace("edit_issue_", ""))
+    try:
+        issue = await sync_to_async(DeviceIssue.objects.get)(id=issue_id)
+        await state.update_data(edit_issue_id=issue.id, edit_issue_title=issue.title)
+        await state.set_state(IssueEditStates.waiting_for_new_data)
+
+        await call.message.edit_text(
+            f"✏️ <b>'{issue.phone.name} → {issue.title}' (Ikonka: #{issue.icon_number})</b>\n\n"
+            f"Yangi nomini yozing (avtomatik tarjima qilinadi) <b>yoki</b> yangi ikonka raqamini yuboring (1-30):",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await call.message.edit_text(f"Xatolik: {e}")
+    await call.answer()
+
+
+@router.message(IssueEditStates.waiting_for_new_data, F.text)
+async def process_edit_issue_data(message: Message, state: FSMContext):
+    text = message.text.strip()
+    data = await state.get_data()
+    issue_id = data.get('edit_issue_id')
+
+    try:
+        issue = await sync_to_async(DeviceIssue.objects.get)(id=issue_id)
+
+        # If user entered an icon number 1..30
+        if text.isdigit() and (1 <= int(text) <= 30):
+            icon_num = int(text)
+            issue.icon_number = icon_num
+            icon_svg_path = ICONS_DIR / f"{icon_num}.svg"
+            if os.path.exists(icon_svg_path):
+                with open(icon_svg_path, 'r', encoding='utf-8') as f:
+                    issue.icon_svg = f.read()
+            await sync_to_async(issue.save)()
+
+            await state.clear()
+            await message.answer(
+                f"✅ <b>'{issue.title}' uchun ikonka #{icon_num} ga yangilandi!</b>",
+                reply_markup=get_section_crud_menu("Muammo"),
+                parse_mode="HTML"
+            )
+            return
+
+        # Otherwise user entered new title -> auto-translate
+        title_ru, title_en = await auto_translate_issue_title(text)
+        old_title = issue.title
+        issue.title = text
+        issue.title_ru = title_ru
+        issue.title_en = title_en
+        await sync_to_async(issue.save)()
+
+        await state.clear()
+        await message.answer(
+            f"✅ <b>Muammo nomi yangilandi va avtomatik tarjima qilindi!</b>\n\n"
+            f"Eski: <i>{old_title}</i>\n"
+            f"🇺🇿 UZ: <b>{issue.title}</b>\n"
+            f"🇷🇺 RU: <i>{issue.title_ru}</i>\n"
+            f"🇬🇧 EN: <i>{issue.title_en}</i>",
+            reply_markup=get_section_crud_menu("Muammo"),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await message.answer(f"Xatolik: {e}")
+

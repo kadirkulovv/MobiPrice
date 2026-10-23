@@ -406,6 +406,19 @@
   border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
+.option-stock.out-of-stock {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.btn-out-stock {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: var(--text-sub) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: none !important;
+}
+
 .option-title {
   font-size: 18px;
   font-weight: 800;
