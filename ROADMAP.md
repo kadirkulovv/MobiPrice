@@ -47,8 +47,8 @@
 - [x] Django loyihasi yaratildi, app strukturasi (`core`, `bot`) sozlandi.
 - [x] Ko‘p tillilik sozlamalari (`uz`, `ru`, `en`) va i18n arxitekturasi ulandi.
 - [x] Statik fayllar va media fayllar yo‘llari (`media/brands/`, `media/phones/`, `static/img/icons/`) sozlandi.
-- [x] Virtualenv (`.venv`) va mustaqil ishga tushirish skriptlari sozlandi.
-- [x] SQLite3 bazasi sozlandi va optimallashtirildi.
+- [x] Virtualenv (`.venv`) va Makefile orqali dasturchi buyruqlari (`run`, `bot`, `migrate`, `shell`) sozlandi.
+- [x] SQLite3 bazasi sozlandi, WAL (Write-Ahead Logging) va 5000ms busy timeout yuqori yuklamalar uchun ulandi.
 
 ---
 
@@ -62,6 +62,7 @@
   - `RepairFAQ`: Ko‘p beriladigan savol-javoblar (3 tilda).
   - `Review`: Mijoz sharhlari va ta'mirdan "Oldin / Keyin" (`before_image`, `after_image`) fotolari.
   - `ServiceOrder`: Unikal `#ORD-XXXX` trek-kodli buyurtmalar modeli.
+- [x] Django Admin boshqaruvi: barcha modellar uchun qidiruv, filtrlar, tartiblash va ombordagi sonini tezkor tahrirlash (`list_editable`) sozlandi.
 - [x] Barcha modellar uchun Django migratsiyalari yaratildi va bazaga muvaffaqiyatli tatbiq qilindi (`0001_initial`, `0002_...`, `0003_...`).
 
 ---
