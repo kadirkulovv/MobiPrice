@@ -1,195 +1,188 @@
-# 📱 SMART PHONE REPAIR & SPARE PARTS PLATFORM
-## Katta Ko‘lamli (Production) Loyiha Yo‘l Xaritasi va Texnik Arxitekturasi (Roadmap)
+# 📱 MOBIPRICE — PROFESSIONAL SMARTPHONE REPAIR & CATALOG PLATFORM
+## 🚀 Loyiha Yo‘l Xaritasi va Texnik Arxitekturasi (Roadmap)
 
-> **Loyiha maqsadi:** Telefon buzilganda bozorga bormasdan turib, har qanday model uchun ehtiyot qismlar narxini (Original vs Kopiyalar farqi, kafolati bilan) bilish, ta'mirlashga buyurtma berish va professional servis xizmatini taklif qiluvchi yuqori yuklamali (High-Load), 3 tilli portal.
-
----
-
-## 📑 MUNDARIJA
-1. [Loyiha Texnologik Staki (Tech Stack)](#1-loyiha-texnologik-staki)
-2. [1-Bosqich: Tizim Arxitekturasi va Dastlabki Sozlash](#1-bosqich-tizim-arxitekturasi-va-sozlash)
-3. [2-Bosqich: Ma'lumotlar Bazasi Strukturasi (Database Modeling)](#2-bosqich-malumotlar-bazasi-strukturasi)
-4. [3-Bosqich: Admin Panel va Maxsus CRM Tizimi](#3-bosqich-admin-panel-va-crm)
-5. [4-Bosqich: Mijoz Interfeysi (UI/UX) va Interaktiv Funksiyalar](#4-bosqich-mijoz-interfeysi-va-uiux)
-6. [5-Bosqich: Telegram Bot va Xabarnomalar Ekotizimi](#5-bosqich-telegram-bot-va-xabarnomalar)
-7. [6-Bosqich: 3 Tilli (Multilingual) Tizim va SEO Strategiyasi](#6-bosqich-3-tilli-tizim-va-seo)
-8. [7-Bosqich: Yuqori Yuklama (High-Load 10,000+), Kesh va Xavfsizlik](#7-bosqich-yuqori-yuklama-va-xavfsizlik)
-9. [8-Bosqich: Docker, Serverga Joylash (Deploy) va Zaxira Nusxalash](#8-bosqich-deploy-va-monitoring)
+> **Loyiha maqsadi:** Telefon buzilganda bozorga bormasdan turib, har qanday model uchun ehtiyot qismlar narxini (Original vs Kopiya farqi, ombordagi qoldig‘i bilan) bilish, ta'mirlashga buyurtma berish va professional servis xizmatini taklif qiluvchi yuqori yuklamali (High-Load), 3 tilli portal hamda Telegram Admin Bot ekotizimi.
 
 ---
 
-## 1. LOYIHA TEXNOLOGIK STAKI
-- **Asosiy Backend:** Python 3.12+ / Django 5.x (ishonchli, kengayuvchan, xavfsiz).
-- **REST API:** Django REST Framework (kelajakda mobil ilova va bot uchun).
-- **Asosiy Ma'lumotlar Bazasi:** PostgreSQL (tranzaksiyalar, qidiruv indekslari uchun).
-- **Kesh va Navbatlar (Message Broker):** Redis + Celery (kataloglarni tezkor yuklash, bot xabarlarini navbatda yuborish).
-- **Frontend / UI:** Zamonaviy Dark Theme, CSS Grid/Flexbox, Vanilla JS / Fetch API (sahifa yangilanmasdan ishlovchi SPA effektlari).
-- **Konteynerlashtirish:** Docker & Docker Compose.
-- **Veb-server & Proksi:** Nginx + Gunicorn + Certbot (SSL/HTTPS).
+## 🧭 ASOSIY ARXITEKTURA VA BIZNES QOIDALARI
+
+1. **5-Bosqichli Katalog Ierarxiyasi:**
+   - **1-Qadam: Brend (`Brand`)** — Apple, Samsung, Xiaomi, Honor... (SVG logo bilan).
+   - **2-Qadam: Model Seriyasi (`DeviceSeries`)** — Masalan: `Pro Model`, `Pro Max Model`, `S Seriya`, `A Seriya`, `Redmi Note`...
+   - **3-Qadam: Telefon (`DevicePhone`)** — Aniq telefon nomi va rasmi (masalan: `iPhone 16 Pro Max`, `Galaxy S25 Ultra`...).
+   - **4-Qadam: Muammo / Detal (`DeviceIssue`)** — 30 ta professional vektor SVG ikonka + 1 ta o‘zbekcha nom kiritilganda avtomatik Ruscha va Inglizcha tillariga tarjima qilinishi.
+   - **5-Qadam: Solishtirish / Narx (`IssueComparison`)** — Soddalashtirilgan taqqoslash: Faqatgina **Original** yoki **Kopiya**, narxi (so‘mda) va ombordagi soni (**Quantity** — mavjud / tugagan). *Ortiqcha kafolat, ta'mirlash vaqti va usta haqqi kabi chalkash ma'lumotlar olib tashlangan.*
+
+2. **Telegram Admin Bot Standartlari:**
+   - Aiogram 3.x FSM (Finite State Machine) asosida.
+   - Faqat xavfsiz Admin IDlar ro‘yxati (`ADMIN_IDS`) orqali kirish.
+   - **Klaviatura ergonomikasi:** Har bir qatorda maksimal **3 tadan** tugma (`build_3_row_reply_kb`, `build_3_row_inline_kb`).
+   - To‘liq CRUD (Yaratish, Ko‘rish, Tahrirlash, O‘chirish) barcha 5 ta bo‘lim uchun.
+
+3. **3 Tilli Tizim (i18n):**
+   - Sayt va API 3 tilda ishlaydi: O‘zbekcha (`/uz/`), Ruscha (`/ru/`), Inglizcha (`/en/`).
+   - Admin botda faqat 1 ta — O‘zbek tilida kiritadi, muammo nomlari avtomatik tarjima qilinadi.
 
 ---
 
-## 2. 1-BOSQICH: TIZIM ARXITEKTURASI VA SOZLASH
-- [ ] **Loyiha muhitini yaratish:** Docker va Docker Compose konfiguratsiyasi (`web`, `db`, `redis`, `celery`, `nginx`).
-- [ ] **Django Apps arxitekturasi:**
-  - `core` — umumiy sozlamalar, bosh sahifa, statik modullar.
-  - `catalog` — brendlar, modellar, zapchast turlari, sifat variantlari (Original/Kopiya).
-  - `orders` — mijoz arizalari, narx kalkulyatsiyasi, statusni tekshirish tizimi.
-  - `knowledge` — FAQ (Nega batareya shishadi?, Nega original qimmat?), tushuntirish maqolalari.
-  - `reviews` — sharhlar va "Oldin / Keyin" (Before/After) fotogalereyasi.
-  - `bot` — Telegram orqali xodimlarni xabardor qilish webhook moduli.
+## 🛠 TEXNOLOGIK STEK (TECH STACK)
+
+- **Backend:** Python 3.12+ / Django 5.1+ (ORM, Asinxron funksiyalar, i18n).
+- **Telegram Bot:** Aiogram 3.17+ (FSM, Polling/Webhook, Custom Keyboards).
+- **Frontend:** Vanilla CSS / JavaScript (No bulky frameworks), Dark Mode, Glassmorphism, Responsive Mobile-First.
+- **Ma'lumotlar Bazasi:** PostgreSQL 16 (Production) / SQLite3 (Mahalliy ishlab chiqish).
+- **Kesh & Xabarlar:** Redis + Celery.
+- **Konteynerlashtirish:** Docker & Docker Compose (web, db, bot).
+- **Web Server:** Nginx + Gunicorn + Certbot SSL.
 
 ---
 
-## 3. 2-BOSQICH: MA'LUMOTLAR BAZASI STRUKTURASI
-Bazani kelajakda minglab modellar va ehtiyot qismlarni sig‘dira oladigan qilib loyihalashtirish:
+## 📋 BOSQICHLAR VA AMALGA OSHIRISH REJASI
 
-1. **Brendlar (`Brand`):**
-   - Nomi (`Apple`, `Samsung`, `Xiaomi`, `Honor`, `Huawei`...)
-   - Logotip, slug, tartib raqami, aktivlik holati.
-2. **Qurilma Modellari (`DeviceModel`):**
-   - Brend bilan bog‘liqlik (`ForeignKey -> Brand`).
-   - Model nomi (`iPhone 16 Pro Max`, `Galaxy S24 Ultra`, `Redmi Note 13 Pro`...)
-   - Chiqqan yili, modeli kodi (masalan, `A3084`), asosiy rasm.
-   - Tezkor qidiruv indekslari.
-3. **Ehtiyot Qism Kategoriyalari (`PartCategory`):**
-   - Kategoriya nomi: `Ekran (Displey)`, `Orqa oyna (Kopust/Krishka)`, `Batareya (Akkumulyator)`, `Kamera oynasi`, `Zaryadka porti`, `Dinamik`, `Plata ta'miri`.
-   - Ikonkasi va qisqa tavsifi.
-4. **Sifat Variantlari va Narxlar (`PartOption`):**
-   - Model va Kategoriya bilan bog‘liqlik.
-   - Sifat darajasi:
-     - `1. Original Service Pack` (100% zavod)
-     - `2. Original Donar` (Boshqa telefondan yechib olingan ideal holatda)
-     - `3. OLED GX / ZY` (Originalga eng yaqin sifatli dublikat)
-     - `4. Incell / TFT` (Hamyonbop variant)
-   - Narx (zapchast narxi + usta o‘rnatib berish haqqi).
-   - Kafolat muddati (`6 oy`, `3 oy`, `1 oy`, `Kafolatsiz`).
-   - Ta'mirlash muddati (`30 daqiqa`, `1 soat`, `1 kun`).
-   - Tavsif va Farqlar: "Originalda nima bor, kopiyasida nima yo‘q?".
-   - Solishtirish rasmlari (Taqqoslash uchun).
-   - Ombor holati (`Mavjud`, `Zakazga 1 kun`, `Tugagan`).
-5. **Bilimlar Bazasi / FAQ (`RepairFAQ`):**
-   - Qaysi qismga tegishliligi (Batareya, Ekran...).
-   - Savol: *"Nega batareya shishadi?"*, *"Nega original ekran qimmat?"*.
-   - Batafsil professional javob va tushuntiruvchi rasm/video havola.
-6. **Mijoz Sharhlari va Before/After (`Review`):**
-   - Mijoz ismi, ta'mirlangan telefon modeli va qilingan ish.
-   - Reyting (1 dan 5 gacha).
-   - Mijoz izohi.
-   - Ta'mirdan oldingi rasm (`before_image`) va Ta'mirdan keyingi rasm (`after_image`).
-   - Tasdiqlangan holat (Admin tekshiruvidan so‘ng saytda ko‘rinadi).
-7. **Arizalar / Buyurtmalar (`ServiceOrder`):**
-   - Unikal Trek-kod (Masalan: `#ORD-7894`).
-   - Mijoz ismi va Telefon raqami.
-   - Tanlangan Model va Detal varianti.
-   - Xizmat formati: `Filialga kelish`, `Usta chaqirish`, `Kuryer orqali yuborish`.
-   - Buyurtma holati: `Yangi` -> `Qabul qilindi` -> `Usta ta'mirlamoqda` -> `Tayyor` -> `Topshirildi` -> `Bekor qilindi`.
-   - Admin va usta uchun ichki izohlar.
+### 1-BOSQICH: TIZIM ARXITEKTURASI VA INFRATUZILMA
+- [x] Django loyihasi yaratildi, app strukturasi (`core`, `bot`) sozlandi.
+- [x] Ko‘p tillilik sozlamalari (`uz`, `ru`, `en`) va `django-modeltranslation` / i18n arxitekturasi ulandi.
+- [x] Statik fayllar va media fayllar yo‘llari (`media/brands/`, `media/phones/`, `static/img/icons/`) sozlandi.
+- [x] `Dockerfile` va `docker-compose.yml` (PostgreSQL 16, Django Web, Telegram Bot servislar bilan) tayyorlandi.
+- [x] Makefile va muhit boshqaruv skriptlari yaratildi.
 
 ---
 
-## 4. 3-BOSQICH: ADMIN PANEL VA CRM
-- [ ] **Brendlangan qulay Admin Panel:**
-  - O‘zbek, rus tillarida qulay boshqaruv.
-  - Excel orqali yuzlab modellarni bir marta yuklash (Bulk Import/Export).
-  - Narxlarni bir zumda yangilash (foizda yoki qo‘lda oshirish/tushirish).
-- [ ] **Buyurtmalar Kanbani (Mini-CRM):**
-  - Yangi kelgan arizalarni bosqichma-bosqich o‘tkazish (Drag & Drop yoki status o‘zgartirish).
-  - Ustalarni biriktirish (Qaysi usta qaysi telefonni ta'mirlayotgani hisobi).
+### 2-BOSQICH: 5-QADAMLI MA'LUMOTLAR BAZASI STRUKTURASI
+- [x] **1. Brendlar modeli (`Brand`):** Nomi, slug, SVG logo kodi, rasm, tartib raqami, aktivlik holati.
+- [x] **2. Model Seriyalari modeli (`DeviceSeries`):** `ForeignKey -> Brand`, seriya nomi, slug, tartibi (`unique_together=('brand', 'name')`).
+- [x] **3. Telefonlar modeli (`DevicePhone`):** `ForeignKey -> DeviceSeries`, telefon nomi, unikal avto-slug (to‘qnashuvlarni `name-1`, `name-2` qilib hal qiluvchi), rasm maydoni (`phones/`), chiqqan yili.
+- [x] **4. Muammolar modeli (`DeviceIssue`):** `ForeignKey -> DevicePhone`, o‘zbekcha nomi (`title`), ruscha nomi (`title_ru`), inglizcha nomi (`title_en`), 30 ta ikonka raqami (`icon_number`), SVG ikonka kodi (`icon_svg`).
+- [x] **5. Sifat va Narxlar modeli (`IssueComparison`):** `ForeignKey -> DeviceIssue`, sifati (`original` / `kopiya`), sarlavha, narxi so‘mda (`part_price_uzs`), USD ekvivalenti (`price_usd`), ombordagi soni (`quantity`), ombor holati (`is_in_stock`).
+- [x] **Yordamchi modellar:**
+  - `RepairFAQ`: Ko‘p beriladigan savol-javoblar (3 tilda).
+  - `Review`: Mijoz sharhlari va ta'mirdan "Oldin / Keyin" (`before_image`, `after_image`) fotolari.
+  - `ServiceOrder`: Unikal `#ORD-XXXX` trek-kodli buyurtmalar modeli.
+- [x] Barcha modellar uchun Django migratsiyalari yaratildi va bazaga muvaffaqiyatli tatbiq qilindi (`0001_initial`, `0002_...`, `0003_...`).
 
 ---
 
-## 5. 4-BOSQICH: MIJOZ INTERFEYSI (UI/UX) VA FUNKSIYALAR
-- [ ] **Dizayn Konsepsiyasi:**
-  - Zamonaviy "Chorniy" (Dark Mode) premium ko‘rinish.
-  - Shishasimon (Glassmorphism) kartochkalar, yuqori kontrastli shriftlar.
-  - Telefon ekranlariga 100% moslashgan (Mobile-First responsive).
-- [ ] **Asosiy Bloklar:**
-  1. **Header:** Logotip, 3 ta til tugmasi (`UZ` | `RU` | `EN`), "Telefonim holatini tekshirish", Tezkor qo‘ng‘iroq / Telegram havolasi.
-  2. **Hero & Smart Live Search:** Telefon modelini qidiruvga yozish bilan bir zumda takliflar chiqishi (`iPhone 16...`).
-  3. **Interaktiv Qadamma-qadam Kalkulyator (Wizard):**
-     - *1-qadam:* Brendni tanlash (Apple, Samsung, Xiaomi...).
-     - *2-qadam:* Modelni tanlash (Rasmlari bilan ro‘yxat).
-     - *3-qadam:* Muammo / Detalni tanlash (Ekran, Orqa oyna, Batareya...).
-     - *4-qadam:* Natija: Sifat variantlari taqqoslash jadvali (Original vs Kopiyalar yonma-yon).
-  4. **Vizual Solishtiruvchi Karta:**
-     - Narx, Kafolat, Ta'mirlash tezligi va Farqlari.
-  5. **Interaktiv "Oldin va Keyin" (Before / After Slider):**
-     - Foydalanuvchi barmog‘i bilan surib, singan telefon qanday tiklanganini ko‘ra oladi.
-  6. **"Ekspert maslahati" (FAQ Akkordeon):**
-     - Odamlarni eng ko‘p qiziqtirgan savollar (Nega batareya shishadi?, Qaysi ekranni tanlagan ma'qul?).
-  7. **Buyurtma berish modali:**
-     - Telefon raqam kiritish -> Telegramga lahzada tushishi.
-  8. **"Telefonim qayerda?" (Trek tekshirish):**
-     - Mijoz telefonini topshirgach, unga berilgan ID orqali saytga kirib: *"Telefoningiz hozir diagnostikada"* yoki *"Tuzatildi, olib ketishingiz mumkin"* holatini ko‘ra oladi.
+### 3-BOSQICH: AIOGRAM 3 TELEGRAM ADMIN BOT PANELI
+- [x] Admin avtorizatsiyasi: faqat ruxsat etilgan Admin IDlar (`ADMIN_IDS`) orqali boshqaruv.
+- [x] Qulay Dashboard klaviaturasi: `📂 Brendlar`, `📁 Modellar`, `📱 Telefonlar`, `🔧 Muammolar`, `💰 Narxlar`, `📊 Statistika`.
+- [x] **Qatorda maksimal 3 ta tugma** ergonomika qoidasi barcha Reply va Inline tugmalarga joriy etildi.
+- [x] **1-Bo‘lim: Brendlar CRUD:**
+  - Ro‘yxat ko‘rish, yangi brend qo‘shish (nomi + `.svg` logotip fayli), tahrirlash (nom va logo), o‘chirish.
+- [x] **2-Bo‘lim: Modellar (Seriyalar) CRUD:**
+  - Brend tanlash -> Seriya nomini kiritish, ro‘yxat, tahrirlash, o‘chirish.
+- [x] **3-Bo‘lim: Telefonlar CRUD:**
+  - Brend tanlash -> Seriya tanlash -> Telefon nomini kiritish -> JPG/PNG rasmini yuklash (rasm yoki fayl ko‘rinishida).
+  - Ro‘yxat ko‘rish, nomini va rasmini alohida tahrirlash, o‘chirish.
+  - Asinxron xavfsiz DB yuklanishi (`select_related`) va rasmlar xavfsiz saqlanishi.
+- [x] **4-Bo‘lim: Muammolar CRUD va Avtomatik Tarjima:**
+  - Brend -> Seriya -> Telefon tanlash.
+  - O‘zbekcha nom kiritilganda avtomatik Ruscha va Inglizcha tarjimalarni yaratish (`bot/utils/translator.py`).
+  - 30 ta vektorli SVG ikonka generatsiyasi va botda ko‘rsatiladigan 6x5 neonli cheatsheet infografika rasmi (`bot/assets/icons_cheatsheet.png`).
+  - Ikonka raqamini (1-30) tanlash va SVG kodini bazaga yozish, tahrirlash, o‘chirish.
+- [x] **5-Bo‘lim: Soddalashtirilgan Narxlar CRUD:**
+  - Brend -> Seriya -> Telefon -> Muammoni tanlash.
+  - Sifat turini tanlash: `🟢 Original` yoki `🟡 Sifatli Kopiya`.
+  - Narxini kiritish (so‘mda).
+  - Ombordagi qoldiq miqdorini kiritish (`quantity` — masalan: 5 yoki 0).
+  - Narx va miqdorni tahrirlash, o‘chirish.
 
 ---
 
-## 6. 5-BOSQICH: TELEGRAM BOT VA XABARNOMALAR
-- [ ] **Admin va Ustalar Guruhiga Bot:**
-  - Saytdan har qanday ariza tushishi bilan 1 soniyada xabar:
-    ```
-    🚨 YANGI BUYURTMA! #ORD-1042
-    👤 Mijoz: Alisher Karimov
-    📞 Tel: +998 90 123 45 67
-    📱 Model: iPhone 16 Pro Max
-    🔧 Xizmat: Orqa oyna almashtirish
-    💎 Tanlangan sifat: Original Zavod ($120)
-    ⏱ Kafolat: 6 oy
-    ```
-  - Xabar tagida tugmalar: `[Qabul qilish]` | `[Mijozga qo'ng'iroq qilindi]` | `[Bekor qilish]`.
-- [ ] **Mijozga SMS / Telegram Bildirishnoma (Ixtiyoriy kengaytmalar):**
-  - "Sizning arizangiz qabul qilindi. Usta tez orada bog‘lanadi".
+### 4-BOSQICH: MIJOZ INTERFEYSI (UI/UX) VA 5-QADAMLI KALKULYATOR
+- [x] **Premium Dark Mode Dizayn:** Glassmorphism neon aksentlar, yuqori kontrastli zamonaviy tipografika, 100% mobil moslashuvchanlik.
+- [x] **Interaktiv 5-Bosqichli Kalkulyator:**
+  - 1-Qadam: Brend tanlash (Apple, Samsung, Xiaomi...).
+  - 2-Qadam: Model Seriyasi tanlash (S seriya, A seriya, Pro seriya...).
+  - 3-Qadam: Aniq telefonni tanlash (suratlari bilan).
+  - 4-Qadam: Muammoni tanlash (30 ta aniq SVG ikonkalari bilan).
+  - 5-Qadam: Solishtirish natijasi: Original vs Kopiya, Narxi, Omborda mavjudlik holati (`🟢 Omborda: X ta` yoki `🔴 Mavjud emas (Kutilmoqda)`).
+- [x] **Interaktiv "Oldin va Keyin" (Before / After Slider):**
+  - Foydalanuvchi sensorli ekranda yoki sichqoncha bilan siljitib ta'mirdan oldingi va keyingi holatni taqqoslay oladi.
+- [x] **FAQ va Mijoz Sharhlari:**
+  - Dinamik tez-tez beriladigan savollar akkordeoni va mijozlar fikrlari bloki.
+- [x] **Til almashtirish interfeysi:** Sayt sarlavhasida `UZ | RU | EN` tillarini bir zumda almashtirish.
+- [x] **Buyurtma berish modali:**
+  - Mijoz o‘z ismi va telefon raqamini kiritib ariza qoldirishi mumkin bo‘lgan tezkor forma.
+- [ ] **Jonli Model Qidiruvi (Live Search):**
+  - Qidiruv qatoriga yozish bilan bir zumda telefon modellarini topib, to‘g‘ridan-to‘g‘ri kalkulyatorga yo‘naltirish.
+- [ ] **"Telefonim holatini tekshirish" (Trek tekshirish UI & API):**
+  - Mijoz o‘zining `#ORD-XXXX` kodi orqali saytdan telefon qaysi bosqichda ekanligini (Diagnostika, Qismlar kutilmoqda, Tuzatildi, Olib ketishga tayyor) bilishi.
 
 ---
 
-## 7. 6-BOSQICH: 3 TILLI TIZIM VA SEO (QIDIRUV TIZIMLARIDA 1-O‘RIN)
-- [ ] **Ko‘p tillilik (i18n):**
-  - O‘zbekcha (`/uz/`), Ruscha (`/ru/`), Inglizcha (`/en/`).
-  - Dinamik ma'lumotlar (zapchast nomlari, tavsiflar) 3 tilda kiritilishi.
-- [ ] **SEO Avtomatizatsiyasi (Biznesga tekin mijozlar oqimi):**
-  - Har bir model va zapchast uchun avtomatik generatsiya bo‘ladigan meta-teglar:
-    - *Title:* "iPhone 16 Pro Max ekran almashtirish narxi Toshkentda | Murod Service"
-    - *Description:* "iPhone 16 Pro Max original va sifatli kopiya ekranlari narxi, 6 oylik kafolat, 30 daqiqada o‘rnatib berish."
-  - Google va Yandex uchun `sitemap.xml` va `robots.txt` sozlash.
-  - Schema.org (Product / Service mikroformati) — Google qidiruvida yulduzchalar va narxlar to‘g‘ridan-to‘g‘ri ko‘rinishi uchun.
+### 5-BOSQICH: BUYURTMALAR EKOTIZIMI VA TELEGRAM CRM
+- [ ] **Saytdan yangi buyurtma tushganda Telegram Botga / Guruhga xabar:**
+  ```
+  🚨 YANGI TA'MIRLASH BUYURTMASI! #ORD-1042
+  👤 Mijoz: Alisher Karimov
+  📞 Telefon: +998 90 123 45 67
+  📱 Model: Samsung Galaxy S25 Ultra
+  🔧 Muammo: Ekran almashtirish
+  💎 Tanlangan detal: Original Service Pack
+  💵 Narxi: 1,850,000 so‘m
+  📦 Holati: Omborda mavjud
+  ```
+- [ ] **Bot orqali arizani tezkor boshqarish:**
+  - Xabar tagidagi inline tugmalar: `[✅ Qabul qilish]` | `[👨‍🔧 Ustaga biriktirish]` | `[📞 Qo‘ng‘iroq qilindi]` | `[❌ Bekor qilish]`.
+- [ ] **Buyurtmalar Mini-CRM interfeysi:**
+  - Saytdan tushgan arizalar ro‘yxati, ustalar hisobi va holatni o‘zgartirish mexanizmi.
+- [ ] **Mijozga avtomatik SMS / Telegram bildirishnoma (Ixtiyoriy):**
+  - Arizangiz qabul qilindi, telefoningiz tayyor bo‘ldi kabi xabarnomalar.
 
 ---
 
-## 8. 7-BOSQICH: YUQORI YUKLAMA (HIGH-LOAD 10,000+), KESH VA XAVFSIZLIK
+### 6-BOSQICH: OMMAVIY MA'LUMOT BOSHQARUVI (EXCEL IMPORT / EXPORT)
+- [ ] **Excel / CSV orqali ommaviy yuklash (Bulk Import):**
+  - Yuzlab telefonlar, seriyalar va ehtiyot qismlar narxlarini 1 ta Excel fayli orqali bazaga avtomatik kiritish.
+- [ ] **Excel orqali eksport va narxlarni yoppasiga yangilash:**
+  - Hamma narxlarni Excel jadval ko‘rinishida yuklab olish va o‘zgartirib qayta yuklash imkoniyati.
+
+---
+
+### 7-BOSQICH: YUQORI YUKLAMA (HIGH-LOAD 10,000+), KESH VA XAVFSIZLIK
 - [ ] **Redis Kesh:**
-  - Brendlar, modellar, zapchast narxlari Redis xotirasida saqlanadi. 10,000 ta mijoz bir vaqtda kirsa ham baza qiynalmaydi (so‘rovlar 0.005 soniyada chiqadi).
-- [ ] **PostgreSQL Optimallashtirish:**
-  - Model nomlari, brendlar bo‘yicha indekslar (`db_index=True`).
-- [ ] **Spam va Hujumlardan Himoya:**
-  - Ariza yuborishda Rate Limiting (1 ta IP dan 1 daqiqada faqat 2 ta so‘rov).
-  - Cloudflare Turnstile yoki reCAPTCHA integratsiyasi.
+  - Katalog ma'lumotlarini (Brendlar, Seriyalar, Telefonlar va Narxlar) Redis xotirasida saqlash (so‘rovlar tezligini < 5ms darajasiga yetkazish).
+- [ ] **PostgreSQL Indexing & Optimization:**
+  - Qidiruv va tanlovlar bo‘yicha indekslarni chuqur optimallashtirish (`db_index=True`, `select_related`).
+- [ ] **Spam va Hujumlardan Himoya (Rate Limiting):**
+  - Buyurtma formasiga 1 ta IP manzildan daqiqasiga 2 tadan ortiq so‘rov yuborishni cheklash (Anti-spam protection).
   - CSRF va XSS himoyasi.
 
 ---
 
-## 9. 8-BOSQICH: DOCKER, SERVERGA JOYLASH (DEPLOY) VA ZAXIRA
-- [ ] **Docker Compose Prod Konfiguratsiyasi:**
-  - `web` (Django Gunicorn bilan).
-  - `postgres` (Ma'lumotlar doimiy `volumes`da saqlanadi).
-  - `redis` (Kesh va navbatlar uchun).
-  - `nginx` (Statik fayllar, SSL sertifikat, kompressiya Gzip/Brotli).
-- [ ] **Avtomatik Zaxira (Backup):**
-  - Har kechasi ma'lumotlar bazasining zaxira nusxasini (dump) olib, xavfsiz joyga (yoki maxfiy Telegram kanalga) yuborish cron-skripti.
-- [ ] **Monitoring:**
-  - Serverning xotirasi va holatini kuzatuvchi sodda monitoring.
+### 8-BOSQICH: SEO VA QIDIRUV TIZIMLARIDA PESHQADAMLIK
+- [ ] Har bir model va muammo uchun avtomatik generatsiya qilinadigan SEO meta-teglar (Title, Meta Description, OpenGraph).
+- [ ] Dinamik `sitemap.xml` va `robots.txt` generatsiyasi.
+- [ ] **Schema.org mikroformati:** Google qidiruv natijalarida to‘g‘ridan-to‘g‘ri yulduzchalar (reyting) va ta'mirlash narxi ko‘rinib turishi uchun `Product` / `Service` JSON-LD formatini integratsiya qilish.
 
 ---
 
-## 🚀 AMALGA OSHIRISH KETMA-KETLIGI (HARAKAT REJASI)
+### 9-BOSQICH: DOCKER PRODUCTION DEPLOY VA MONITORING
+- [ ] **Production Docker Compose:**
+  - `web` konteyneri (Gunicorn production serveri).
+  - `db` konteyneri (PostgreSQL 16 doimiy docker volumes bilan).
+  - `redis` konteyneri.
+  - `bot` konteyneri (Aiogram fon jarayoni).
+  - `nginx` konteyneri (Statik fayllar keshlanishi, Gzip kompressiya, SSL terminatsiyasi).
+- [ ] **Let's Encrypt SSL/HTTPS:**
+  - Domen uchun Certbot orqali avtomatik yangilanuvchi bepul xavfsiz SSL sertifikati.
+- [ ] **Avtomatik Backup (Zaxiralash):**
+  - Har kechasi PostgreSQL ma'lumotlar bazasining to‘liq nusxasini (dump) olib, maxfiy zaxira joyiga saqlash cron skripti.
+- [ ] **Avtomatik qayta tiklanish (Healthcheck & Restart policies):**
+  - Server o‘chib yonganda barcha konteynerlarning avtomatik ishga tushishi (`restart: unless-stopped`).
 
-| Bosqich | Vazifa | Muddat (Taxminiy) |
+---
+
+## 📊 HOZIRGI HOLAT XULOSASI (STATUS OVERVIEW)
+
+| Bo‘lim | Holati | Izoh |
 | :--- | :--- | :--- |
-| **Sprint 1** | Django, Docker, 3 ta til, Baza modellari va Demo ma'lumotlar (Seed) | 2-3 kun |
-| **Sprint 2** | Dark Mode interfeysi, Kalkulyator Wizard, Before/After slayderi | 3-4 kun |
-| **Sprint 3** | FAQ moduli, Otzivlar, Buyurtma formasi, Telegram Bot | 2-3 kun |
-| **Sprint 4** | Trek tekshirish, Admin CRM sozlash, Excel orqali ma'lumot to‘ldirish | 2-3 kun |
-| **Sprint 5** | Redis kesh, SEO optimallashtirish, Serverga deploy qilish | 2 kun |
-
----
-*Ushbu hujjat loyiha uchun to‘liq texnik ko‘rsatma (specification) hisoblanadi.*
+| **5-Bosqichli Baza Modeli** | ✅ **Bajarildi (100%)** | `Brand` -> `Series` -> `Phone` -> `Issue` -> `Comparison` to‘liq tayyor |
+| **Aiogram 3 Admin Bot** | ✅ **Bajarildi (100%)** | 5 ta bo‘lim uchun to‘liq CRUD, 30 ta SVG ikonka, avto-tarjima, 3-tugmali menyu |
+| **Kalkulyator UI (Web)** | ✅ **Bajarildi (95%)** | 5 ta bosqich, Before/After slider, Dark UI, 3 ta til faol |
+| **Telegram Xabarnomalar** | ⏳ **Keyingi navbatda** | Saytdan tushgan buyurtmani botga / guruhga uzatish |
+| **Trek Tekshirish (Track Order)** | ⏳ **Keyingi navbatda** | Saytda `#ORD-XXXX` kodi bilan status ko‘rish |
+| **Excel Import / Export** | ⏳ **Rejada** | Ommaviy ma'lumot kiritish |
+| **Redis Kesh & High-Load** | ⏳ **Rejada** | 10,000+ so‘rovlar uchun optimizatsiya |
+| **Production Deploy** | ⏳ **Rejada** | Nginx, SSL, Postgres Volume va Serverga o‘rnatish |
