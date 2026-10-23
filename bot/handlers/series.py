@@ -135,7 +135,7 @@ async def delete_series_start(message: Message):
 async def process_delete_series(call: CallbackQuery):
     series_id = int(call.data.replace("del_series_", ""))
     try:
-        series = await sync_to_async(DeviceSeries.objects.get)(id=series_id)
+        series = await sync_to_async(DeviceSeries.objects.select_related('brand').get)(id=series_id)
         name = f"{series.brand.name} {series.name}"
         await sync_to_async(series.delete)()
         await call.message.edit_text(f"✅ <b>{name}</b> seriyasi muvaffaqiyatli o‘chirildi!", parse_mode="HTML")
@@ -165,7 +165,7 @@ async def edit_series_start(message: Message):
 async def process_select_series_for_edit(call: CallbackQuery, state: FSMContext):
     series_id = int(call.data.replace("edit_series_", ""))
     try:
-        series = await sync_to_async(DeviceSeries.objects.get)(id=series_id)
+        series = await sync_to_async(DeviceSeries.objects.select_related('brand').get)(id=series_id)
         await state.update_data(edit_series_id=series.id, edit_series_name=series.name)
         await state.set_state(SeriesEditStates.waiting_for_new_name)
 

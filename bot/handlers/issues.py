@@ -254,7 +254,7 @@ async def delete_issue_start(message: Message):
 async def process_delete_issue(call: CallbackQuery):
     issue_id = int(call.data.replace("del_issue_", ""))
     try:
-        issue = await sync_to_async(DeviceIssue.objects.get)(id=issue_id)
+        issue = await sync_to_async(DeviceIssue.objects.select_related('phone').get)(id=issue_id)
         name = f"{issue.phone.name} → {issue.title}"
         await sync_to_async(issue.delete)()
         await call.message.edit_text(f"✅ <b>{name}</b> muammosi muvaffaqiyatli o‘chirildi!", parse_mode="HTML")
@@ -284,7 +284,7 @@ async def edit_issue_start(message: Message):
 async def process_select_issue_for_edit(call: CallbackQuery, state: FSMContext):
     issue_id = int(call.data.replace("edit_issue_", ""))
     try:
-        issue = await sync_to_async(DeviceIssue.objects.get)(id=issue_id)
+        issue = await sync_to_async(DeviceIssue.objects.select_related('phone').get)(id=issue_id)
         await state.update_data(edit_issue_id=issue.id, edit_issue_title=issue.title)
         await state.set_state(IssueEditStates.waiting_for_new_data)
 

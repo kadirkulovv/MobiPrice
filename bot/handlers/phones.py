@@ -141,71 +141,124 @@ async def process_phone_name(message: Message, state: FSMContext):
     )
 
 
+def _save_or_update_phone(series_id, phone_name, rel_image_path):
+    phone = DevicePhone.objects.filter(series_id=series_id, name__iexact=phone_name).first()
+    if not phone:
+        phone = DevicePhone.objects.filter(name__iexact=phone_name).first()
+
+    if phone:
+        if series_id:
+            phone.series_id = series_id
+        phone.image = rel_image_path
+        phone.save()
+    else:
+        phone = DevicePhone.objects.create(
+            series_id=series_id,
+            name=phone_name,
+            image=rel_image_path
+        )
+    return DevicePhone.objects.select_related('series', 'series__brand').get(id=phone.id)
+
+
 @router.message(PhoneAddStates.waiting_for_image, F.photo)
 async def process_phone_image_photo(message: Message, state: FSMContext, bot: Bot):
-    photo: PhotoSize = message.photo[-1]
-    data = await state.get_data()
-    series_id = data.get('series_id')
-    phone_name = data.get('phone_name')
+    try:
+        photo: PhotoSize = message.photo[-1]
+        data = await state.get_data()
+        series_id = data.get('series_id')
+        series_name = data.get('series_name', '')
+        brand_name = data.get('brand_name', '')
+        phone_name = data.get('phone_name', 'Telefon')
 
-    file = await bot.get_file(photo.file_id)
-    safe_slug = phone_name.lower().replace(' ', '_').replace('-', '_')
-    save_filename = f"{safe_slug}.jpg"
-    dest_path = MEDIA_PHONES_DIR / save_filename
+        file = await bot.get_file(photo.file_id)
+        from django.utils.text import slugify
+        safe_slug = slugify(phone_name).replace('-', '_')
+        save_filename = f"{safe_slug}.jpg"
+        dest_path = MEDIA_PHONES_DIR / save_filename
 
-    await bot.download_file(file.file_path, destination=dest_path)
+        await bot.download_file(file.file_path, destination=dest_path)
 
-    phone = await sync_to_async(DevicePhone.objects.create)(
-        series_id=series_id,
-        name=phone_name,
-        image=f"phones/{save_filename}"
-    )
+        rel_path = f"phones/{save_filename}"
+        phone = await sync_to_async(_save_or_update_phone)(series_id, phone_name, rel_path)
 
-    await state.clear()
-    await message.answer(
-        f"🎉 <b>Yangi telefon muvaffaqiyatli saqlandi!</b>\n\n"
-        f"📱 Nomi: <b>{phone.name}</b>\n"
-        f"📂 Seriya: <b>{phone.series.name}</b>\n"
-        f"🏷 Brend: <b>{phone.series.brand.name}</b>\n"
-        f"🖼 Rasm: <code>{save_filename}</code>",
-        reply_markup=get_section_crud_menu("Telefon"),
-        parse_mode="HTML"
-    )
+        display_series = phone.series.name if phone.series else series_name
+        display_brand = phone.series.brand.name if (phone.series and phone.series.brand) else brand_name
+
+        await state.clear()
+        await message.answer(
+            f"🎉 <b>Telefon rasmi muvaffaqiyatli saqlandi!</b>\n\n"
+            f"📱 Nomi: <b>{phone.name}</b>\n"
+            f"📂 Seriya: <b>{display_series}</b>\n"
+            f"🏷 Brend: <b>{display_brand}</b>\n"
+            f"🖼 Rasm fayli: <code>{save_filename}</code>",
+            reply_markup=get_section_crud_menu("Telefon"),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger("mobiprice_bot").error(f"Error saving phone photo: {e}", exc_info=True)
+        await message.answer(
+            f"⚠️ Rasm saqlashda xatolik yuz berdi: {e}\n"
+            f"Iltimos, qaytadan rasm yuboring yoki '❌ Bekor qilish' tugmasini bosing:",
+            reply_markup=get_cancel_menu()
+        )
 
 
 @router.message(PhoneAddStates.waiting_for_image, F.document)
 async def process_phone_image_doc(message: Message, state: FSMContext, bot: Bot):
-    doc: Document = message.document
-    if not doc.file_name.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
-        await message.answer("⚠️ Iltimos faqat JPG, PNG yoki WEBP formatdagi rasm yuboring:")
-        return
+    try:
+        doc: Document = message.document
+        if not doc.file_name.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
+            await message.answer("⚠️ Iltimos faqat JPG, PNG yoki WEBP formatdagi rasm yuboring:")
+            return
 
-    data = await state.get_data()
-    series_id = data.get('series_id')
-    phone_name = data.get('phone_name')
+        data = await state.get_data()
+        series_id = data.get('series_id')
+        series_name = data.get('series_name', '')
+        brand_name = data.get('brand_name', '')
+        phone_name = data.get('phone_name', 'Telefon')
 
-    file = await bot.get_file(doc.file_id)
-    ext = os.path.splitext(doc.file_name)[1].lower() or '.jpg'
-    safe_slug = phone_name.lower().replace(' ', '_').replace('-', '_')
-    save_filename = f"{safe_slug}{ext}"
-    dest_path = MEDIA_PHONES_DIR / save_filename
+        file = await bot.get_file(doc.file_id)
+        ext = os.path.splitext(doc.file_name)[1].lower() or '.jpg'
+        from django.utils.text import slugify
+        safe_slug = slugify(phone_name).replace('-', '_')
+        save_filename = f"{safe_slug}{ext}"
+        dest_path = MEDIA_PHONES_DIR / save_filename
 
-    await bot.download_file(file.file_path, destination=dest_path)
+        await bot.download_file(file.file_path, destination=dest_path)
 
-    phone = await sync_to_async(DevicePhone.objects.create)(
-        series_id=series_id,
-        name=phone_name,
-        image=f"phones/{save_filename}"
-    )
+        rel_path = f"phones/{save_filename}"
+        phone = await sync_to_async(_save_or_update_phone)(series_id, phone_name, rel_path)
 
-    await state.clear()
+        display_series = phone.series.name if phone.series else series_name
+        display_brand = phone.series.brand.name if (phone.series and phone.series.brand) else brand_name
+
+        await state.clear()
+        await message.answer(
+            f"🎉 <b>Telefon rasmi muvaffaqiyatli saqlandi!</b>\n\n"
+            f"📱 Nomi: <b>{phone.name}</b>\n"
+            f"📂 Seriya: <b>{display_series}</b>\n"
+            f"🏷 Brend: <b>{display_brand}</b>\n"
+            f"🖼 Rasm fayli: <code>{save_filename}</code>",
+            reply_markup=get_section_crud_menu("Telefon"),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger("mobiprice_bot").error(f"Error saving phone doc: {e}", exc_info=True)
+        await message.answer(
+            f"⚠️ Faylni saqlashda xatolik yuz berdi: {e}\n"
+            f"Iltimos, qaytadan rasm yuboring:",
+            reply_markup=get_cancel_menu()
+        )
+
+
+@router.message(PhoneAddStates.waiting_for_image)
+async def process_phone_image_invalid(message: Message):
     await message.answer(
-        f"🎉 <b>Yangi telefon muvaffaqiyatli saqlandi!</b>\n\n"
-        f"📱 Nomi: <b>{phone.name}</b>\n"
-        f"📂 Seriya: <b>{phone.series.name}</b>\n"
-        f"🏷 Brend: <b>{phone.series.brand.name}</b>",
-        reply_markup=get_section_crud_menu("Telefon"),
-        parse_mode="HTML"
+        "⚠️ Iltimos, telefon rasmini fotosurat yoki fayl (JPG/PNG) sifatida yuboring:\n"
+        "(Yoki '❌ Bekor qilish' tugmasini bosing)",
+        reply_markup=get_cancel_menu()
     )
 
 
@@ -231,7 +284,7 @@ async def delete_phone_start(message: Message):
 async def process_delete_phone(call: CallbackQuery):
     phone_id = int(call.data.replace("del_phone_", ""))
     try:
-        phone = await sync_to_async(DevicePhone.objects.get)(id=phone_id)
+        phone = await sync_to_async(DevicePhone.objects.select_related('series', 'series__brand').get)(id=phone_id)
         name = phone.name
         await sync_to_async(phone.delete)()
         await call.message.edit_text(f"✅ <b>{name}</b> telefoni muvaffaqiyatli o‘chirildi!", parse_mode="HTML")
@@ -261,7 +314,7 @@ async def edit_phone_start(message: Message):
 async def process_select_phone_for_edit(call: CallbackQuery, state: FSMContext):
     phone_id = int(call.data.replace("edit_phone_", ""))
     try:
-        phone = await sync_to_async(DevicePhone.objects.get)(id=phone_id)
+        phone = await sync_to_async(DevicePhone.objects.select_related('series', 'series__brand').get)(id=phone_id)
         await state.update_data(edit_phone_id=phone.id, edit_phone_name=phone.name)
         await state.set_state(PhoneEditStates.waiting_for_new_data)
 
@@ -329,4 +382,36 @@ async def process_edit_phone_photo(message: Message, state: FSMContext, bot: Bot
         )
     except Exception as e:
         await message.answer(f"Xatolik: {e}")
+
+
+@router.message(PhoneEditStates.waiting_for_new_data, F.document)
+async def process_edit_phone_doc(message: Message, state: FSMContext, bot: Bot):
+    doc: Document = message.document
+    if not doc.file_name.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
+        await message.answer("⚠️ Iltimos faqat JPG yoki PNG formatdagi rasm yuboring:")
+        return
+
+    data = await state.get_data()
+    phone_id = data.get('edit_phone_id')
+
+    try:
+        phone = await sync_to_async(DevicePhone.objects.get)(id=phone_id)
+        file = await bot.get_file(doc.file_id)
+        ext = os.path.splitext(doc.file_name)[1].lower() or '.jpg'
+        save_filename = f"{phone.slug}{ext}"
+        dest_path = MEDIA_PHONES_DIR / save_filename
+        await bot.download_file(file.file_path, destination=dest_path)
+
+        phone.image = f"phones/{save_filename}"
+        await sync_to_async(phone.save)()
+
+        await state.clear()
+        await message.answer(
+            f"✅ <b>'{phone.name}' rasmi muvaffaqiyatli yangilandi!</b>",
+            reply_markup=get_section_crud_menu("Telefon"),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await message.answer(f"Xatolik: {e}")
+
 

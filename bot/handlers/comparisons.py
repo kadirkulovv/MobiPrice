@@ -421,7 +421,7 @@ async def delete_comparison_start(message: Message):
 async def process_delete_comparison(call: CallbackQuery):
     comp_id = int(call.data.replace("del_comp_", ""))
     try:
-        comp = await sync_to_async(IssueComparison.objects.get)(id=comp_id)
+        comp = await sync_to_async(IssueComparison.objects.select_related('issue', 'issue__phone').get)(id=comp_id)
         name = f"{comp.issue.phone.name} → {comp.issue.title} ({comp.title})"
         await sync_to_async(comp.delete)()
         await call.message.edit_text(f"✅ <b>{name}</b> narxi muvaffaqiyatli o‘chirildi!", parse_mode="HTML")
