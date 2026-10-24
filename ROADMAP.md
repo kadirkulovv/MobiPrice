@@ -132,23 +132,24 @@
 ---
 
 ### 5-BOSQICH: BUYURTMALAR EKOTIZIMI VA TELEGRAM CRM
-- [ ] **Saytdan yangi buyurtma tushganda Telegram Botga / Guruhga xabar:**
+- [✅] **Saytdan yangi buyurtma tushganda Telegram Botga / Guruhga xabar:**
   ```
-  🚨 YANGI TA'MIRLASH BUYURTMASI! #ORD-1042
+  🚨 YANGI TA'MIRLASH BUYURTMASI! #MP-D37FF1
   👤 Mijoz: Alisher Karimov
   📞 Telefon: +998 90 123 45 67
   📱 Model: Samsung Galaxy S25 Ultra
   🔧 Muammo: Ekran almashtirish
-  💎 Tanlangan detal: Original Service Pack
   💵 Narxi: 1,850,000 so‘m
-  📦 Holati: Omborda mavjud
+  📦 Holati: 🔴 Yangi ariza
   ```
-- [ ] **Bot orqali arizani tezkor boshqarish:**
-  - Xabar tagidagi inline tugmalar: `[✅ Qabul qilish]` | `[👨‍🔧 Ustaga biriktirish]` | `[📞 Qo‘ng‘iroq qilindi]` | `[❌ Bekor qilish]`.
-- [ ] **Buyurtmalar Mini-CRM interfeysi:**
-  - Saytdan tushgan arizalar ro‘yxati, ustalar hisobi va holatni o‘zgartirish mexanizmi.
-- [ ] **Mijozga avtomatik SMS / Telegram bildirishnoma (Ixtiyoriy):**
-  - Arizangiz qabul qilindi, telefoningiz tayyor bo‘ldi kabi xabarnomalar.
+- [✅] **Bot orqali arizani tezkor boshqarish:**
+  - Xabar tagidagi inline tugmalar: `[✅ Qabul qilish]` | `[👨‍🔧 Ustaga biriktirish]` | `[📞 Bog‘lanildi]` | `[🎉 Tayyor]` | `[❌ Bekor qilish]`.
+- [✅] **Buyurtmalar Mini-CRM interfeysi:**
+  - Bot bosh menyusida `📦 Buyurtmalar (CRM)` bo‘limi, yangi arizalar, ta'mirlanayotganlar, tayyor bo‘lganlar ro‘yxati va kod bo‘yicha qidirish (`bot/handlers/crm.py`).
+- [✅] **Ustaga biriktirish mexanizmi:**
+  - Har bir buyurtmaga bazadagi jamoa ustalaridan birini biriktirish, statusni `in_progress` ga o'tkazish va saytdagi trekkerda aks ettirish.
+- [✅] **Mijoz uchun avtomatik yangilanish:**
+  - Usta buyurtmani `Tayyor` deb belgilaganda, mijoz saytda `#MP-XXXXXX` kodini tekshirganida darhol "4-bosqich: Tayyor (Olib ketishingiz mumkin)" holatida ko‘rinadi.
 
 ---
 
@@ -202,7 +203,7 @@
 | **Kalkulyator UI (Web)** | ✅ **Bajarildi** | 5 ta bosqich, Before/After slider, Dark UI, 3 ta til faol |
 | **Trek Tekshirish (Track Order)** | ✅ **Bajarildi** | `#ORD-XXXX` kodi bilan 4 bosqichli status stepper va modal |
 | **Scroll Animatsiyalar & Konsultatsiya** | ✅ **Bajarildi** | IntersectionObserver animatsiyalari, QR kod, 2 ta telefon raqami |
-| **Telegram CRM & Xabarnomalar** | ⏳ **Keyingi navbatda** | Saytdan tushgan buyurtmani botga / guruhga lahzada uzatish |
-| **Excel Import / Export** | ⏳ **Rejada** | Ommaviy ma'lumot kiritish |
+| **Telegram CRM & Xabarnomalar** | ✅ **Bajarildi** | Saytdan tushgan buyurtmani botga lahzada uzatish, inline boshqaruv va ustaga biriktirish |
+| **Excel Import / Export** | ⏳ **Keyingi navbatda** | Ommaviy ma'lumot kiritish |
 | **Tezkor Kesh & Anti-Spam** | ⏳ **Rejada** | SQLite WAL rejimi, xotira keshi va cheklovlar |
 | **Serverga Joylash (Deploy)** | ⏳ **Rejada** | Linux systemd (`.service`), Gunicorn, Nginx, SSL, SQLite3 |
