@@ -9,6 +9,8 @@ from django.conf import settings
 
 from django.utils import timezone
 from django.utils.translation import get_language
+from django.core.cache import cache
+from django.utils.html import escape
 from .models import (
     Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison,
     RepairFAQ, Review, ServiceOrder, TeamMember, BotAdmin
@@ -216,42 +218,60 @@ def index_view(request):
     return render(request, 'index.html', context)
 
 
-# --- 5-Step Dynamic APIs ---
+def get_client_ip(request):
+    """Mijozning haqiqiy IP manzilini aniqlash"""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0].strip()
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip or '127.0.0.1'
+
+
+# --- 5-Step Dynamic APIs (Cached for High-Load 10,000+ RPS) ---
 
 @require_GET
 def api_series_by_brand(request, brand_id):
     """Step 2: Model seriyalari (Pro seriya, S seriya, va h.k.)"""
-    series_qs = DeviceSeries.objects.filter(brand_id=brand_id).order_by('order', 'name')
-    data = []
-    for s in series_qs:
-        data.append({
-            'id': s.id,
-            'name': s.name,
-            'slug': s.slug,
-            'brand_id': s.brand.id,
-            'brand_name': s.brand.name,
-            'brand_slug': s.brand.slug,
-        })
+    cache_key = f"api_series_brand_{brand_id}"
+    data = cache.get(cache_key)
+    if data is None:
+        series_qs = DeviceSeries.objects.filter(brand_id=brand_id).order_by('order', 'name')
+        data = []
+        for s in series_qs:
+            data.append({
+                'id': s.id,
+                'name': s.name,
+                'slug': s.slug,
+                'brand_id': s.brand.id,
+                'brand_name': s.brand.name,
+                'brand_slug': s.brand.slug,
+            })
+        cache.set(cache_key, data, 300)
     return JsonResponse({'series': data})
 
 
 @require_GET
 def api_phones_by_series(request, series_id):
     """Step 3: Aniq telefon modellari (iPhone 16 Pro Max va h.k.)"""
-    phones_qs = DevicePhone.objects.filter(series_id=series_id).select_related('series', 'series__brand').order_by('order', 'name')
-    data = []
-    for p in phones_qs:
-        image_url = p.image.url if p.image else f"/static/img/models/{p.slug.replace('-', '_')}.jpg"
-        data.append({
-            'id': p.id,
-            'name': p.name,
-            'slug': p.slug,
-            'release_year': p.release_year,
-            'image_url': image_url,
-            'series_id': p.series.id,
-            'series_name': p.series.name,
-            'brand_name': p.series.brand.name,
-        })
+    cache_key = f"api_phones_series_{series_id}"
+    data = cache.get(cache_key)
+    if data is None:
+        phones_qs = DevicePhone.objects.filter(series_id=series_id).select_related('series', 'series__brand').order_by('order', 'name')
+        data = []
+        for p in phones_qs:
+            image_url = p.image.url if p.image else f"/static/img/models/{p.slug.replace('-', '_')}.jpg"
+            data.append({
+                'id': p.id,
+                'name': p.name,
+                'slug': p.slug,
+                'release_year': p.release_year,
+                'image_url': image_url,
+                'series_id': p.series.id,
+                'series_name': p.series.name,
+                'brand_name': p.series.brand.name,
+            })
+        cache.set(cache_key, data, 300)
     return JsonResponse({'phones': data})
 
 
@@ -259,23 +279,27 @@ def api_phones_by_series(request, series_id):
 def api_issues_by_phone(request, phone_id):
     """Step 4: Muammolar / Detallar (30 ta ikonka bilan)"""
     lang = request.GET.get('lang') or get_language() or 'uz'
-    issues_qs = DeviceIssue.objects.filter(phone_id=phone_id).order_by('order', 'title')
-    data = []
-    for issue in issues_qs:
-        title = issue.title
-        if lang == 'ru' and issue.title_ru:
-            title = issue.title_ru
-        elif lang == 'en' and issue.title_en:
-            title = issue.title_en
+    cache_key = f"api_issues_phone_{phone_id}_{lang}"
+    data = cache.get(cache_key)
+    if data is None:
+        issues_qs = DeviceIssue.objects.filter(phone_id=phone_id).order_by('order', 'title')
+        data = []
+        for issue in issues_qs:
+            title = issue.title
+            if lang == 'ru' and issue.title_ru:
+                title = issue.title_ru
+            elif lang == 'en' and issue.title_en:
+                title = issue.title_en
 
-        icon_svg_url = f"/static/img/icons/{issue.icon_number}.svg" if issue.icon_number else "/static/img/brands/apple.svg"
+            icon_svg_url = f"/static/img/icons/{issue.icon_number}.svg" if issue.icon_number else "/static/img/brands/apple.svg"
 
-        data.append({
-            'id': issue.id,
-            'title': title,
-            'icon_number': issue.icon_number,
-            'icon_svg_url': icon_svg_url,
-        })
+            data.append({
+                'id': issue.id,
+                'title': title,
+                'icon_number': issue.icon_number,
+                'icon_svg_url': icon_svg_url,
+            })
+        cache.set(cache_key, data, 300)
     return JsonResponse({'issues': data})
 
 
@@ -283,55 +307,59 @@ def api_issues_by_phone(request, phone_id):
 def api_comparisons_by_issue(request, issue_id):
     """Step 5: Narxlar va solishtirish kartalari"""
     lang = request.GET.get('lang') or get_language() or 'uz'
-    comp_qs = IssueComparison.objects.filter(issue_id=issue_id).order_by('-quality_type')
+    cache_key = f"api_comparisons_issue_{issue_id}_{lang}"
+    data = cache.get(cache_key)
+    if data is None:
+        comp_qs = IssueComparison.objects.filter(issue_id=issue_id).order_by('-quality_type')
 
-    data = []
-    for c in comp_qs:
-        title = c.title
-        is_original = (c.quality_type == 'original_service_pack')
+        data = []
+        for c in comp_qs:
+            title = c.title
+            is_original = (c.quality_type == 'original_service_pack')
 
-        if lang == 'ru':
-            title = c.title_ru or ("Оригинал Завод" if is_original else "Качественная Копия")
-            badge = "Оригинал" if is_original else "Копия"
-            warranty = c.warranty_ru or c.warranty or ""
-            desc = c.description_ru or c.description or ""
-        elif lang == 'en':
-            title = c.title_en or ("Original Factory" if is_original else "High-Quality Copy")
-            badge = "Original" if is_original else "Copy"
-            warranty = c.warranty_en or c.warranty or ""
-            desc = c.description_en or c.description or ""
-        else:
-            title = c.title or ("Original Zavod" if is_original else "Sifatli Kopiya")
-            badge = "Original" if is_original else "Kopiya"
-            warranty = c.warranty or ""
-            desc = c.description or ""
+            if lang == 'ru':
+                title = c.title_ru or ("Оригинал Завод" if is_original else "Качественная Копия")
+                badge = "Оригинал" if is_original else "Копия"
+                warranty = c.warranty_ru or c.warranty or ""
+                desc = c.description_ru or c.description or ""
+            elif lang == 'en':
+                title = c.title_en or ("Original Factory" if is_original else "High-Quality Copy")
+                badge = "Original" if is_original else "Copy"
+                warranty = c.warranty_en or c.warranty or ""
+                desc = c.description_en or c.description or ""
+            else:
+                title = c.title or ("Original Zavod" if is_original else "Sifatli Kopiya")
+                badge = "Original" if is_original else "Kopiya"
+                warranty = c.warranty or ""
+                desc = c.description or ""
 
-        is_available = bool(c.is_in_stock and (c.quantity > 0))
-        if lang == 'ru':
-            stock_display = f"В наличии: {c.quantity} шт." if is_available else "Нет в наличии (Под заказ)"
-        elif lang == 'en':
-            stock_display = f"In Stock: {c.quantity} pcs" if is_available else "Out of stock (On order)"
-        else:
-            stock_display = f"Omborda: {c.quantity} ta" if is_available else "Mavjud emas (Kutilmoqda)"
+            is_available = bool(c.is_in_stock and (c.quantity > 0))
+            if lang == 'ru':
+                stock_display = f"В наличии: {c.quantity} шт." if is_available else "Нет в наличии (Под заказ)"
+            elif lang == 'en':
+                stock_display = f"In Stock: {c.quantity} pcs" if is_available else "Out of stock (On order)"
+            else:
+                stock_display = f"Omborda: {c.quantity} ta" if is_available else "Mavjud emas (Kutilmoqda)"
 
-        data.append({
-            'id': c.id,
-            'quality_type': c.quality_type,
-            'quality_display': c.get_quality_type_display(),
-            'title': title,
-            'part_price_uzs': int(c.part_price_uzs),
-            'service_fee_uzs': int(c.service_fee_uzs),
-            'total_price_uzs': int(c.total_price_uzs),
-            'price_usd': int(c.price_usd),
-            'quantity': c.quantity,
-            'is_in_stock': is_available,
-            'stock_display': stock_display,
-            'warranty': warranty,
-            'repair_time': c.repair_time,
-            'badge': badge,
-            'description': desc,
-            'features': c.features if isinstance(c.features, list) else [],
-        })
+            data.append({
+                'id': c.id,
+                'quality_type': c.quality_type,
+                'quality_display': c.get_quality_type_display(),
+                'title': title,
+                'part_price_uzs': int(c.part_price_uzs),
+                'service_fee_uzs': int(c.service_fee_uzs),
+                'total_price_uzs': int(c.total_price_uzs),
+                'price_usd': int(c.price_usd),
+                'quantity': c.quantity,
+                'is_in_stock': is_available,
+                'stock_display': stock_display,
+                'warranty': warranty,
+                'repair_time': c.repair_time,
+                'badge': badge,
+                'description': desc,
+                'features': c.features if isinstance(c.features, list) else [],
+            })
+        cache.set(cache_key, data, 300)
     return JsonResponse({'options': data})
 
 
@@ -361,15 +389,25 @@ def api_search_phones(request):
 @csrf_exempt
 @require_POST
 def api_submit_order(request):
-
-    """Ariza qabul qilish va Telegram admin(lar)ga xabar yuborish"""
+    """Ariza qabul qilish va Telegram admin(lar)ga xabar yuborish (Rate Limiter: max 2/min per IP)"""
     try:
+        # Rate Limiting (Anti-Spam: max 2 per minute from same IP)
+        client_ip = get_client_ip(request)
+        rate_key = f"order_ratelimit_{client_ip}"
+        submits = cache.get(rate_key, 0)
+        if submits >= 2:
+            return JsonResponse({
+                'success': False,
+                'error': "Spam himoyasi: 1 daqiqada maksimum 2 ta ariza yuborish mumkin. Iltimos, ozroq kuting."
+            }, status=429)
+        cache.set(rate_key, submits + 1, 60)
+
         data = json.loads(request.body)
-        client_name = data.get('client_name', '').strip()
-        phone_number = data.get('phone_number', '').strip()
+        client_name = escape(data.get('client_name', '').strip())
+        phone_number = escape(data.get('phone_number', '').strip())
         phone_id = data.get('phone_id')
         comparison_id = data.get('comparison_id') or data.get('option_id')
-        service_type = data.get('service_type', 'in_service')
+        service_type = escape(data.get('service_type', 'in_service'))
 
         if not client_name or not phone_number:
             return JsonResponse({'success': False, 'error': "Ism va telefon raqami kiritilishi shart!"}, status=400)
@@ -546,29 +584,18 @@ def api_track_order(request):
         return JsonResponse({'found': False, 'error': str(e)}, status=500)
 
 
-def get_client_ip(request):
-    """Mijozning haqiqiy IP manzilini aniqlash"""
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        ip = x_forwarded_for.split(',')[0].strip()
-    else:
-        ip = request.META.get('REMOTE_ADDR')
-    return ip or '127.0.0.1'
-
-
 @csrf_exempt
 @require_POST
 def api_submit_review(request):
-
     """Mijoz fikri qabul qilish (Anti-Spam: 1 ta qurilma + 1 ta IP dan 24 soatda faqat 1 marta)"""
     try:
         data = json.loads(request.body)
-        client_name = data.get('client_name', '').strip()
-        device_model = data.get('device_model', '').strip()
-        service_type = data.get('service_type', '').strip()
+        client_name = escape(data.get('client_name', '').strip())
+        device_model = escape(data.get('device_model', '').strip())
+        service_type = escape(data.get('service_type', '').strip())
         rating = int(data.get('rating', 5))
-        comment = data.get('comment', '').strip()
-        device_fp = data.get('device_fingerprint', '').strip()
+        comment = escape(data.get('comment', '').strip())
+        device_fp = escape(data.get('device_fingerprint', '').strip())
         lang = data.get('lang', 'uz')
 
         if not client_name or not comment:
