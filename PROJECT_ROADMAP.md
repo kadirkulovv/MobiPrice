@@ -110,10 +110,16 @@
 - [✅] **Til almashtirish interfeysi:** Sayt sarlavhasida `UZ | RU | EN` tillarini bir zumda almashtirish.
 - [✅] **Buyurtma berish modali:**
   - Mijoz o‘z ismi va telefon raqamini kiritib ariza qoldirishi mumkin bo‘lgan tezkor forma.
-- [ ] **Jonli Model Qidiruvi (Live Search):**
-  - Qidiruv qatoriga yozish bilan bir zumda telefon modellarini topib, to‘g‘ridan-to‘g‘ri kalkulyatorga yo‘naltirish.
-- [ ] **"Telefonim holatini tekshirish" (Trek tekshirish UI & API):**
-  - Mijoz o‘zining `#ORD-XXXX` kodi orqali saytdan telefon qaysi bosqichda ekanligini (Diagnostika, Qismlar kutilmoqda, Tuzatildi, Olib ketishga tayyor) bilishi.
+- [✅] **Jonli Model Qidiruvi (Live Search):**
+  - Qidiruv qatoriga yozish bilan bir zumda telefon modellarini topib, to‘g‘ridan-to‘g‘ri kalkulyatorga yo‘naltirish (`/api/phones/search/`).
+- [✅] **"Telefonim holatini tekshirish" (Trek tekshirish UI & API):**
+  - Mijoz o‘zining `#ORD-XXXX` kodi orqali saytdan telefon qaysi bosqichda ekanligini (Qabul qilindi, Diagnostika, Ta'mirlanmoqda, Tayyor) ko'rish uchun interaktiv stepper va `/api/orders/track/` API.
+- [✅] **Scroll bo'yicha kirib keluvchi animatsiyalar (Scroll Reveal Engine):**
+  - Sayt bo'ylab pastga tushganda har bir bo'lim va div kartalar `IntersectionObserver` yordamida silliq neon fade-up va zoom effekti bilan ochiladi (`static/js/scroll_reveal.js` va `static/css/animations.css`).
+- [✅] **Saytdan topilmagan modellar va Tajribali ustalar bloki:**
+  - Saytdan topilmagan har qanday smartfon va ehtiyot qismlari uchun tajribali ustalar bilan bog'lanish vitrinasi, orqa fonga laboratoriya ustaxonasi surati (`static/img/team_workshop_bg.jpg`).
+- [✅] **Instagram QR-kod kartasi va 2 ta rasmiy telefon raqami:**
+  - `@MURODJONMILYAZOV_` Instagram skaner kartasi, `+998 (90) 919-76-00` va `+998 (90) 918-76-00` raqamlari hamda Telegram/Instagram havolalari.
 
 ---
 
@@ -186,8 +192,9 @@
 | **5-Bosqichli Baza Modeli** | ✅ **Bajarildi** | `Brand` -> `Series` -> `Phone` -> `Issue` -> `Comparison` to‘liq tayyor |
 | **Aiogram 3 Admin Bot** | ✅ **Bajarildi** | 5 ta bo‘lim uchun to‘liq CRUD, 30 ta SVG ikonka, avto-tarjima, 3-tugmali menyu |
 | **Kalkulyator UI (Web)** | ✅ **Bajarildi** | 5 ta bosqich, Before/After slider, Dark UI, 3 ta til faol |
-| **Telegram Xabarnomalar** | ⏳ **Keyingi navbatda** | Saytdan tushgan buyurtmani botga / guruhga lahzada uzatish |
-| **Trek Tekshirish (Track Order)** | ⏳ **Keyingi navbatda** | Saytda `#ORD-XXXX` kodi bilan status ko‘rish |
+| **Trek Tekshirish (Track Order)** | ✅ **Bajarildi** | `#ORD-XXXX` kodi bilan 4 bosqichli status stepper va modal |
+| **Scroll Animatsiyalar & Konsultatsiya** | ✅ **Bajarildi** | IntersectionObserver animatsiyalari, QR kod, 2 ta telefon raqami |
+| **Telegram CRM & Xabarnomalar** | ⏳ **Keyingi navbatda** | Saytdan tushgan buyurtmani botga / guruhga lahzada uzatish |
 | **Excel Import / Export** | ⏳ **Rejada** | Ommaviy ma'lumot kiritish |
 | **Tezkor Kesh & Anti-Spam** | ⏳ **Rejada** | SQLite WAL rejimi, xotira keshi va cheklovlar |
 | **Serverga Joylash (Deploy)** | ⏳ **Rejada** | Linux systemd (`.service`), Gunicorn, Nginx, SSL, SQLite3 |
