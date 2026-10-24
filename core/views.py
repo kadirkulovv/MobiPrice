@@ -403,3 +403,97 @@ def api_submit_order(request):
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@require_GET
+def api_track_order(request):
+    """Mijoz uchun ta'mirlash holatini (Order tracking) tekshirish API"""
+    raw_code = request.GET.get('order_id', '').strip()
+    clean_code = raw_code.replace('#', '').strip().upper()
+    lang = request.GET.get('lang', 'uz')
+
+    if not clean_code:
+        err_msg = {
+            'ru': "Пожалуйста, введите код заказа (например: MP-A1B2C3)",
+            'en': "Please enter your order ID (e.g. MP-A1B2C3)",
+            'uz': "Iltimos, buyurtma kodini kiriting (masalan: MP-A1B2C3)"
+        }.get(lang, "Iltimos, buyurtma kodini kiriting")
+        return JsonResponse({'found': False, 'error': err_msg}, status=400)
+
+    try:
+        order = ServiceOrder.objects.filter(order_id__iexact=clean_code).select_related('phone', 'comparison').first()
+        if not order:
+            not_found_msg = {
+                'ru': f"Заказ с кодом #{clean_code} не найден. Проверьте правильность кода.",
+                'en': f"Order #{clean_code} was not found. Please double-check your code.",
+                'uz': f"#{clean_code} raqamli buyurtma topilmadi. Kodni to'g'ri kiritganingizni tekshiring."
+            }.get(lang, "Buyurtma topilmadi.")
+            return JsonResponse({'found': False, 'error': not_found_msg}, status=404)
+
+        # Mapping status to 4-step progress:
+        # 1: Qabul qilindi
+        # 2: Diagnostika / Bog'lanildi
+        # 3: Ta'mirlanmoqda
+        # 4: Tayyor / Topshirildi
+        step_map = {
+            'new': 1,
+            'contacted': 2,
+            'in_progress': 3,
+            'ready': 4,
+            'completed': 4,
+            'cancelled': 0,
+        }
+        current_step = step_map.get(order.status, 1)
+
+        # Status labels per language
+        status_labels = {
+            'uz': {
+                'new': 'Qabul qilindi',
+                'contacted': 'Diagnostika jarayonida',
+                'in_progress': "Ta'mirlanmoqda",
+                'ready': "Tayyor (Olib ketishingiz mumkin)",
+                'completed': "Topshirildi",
+                'cancelled': "Bekor qilingan"
+            },
+            'ru': {
+                'new': 'Принято',
+                'contacted': 'На диагностике',
+                'in_progress': 'В процессе ремонта',
+                'ready': 'Готов к выдаче',
+                'completed': 'Выдан клиенту',
+                'cancelled': 'Отменен'
+            },
+            'en': {
+                'new': 'Received',
+                'contacted': 'Diagnostic in progress',
+                'in_progress': 'In repair',
+                'ready': 'Ready for pickup',
+                'completed': 'Completed',
+                'cancelled': 'Cancelled'
+            }
+        }
+        status_text = status_labels.get(lang, status_labels['uz']).get(order.status, order.get_status_display())
+
+        # Mask client name for privacy (e.g., "Murodjon" -> "Mu***on")
+        name = order.client_name
+        masked_name = f"{name[:2]}***{name[-2:]}" if len(name) > 4 else f"{name[:1]}***"
+
+        phone_name = order.phone.name if order.phone else "Smartfon"
+        part_name = order.comparison.title if order.comparison else "-"
+        price_val = int(order.comparison.total_price_uzs) if (order.comparison and order.comparison.total_price_uzs) else None
+
+        return JsonResponse({
+            'found': True,
+            'order_id': order.order_id,
+            'client_masked': masked_name,
+            'device_model': phone_name,
+            'issue_title': part_name,
+            'price_uzs': price_val,
+            'status': order.status,
+            'status_display': status_text,
+            'current_step': current_step,
+            'created_at': order.created_at.strftime('%d.%m.%Y %H:%M'),
+        })
+    except Exception as e:
+        return JsonResponse({'found': False, 'error': str(e)}, status=500)
+

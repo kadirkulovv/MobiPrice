@@ -1,0 +1,110 @@
+<!-- Order Tracking Modal -->
+<div id="track-modal" class="modal-backdrop" aria-hidden="true" style="display: none;">
+  <div class="modal-card track-modal-card">
+    <button type="button" class="modal-close-btn" id="btn-close-track-modal" aria-label="Yopish">&times;</button>
+    
+    <div class="track-modal-header">
+      <div class="track-modal-icon">🔍</div>
+      <h3 class="track-modal-title">{{ t.track_modal_title }}</h3>
+      <p class="track-modal-subtitle">
+        {% if current_lang == 'ru' %}
+          Введите персональный ID заказа, чтобы узнать текущий статус ремонта вашего устройства
+        {% elif current_lang == 'en' %}
+          Enter your unique order ID to check the real-time repair progress of your smartphone
+        {% else %}
+          Qurilmangiz ta'mirlanish jarayonini real vaqtda kuzatish uchun buyurtma kodini kiriting
+        {% endif %}
+      </p>
+    </div>
+
+    <!-- Search Form -->
+    <form id="track-order-form" class="track-form" onsubmit="return false;">
+      <div class="track-input-group">
+        <span class="track-input-prefix">#</span>
+        <input 
+          type="text" 
+          id="track-order-input" 
+          class="track-input" 
+          placeholder="{{ t.track_placeholder }}" 
+          maxlength="20"
+          autocomplete="off"
+          spellcheck="false"
+          required
+        >
+        <button type="submit" id="btn-submit-track" class="btn-track-submit">
+          <span class="btn-text">{{ t.track_btn }}</span>
+          <span class="btn-spinner" style="display: none;">⏳</span>
+        </button>
+      </div>
+      <div id="track-error-msg" class="track-error" style="display: none;"></div>
+    </form>
+
+    <!-- Tracking Result Box -->
+    <div id="track-result-box" class="track-result-box" style="display: none;">
+      <div class="track-result-header">
+        <div>
+          <span class="track-badge-id" id="track-res-id">#MP-000000</span>
+          <h4 class="track-res-device" id="track-res-device">Samsung Galaxy S24 Ultra</h4>
+        </div>
+        <div class="track-status-pill" id="track-res-pill">Ta'mirlanmoqda</div>
+      </div>
+
+      <!-- 4-Step Stepper -->
+      <div class="track-stepper" id="track-stepper">
+        <div class="stepper-step" data-step="1">
+          <div class="step-circle"><span class="step-ico">📥</span></div>
+          <div class="step-label">
+            {% if current_lang == 'ru' %}Принято{% elif current_lang == 'en' %}Received{% else %}Qabul qilindi{% endif %}
+          </div>
+        </div>
+        <div class="stepper-line" data-line="1"></div>
+        <div class="stepper-step" data-step="2">
+          <div class="step-circle"><span class="step-ico">🔍</span></div>
+          <div class="step-label">
+            {% if current_lang == 'ru' %}Диагностика{% elif current_lang == 'en' %}Diagnostic{% else %}Diagnostika{% endif %}
+          </div>
+        </div>
+        <div class="stepper-line" data-line="2"></div>
+        <div class="stepper-step" data-step="3">
+          <div class="step-circle"><span class="step-ico">🔧</span></div>
+          <div class="step-label">
+            {% if current_lang == 'ru' %}В ремонте{% elif current_lang == 'en' %}In repair{% else %}Ta'mirlanmoqda{% endif %}
+          </div>
+        </div>
+        <div class="stepper-line" data-line="3"></div>
+        <div class="stepper-step" data-step="4">
+          <div class="step-circle"><span class="step-ico">✅</span></div>
+          <div class="step-label">
+            {% if current_lang == 'ru' %}Готов{% elif current_lang == 'en' %}Ready{% else %}Tayyor{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Meta Grid -->
+      <div class="track-meta-grid">
+        <div class="track-meta-item">
+          <div class="meta-label">{% if current_lang == 'ru' %}Клиент{% elif current_lang == 'en' %}Client{% else %}Mijoz{% endif %}</div>
+          <div class="meta-val" id="track-res-client">Mu***ov</div>
+        </div>
+        <div class="track-meta-item">
+          <div class="meta-label">{% if current_lang == 'ru' %}Услуга / Деталь{% elif current_lang == 'en' %}Service / Part{% else %}Xizmat / Detal{% endif %}</div>
+          <div class="meta-val" id="track-res-service">Original ekran</div>
+        </div>
+        <div class="track-meta-item">
+          <div class="meta-label">{% if current_lang == 'ru' %}Сумма{% elif current_lang == 'en' %}Price{% else %}Narxi{% endif %}</div>
+          <div class="meta-val highlight" id="track-res-price">1,850,000 so'm</div>
+        </div>
+        <div class="track-meta-item">
+          <div class="meta-label">{% if current_lang == 'ru' %}Дата приема{% elif current_lang == 'en' %}Date{% else %}Qabul vaqti{% endif %}</div>
+          <div class="meta-val" id="track-res-date">24.10.2026 12:00</div>
+        </div>
+      </div>
+
+      <div class="track-direct-help">
+        <span>{% if current_lang == 'ru' %}Вопросы по заказу?{% elif current_lang == 'en' %}Questions?{% else %}Savollaringiz bormi?{% endif %}</span>
+        <a href="tel:+998909197600" class="track-help-link">📞 +998 90 919-76-00</a>
+        <a href="https://t.me/Murodjonmilyazov" target="_blank" rel="noopener" class="track-help-link">✈️ @Murodjonmilyazov</a>
+      </div>
+    </div>
+  </div>
+</div>

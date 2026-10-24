@@ -97,14 +97,14 @@
               modalAlert.style.background = 'rgba(16, 185, 129, 0.2)';
               modalAlert.style.color = '#10b981';
               modalAlert.style.border = '1px solid rgba(16, 185, 129, 0.3)';
-              modalAlert.innerHTML = `✅ <b>Arizangiz qabul qilindi!</b><br>ID: #${data.order_id}. Tez orada ustamiz siz bilan bog‘lanadi.`;
+              modalAlert.innerHTML = `✅ <b>Arizangiz qabul qilindi!</b><br>ID: <b>#${data.order_id}</b>. Tez orada ustamiz siz bilan bog‘lanadi.<br><a href="#" onclick="window.mobiModal.close(); if(window.openOrderTracking) window.openOrderTracking('${data.order_id}'); return false;" style="color:#00f2fe; text-decoration:underline; font-weight:700; margin-top:6px; display:inline-block;">🔍 Buyurtma holatini ko'rish &rarr;</a>`;
             }
             orderForm.reset();
             setTimeout(() => {
               closeModal();
               submitBtn.disabled = false;
               submitBtn.textContent = origBtnText;
-            }, 3000);
+            }, 5000);
           } else {
             if (modalAlert) {
               modalAlert.className = '';
