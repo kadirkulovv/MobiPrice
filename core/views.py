@@ -2,7 +2,7 @@ import json
 import requests
 from datetime import timedelta
 from django.shortcuts import render
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST, require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
@@ -706,5 +706,55 @@ def api_submit_review(request):
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@require_GET
+def robots_txt_view(request):
+    """Dynamic robots.txt for search engines"""
+    host = request.get_host()
+    scheme = "https" if request.is_secure() else "http"
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /admin/",
+        "Disallow: /api/",
+        f"Sitemap: {scheme}://{host}/sitemap.xml",
+    ]
+    return HttpResponse("\n".join(lines), content_type="text/plain; charset=utf-8")
+
+
+@require_GET
+def sitemap_xml_view(request):
+    """Dynamic sitemap.xml with multi-language and catalog URLs"""
+    host = request.get_host()
+    scheme = "https" if request.is_secure() else "http"
+    base_url = f"{scheme}://{host}"
+
+    xml_lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
+    ]
+
+    for lang in ['uz', 'ru', 'en']:
+        xml_lines.append(f"""  <url>
+    <loc>{base_url}/{lang}/</loc>
+    <xhtml:link rel="alternate" hreflang="uz" href="{base_url}/uz/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="{base_url}/ru/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="{base_url}/en/"/>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>""")
+
+    brands = Brand.objects.filter(is_active=True)
+    for b in brands:
+        xml_lines.append(f"""  <url>
+    <loc>{base_url}/uz/?brand={b.slug}</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>""")
+
+    xml_lines.append('</urlset>')
+    return HttpResponse("\n".join(xml_lines), content_type="application/xml; charset=utf-8")
+
 
 

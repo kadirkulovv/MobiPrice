@@ -4,8 +4,12 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.conf.urls.i18n import i18n_patterns
 
+from core import views as core_views
+
 # Global non-prefixed routes
 urlpatterns = [
+    path('robots.txt', core_views.robots_txt_view, name='robots_txt'),
+    path('sitemap.xml', core_views.sitemap_xml_view, name='sitemap_xml'),
     path('i18n/', include('django.conf.urls.i18n')),
     path('api/', include('core.api_urls')),
 ]

@@ -7,6 +7,93 @@
   <title>MobiPrice — {% if current_lang == 'ru' %}Цены на ремонт и запчасти смартфонов{% elif current_lang == 'en' %}Smart Phone Repair & Spare Parts Pricing{% else %}Smartfon Ehtiyot Qismlari va Servis Narxlari{% endif %}</title>
   <meta name="description" content="{% if current_lang == 'ru' %}Узнайте точные цены на замену экранов, стекла и батарей для iPhone, Samsung, Xiaomi с гарантией.{% elif current_lang == 'en' %}Check exact repair and spare part prices for iPhone, Samsung, Xiaomi with full warranty.{% else %}Telefoningiz buzildimi? iPhone, Samsung, Xiaomi zapchast narxlarini bozorga bormasdan bilib oling.{% endif %}">
 
+  <meta name="keywords" content="MobiPrice, smartfon tamirlash narxlari, iPhone ekran almashtirish, Samsung zapchast, Xiaomi batareya, telefon tuzatish Toshkent, Murodjon Milyazov, Malika bozor telefon ustasi">
+  <meta name="author" content="Murodjon Milyazov — MobiPrice">
+  <meta name="robots" content="index, follow">
+
+  <!-- Canonical & Alternate Multi-language Hreflang Tags -->
+  <link rel="canonical" href="{{ request.build_absolute_uri }}">
+  <link rel="alternate" hreflang="uz" href="{{ request.scheme }}://{{ request.get_host }}/uz/">
+  <link rel="alternate" hreflang="ru" href="{{ request.scheme }}://{{ request.get_host }}/ru/">
+  <link rel="alternate" hreflang="en" href="{{ request.scheme }}://{{ request.get_host }}/en/">
+  <link rel="alternate" hreflang="x-default" href="{{ request.scheme }}://{{ request.get_host }}/uz/">
+
+  <!-- OpenGraph Metadata -->
+  <meta property="og:site_name" content="MobiPrice">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{ request.build_absolute_uri }}">
+  <meta property="og:title" content="MobiPrice — {% if current_lang == 'ru' %}Цены на ремонт и запчасти смартфонов{% elif current_lang == 'en' %}Smart Phone Repair & Spare Parts Pricing{% else %}Smartfon Ehtiyot Qismlari va Servis Narxlari{% endif %}">
+  <meta property="og:description" content="{% if current_lang == 'ru' %}Узнайте точные цены на замену экранов, стекла и батарей для iPhone, Samsung, Xiaomi с гарантией.{% elif current_lang == 'en' %}Check exact repair and spare part prices for iPhone, Samsung, Xiaomi with full warranty.{% else %}Telefoningiz buzildimi? iPhone, Samsung, Xiaomi zapchast narxlarini bozorga bormasdan bilib oling.{% endif %}">
+  <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'img/logo.jpg' %}">
+  <meta property="og:locale" content="{{ current_lang }}">
+
+  <!-- Twitter Card Metadata -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="MobiPrice — {% if current_lang == 'ru' %}Цены на ремонт смартфонов{% elif current_lang == 'en' %}Phone Repair Pricing{% else %}Smartfon Servis Narxlari{% endif %}">
+  <meta name="twitter:description" content="{% if current_lang == 'ru' %}Прозрачные цены на ремонт iPhone, Samsung, Xiaomi.{% elif current_lang == 'en' %}Transparent pricing for iPhone, Samsung, Xiaomi repair.{% else %}Bozorga bormasdan telefoningiz ta'mirlash narxini 10 soniyada bilib oling.{% endif %}">
+  <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'img/logo.jpg' %}">
+
+  <!-- Schema.org JSON-LD Structured Data: LocalBusiness & Service -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "name": "MobiPrice",
+    "alternateName": "MobiPrice Service Center",
+    "image": "{{ request.scheme }}://{{ request.get_host }}{% static 'img/logo.jpg' %}",
+    "@id": "{{ request.scheme }}://{{ request.get_host }}/#business",
+    "url": "{{ request.scheme }}://{{ request.get_host }}/",
+    "telephone": "+998909197600",
+    "priceRange": "$$",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Tashkent",
+      "addressCountry": "UZ"
+    },
+    "founder": {
+      "@type": "Person",
+      "name": "Murodjon Milyazov"
+    },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.9",
+      "reviewCount": "128",
+      "bestRating": "5",
+      "worstRating": "1"
+    },
+    "openingHoursSpecification": {
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": [
+        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
+      ],
+      "opens": "09:00",
+      "closes": "21:00"
+    }
+  }
+  </script>
+
+  {% if faqs %}
+  <!-- Schema.org JSON-LD: FAQPage -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {% for faq in faqs %}
+      {
+        "@type": "Question",
+        "name": "{{ faq.question|escapejs }}",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "{{ faq.answer|escapejs }}"
+        }
+      }{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ]
+  }
+  </script>
+  {% endif %}
+
   <!-- Google Fonts: Plus Jakarta Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
