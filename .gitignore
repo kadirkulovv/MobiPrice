@@ -21,9 +21,6 @@ var/
 wheels/
 *.egg-info/
 .installed.cfg
-*.egg
-*.static/img/*
-
 # Django
 *.log
 local_settings.py
@@ -33,12 +30,10 @@ db.sqlite3-shm
 db.sqlite3-wal
 media/
 staticfiles/
-static/img/*
 
 # Environment variables
 .env
 !.env.example
-PROJECT_ROADMAP.md
 
 # IDEs
 .idea/

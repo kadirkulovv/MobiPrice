@@ -1,0 +1,98 @@
+{% load static %}
+<section class="consultation-section" id="consultation">
+  <div class="consultation-bg-wrap">
+    <img src="{% static 'img/team_workshop_bg.jpg' %}" alt="MobiPrice Repair Workshop" class="consultation-bg-img">
+    <div class="consultation-bg-overlay"></div>
+  </div>
+
+  <div class="container consultation-container">
+    <div class="consultation-card" data-reveal="zoom-in">
+      
+      <!-- Left: Text & Contact Actions -->
+      <div class="consult-content">
+        <div class="consult-badge pulsing-glow" data-reveal="fade-down" data-delay="100">
+          <span class="badge-icon">🛠</span>
+          <span>{{ t.consult_badge }}</span>
+        </div>
+
+        <h2 class="consult-title" data-reveal="fade-up" data-delay="150">
+          {{ t.consult_title }}
+        </h2>
+
+        <p class="consult-desc" data-reveal="fade-up" data-delay="200">
+          {{ t.consult_desc }}
+        </p>
+
+        <!-- Feature Points -->
+        <div class="consult-features" data-reveal="fade-up" data-delay="250">
+          <div class="c-feature-item">
+            <span class="c-feat-icon">⚡️</span>
+            <span>{% if current_lang == 'ru' %}Срочный ремонт от 30 минут{% elif current_lang == 'en' %}Rapid 30-min repair{% else %}30 daqiqadan boshlab tezkor ta'mirlash{% endif %}</span>
+          </div>
+          <div class="c-feature-item">
+            <span class="c-feat-icon">💎</span>
+            <span>{% if current_lang == 'ru' %}100% Заводские и проверенные детали{% elif current_lang == 'en' %}100% Genuine & verified parts{% else %}100% Zavod va tekshirilgan ehtiyot qismlar{% endif %}</span>
+          </div>
+          <div class="c-feature-item">
+            <span class="c-feat-icon">🛡</span>
+            <span>{% if current_lang == 'ru' %}Честная гарантия и сохранность данных{% elif current_lang == 'en' %}Full warranty & data safety{% else %}To‘liq kafolat va omonat ishonchi{% endif %}</span>
+          </div>
+        </div>
+
+        <!-- Phone Numbers Grid -->
+        <div class="consult-phones" data-reveal="fade-up" data-delay="300">
+          <a href="tel:+998909197600" class="btn-consult-phone">
+            <span class="c-phone-icon">📞</span>
+            <div class="c-phone-info">
+              <span class="c-phone-label">{% if current_lang == 'ru' %}Главный номер{% elif current_lang == 'en' %}Primary Hotline{% else %}Asosiy raqam{% endif %}</span>
+              <span class="c-phone-val">+998 (90) 919-76-00</span>
+            </div>
+          </a>
+
+          <a href="tel:+998909187600" class="btn-consult-phone">
+            <span class="c-phone-icon">📞</span>
+            <div class="c-phone-info">
+              <span class="c-phone-label">{% if current_lang == 'ru' %}Дополнительный номер{% elif current_lang == 'en' %}Secondary Line{% else %}Qo‘shimcha raqam{% endif %}</span>
+              <span class="c-phone-val">+998 (90) 918-76-00</span>
+            </div>
+          </a>
+        </div>
+
+        <!-- Social Action Buttons -->
+        <div class="consult-socials" data-reveal="fade-up" data-delay="350">
+          <a href="https://t.me/Murodjonmilyazov" target="_blank" rel="noopener" class="btn-social-action btn-tg-action">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+            </svg>
+            <span>{{ t.consult_tg }}</span>
+          </a>
+
+          <a href="https://www.instagram.com/murodjonmilyazov_" target="_blank" rel="noopener" class="btn-social-action btn-ig-action">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+            </svg>
+            <span>{{ t.consult_ig }}</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Right: Interactive Instagram QR Card -->
+      <div class="consult-qr-col" data-reveal="fade-left" data-delay="300">
+        <a href="https://www.instagram.com/murodjonmilyazov_" target="_blank" rel="noopener" class="qr-interactive-card">
+          <div class="qr-glow-effect"></div>
+          <div class="qr-frame">
+            <img src="{% static 'img/instagram_qr.png' %}" alt="Instagram QR @murodjonmilyazov_" class="qr-img">
+          </div>
+          <div class="qr-card-footer">
+            <div class="qr-ig-user">@MURODJONMILYAZOV_</div>
+            <div class="qr-hint-text">
+              <span class="qr-camera-icon">📷</span>
+              <span>{{ t.consult_qr_hint }}</span>
+            </div>
+          </div>
+        </a>
+      </div>
+
+    </div>
+  </div>
+</section>

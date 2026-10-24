@@ -1,0 +1,299 @@
+/* MobiPrice — Consultation & Master Team Section Styles */
+
+.consultation-section {
+  position: relative;
+  padding: 90px 0;
+  overflow: hidden;
+  background-color: #0b0f19;
+}
+
+.consultation-bg-wrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.consultation-bg-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: brightness(0.28) contrast(1.15) saturate(1.2);
+  transform: scale(1.04);
+}
+
+.consultation-bg-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 75% 50%, rgba(0, 242, 254, 0.12) 0%, transparent 60%),
+              linear-gradient(135deg, rgba(10, 14, 26, 0.95) 0%, rgba(15, 23, 42, 0.85) 50%, rgba(8, 12, 22, 0.96) 100%);
+}
+
+.consultation-container {
+  position: relative;
+  z-index: 2;
+}
+
+.consultation-card {
+  display: grid;
+  grid-template-columns: 1.35fr 0.95fr;
+  gap: 48px;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  border-radius: 28px;
+  padding: 52px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 
+              0 0 40px rgba(0, 242, 254, 0.12),
+              inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+
+/* Content Left */
+.consult-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 242, 254, 0.12);
+  border: 1px solid rgba(0, 242, 254, 0.35);
+  color: #00f2fe;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 999px;
+  margin-bottom: 18px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.consult-title {
+  font-size: clamp(24px, 3.2vw, 36px);
+  font-weight: 800;
+  line-height: 1.25;
+  color: #ffffff;
+  margin-bottom: 16px;
+}
+
+.consult-title span {
+  background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.consult-desc {
+  font-size: 15px;
+  line-height: 1.65;
+  color: #94a3b8;
+  margin-bottom: 26px;
+}
+
+/* Feature Points */
+.consult-features {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.c-feature-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.c-feat-icon {
+  font-size: 16px;
+}
+
+/* Phones Grid */
+.consult-phones {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.btn-consult-phone {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 12px 16px;
+  text-decoration: none;
+  transition: all 0.28s ease;
+}
+
+.btn-consult-phone:hover {
+  background: rgba(0, 242, 254, 0.14);
+  border-color: #00f2fe;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 242, 254, 0.2);
+}
+
+.c-phone-icon {
+  font-size: 20px;
+}
+
+.c-phone-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.c-phone-label {
+  font-size: 11px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.c-phone-val {
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+/* Social Actions */
+.consult-socials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.btn-social-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.28s ease;
+}
+
+.btn-tg-action {
+  background: linear-gradient(135deg, #0088cc 0%, #29b6f6 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 24px rgba(0, 136, 204, 0.35);
+}
+
+.btn-tg-action:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0, 136, 204, 0.5);
+  filter: brightness(1.1);
+}
+
+.btn-ig-action {
+  background: linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 24px rgba(220, 39, 67, 0.35);
+}
+
+.btn-ig-action:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(220, 39, 67, 0.55);
+  filter: brightness(1.1);
+}
+
+/* QR Code Card (Right) */
+.consult-qr-col {
+  display: flex;
+  justify-content: center;
+}
+
+.qr-interactive-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(17, 24, 39, 0.88);
+  border: 1px solid rgba(220, 39, 67, 0.35);
+  border-radius: 24px;
+  padding: 24px;
+  text-decoration: none;
+  max-width: 320px;
+  width: 100%;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(220, 39, 67, 0.15);
+}
+
+.qr-interactive-card:hover {
+  transform: translateY(-5px) scale(1.02);
+  border-color: #f09433;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 45px rgba(220, 39, 67, 0.35);
+}
+
+.qr-frame {
+  width: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #ffffff;
+  padding: 10px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.qr-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 12px;
+}
+
+.qr-card-footer {
+  margin-top: 14px;
+  text-align: center;
+  width: 100%;
+}
+
+.qr-ig-user {
+  font-size: 15px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+.qr-hint-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .consultation-card {
+    grid-template-columns: 1fr;
+    padding: 32px 24px;
+    gap: 36px;
+  }
+
+  .consult-phones {
+    grid-template-columns: 1fr;
+  }
+
+  .consult-socials {
+    flex-direction: column;
+  }
+
+  .btn-social-action {
+    width: 100%;
+    justify-content: center;
+  }
+}
