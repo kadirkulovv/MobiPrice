@@ -1,13 +1,17 @@
 import json
 import requests
+from datetime import timedelta
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_GET
+from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
+
+from django.utils import timezone
 from django.utils.translation import get_language
 from .models import (
     Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison,
-    RepairFAQ, Review, ServiceOrder
+    RepairFAQ, Review, ServiceOrder, TeamMember, BotAdmin
 )
 
 
@@ -41,10 +45,14 @@ UI_TRANSLATIONS = {
         'ba_sub': "Orqa oynasi singan iPhone 15 Pro Max'ni ochmasdan lazer texnologiyasi bilan 100% tiklash jarayoni",
         'ba_before_badge': "Oldin: Singan holati",
         'ba_after_badge': "Keyin: 100% Zavod holati",
+        'team_title': "Bizning <span>jamoamiz!</span>",
+        'team_sub': "Mutaxassislarimiz qurilmangizga ehtiyotkorlik bilan yondashadi",
         'faq_title': "Ekspert maslahati: <span>Eng ko'p beriladigan savollar</span>",
         'faq_sub': "Nega batareya shishadi? Nega original qimmat? Ustalarimiz ochiq tushuntirish beradi.",
         'reviews_title': "Mijozlarimiz <span>fikrlari</span>",
         'reviews_sub': "Shaffof narxlar va tezkor servisimizdan foydalangan mijozlar sharhlari",
+        'leave_review_btn': "✍️ Fikr qoldirish",
+        'review_modal_title': "Fikr va mulohaza qoldirish",
         'modal_title': "Buyurtmani tasdiqlash",
         'name_label': "Ismingiz *",
         'phone_label': "Telefon raqamingiz *",
@@ -95,10 +103,14 @@ UI_TRANSLATIONS = {
         'ba_sub': "Лазерная замена разбитого заднего стекла iPhone 15 Pro Max без вскрытия корпуса",
         'ba_before_badge': "До: Разбитое стекло",
         'ba_after_badge': "После: 100% Заводской вид",
+        'team_title': "Наша <span>команда!</span>",
+        'team_sub': "Наши специалисты бережно относятся к вашему устройству",
         'faq_title': "Советы экспертов: <span>Частые вопросы</span>",
         'faq_sub': "Почему вздувается батарея? Почему оригинал дороже? Мастера дают открытый ответ.",
         'reviews_title': "Отзывы <span>наших клиентов</span>",
         'reviews_sub': "Отзывы клиентов, выбравших прозрачные цены и быстрый ремонт",
+        'leave_review_btn': "✍️ Оставить отзыв",
+        'review_modal_title': "Оставить отзыв о сервисе",
         'modal_title': "Подтверждение заявки",
         'name_label': "Ваше имя *",
         'phone_label': "Номер телефона *",
@@ -149,10 +161,14 @@ UI_TRANSLATIONS = {
         'ba_sub': "Laser rear glass restoration on iPhone 15 Pro Max without disassembling the device",
         'ba_before_badge': "Before: Shattered glass",
         'ba_after_badge': "After: 100% Factory pristine",
+        'team_title': "Our <span>Team!</span>",
+        'team_sub': "Our experienced specialists handle your device with maximum care",
         'faq_title': "Expert Advice: <span>Frequently Asked Questions</span>",
         'faq_sub': "Why do batteries swell? Why are genuine screens costly? Our technicians explain.",
         'reviews_title': "Customer <span>Reviews</span>",
         'reviews_sub': "Verified customer feedback about our transparent pricing and rapid service",
+        'leave_review_btn': "✍️ Leave a Review",
+        'review_modal_title': "Leave Customer Feedback",
         'modal_title': "Confirm Request",
         'name_label': "Your Name *",
         'phone_label': "Phone Number *",
@@ -184,7 +200,8 @@ def index_view(request):
 
     brands = Brand.objects.filter(is_active=True).order_by('order', 'name')
     faqs = RepairFAQ.objects.all().order_by('order')
-    reviews = Review.objects.filter(is_verified=True).order_by('-created_at')[:6]
+    reviews = Review.objects.filter(is_verified=True).order_by('-created_at')[:8]
+    team_members = TeamMember.objects.filter(is_active=True).order_by('order', 'id')
 
     t = UI_TRANSLATIONS.get(current_lang, UI_TRANSLATIONS['uz'])
 
@@ -192,6 +209,7 @@ def index_view(request):
         'brands': brands,
         'faqs': faqs,
         'reviews': reviews,
+        'team_members': team_members,
         'current_lang': current_lang,
         't': t,
     }
@@ -340,8 +358,10 @@ def api_search_phones(request):
     return JsonResponse({'phones': data})
 
 
+@csrf_exempt
 @require_POST
 def api_submit_order(request):
+
     """Ariza qabul qilish va Telegram admin(lar)ga xabar yuborish"""
     try:
         data = json.loads(request.body)
@@ -496,4 +516,140 @@ def api_track_order(request):
         })
     except Exception as e:
         return JsonResponse({'found': False, 'error': str(e)}, status=500)
+
+
+def get_client_ip(request):
+    """Mijozning haqiqiy IP manzilini aniqlash"""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0].strip()
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip or '127.0.0.1'
+
+
+@csrf_exempt
+@require_POST
+def api_submit_review(request):
+
+    """Mijoz fikri qabul qilish (Anti-Spam: 1 ta qurilma + 1 ta IP dan 24 soatda faqat 1 marta)"""
+    try:
+        data = json.loads(request.body)
+        client_name = data.get('client_name', '').strip()
+        device_model = data.get('device_model', '').strip()
+        service_type = data.get('service_type', '').strip()
+        rating = int(data.get('rating', 5))
+        comment = data.get('comment', '').strip()
+        device_fp = data.get('device_fingerprint', '').strip()
+        lang = data.get('lang', 'uz')
+
+        if not client_name or not comment:
+            err_msg = {
+                'ru': "Пожалуйста, укажите имя и напишите отзыв.",
+                'en': "Please enter your name and review text.",
+                'uz': "Iltimos, ismingizni va fikringizni yozing."
+            }.get(lang, "Ism va fikr matni kiritilishi shart.")
+            return JsonResponse({'success': False, 'error': err_msg}, status=400)
+
+        if rating < 1 or rating > 5:
+            rating = 5
+
+        client_ip = get_client_ip(request)
+        one_day_ago = timezone.now() - timedelta(hours=24)
+
+        # 1. IP tekshiruvi (Oxirgi 24 soat ichida)
+        ip_has_reviewed = Review.objects.filter(
+            ip_address=client_ip,
+            created_at__gte=one_day_ago
+        ).exists()
+
+        # 2. Qurilma identifikatori (Fingerprint) tekshiruvi (Oxirgi 24 soat ichida)
+        device_has_reviewed = False
+        if device_fp:
+            device_has_reviewed = Review.objects.filter(
+                device_fingerprint=device_fp,
+                created_at__gte=one_day_ago
+            ).exists()
+
+        if ip_has_reviewed or device_has_reviewed:
+            limit_msg = {
+                'ru': "Вы уже оставляли отзыв за последние 24 часа. С одного устройства и IP разрешен только 1 отзыв в день!",
+                'en': "You have already submitted a review in the last 24 hours. Only 1 review per day is allowed from the same device and IP!",
+                'uz': "Siz oxirgi 24 soat ichida fikr qoldirgansiz. 1 ta qurilma va IP dan kunda faqat 1 marta sharh yozish mumkin!"
+            }.get(lang, "Kunda faqat 1 marta fikr qoldirish mumkin!")
+            return JsonResponse({'success': False, 'error': limit_msg}, status=429)
+
+        # Sharhni bazaga saqlash
+        review = Review.objects.create(
+            client_name=client_name,
+            device_model=device_model or "Smartfon",
+            service_type=service_type or "Servis xizmati",
+            rating=rating,
+            comment=comment,
+            ip_address=client_ip,
+            device_fingerprint=device_fp or None,
+            is_verified=True,
+        )
+
+        # Telegram bot orqali barcha adminlarga bildirishnoma yuborish
+        bot_token = settings.TELEGRAM_BOT_TOKEN
+        admin_chat_ids_raw = getattr(settings, 'TELEGRAM_ADMIN_CHAT_ID', '') or ''
+        admin_ids = [i.strip() for i in str(admin_chat_ids_raw).split(',') if i.strip()]
+
+        # Dinamik BotAdmin larni ham qo'shamiz
+        try:
+            db_admin_ids = list(BotAdmin.objects.exclude(telegram_id__isnull=True).values_list('telegram_id', flat=True))
+            for aid in db_admin_ids:
+                if str(aid) not in admin_ids:
+                    admin_ids.append(str(aid))
+        except Exception:
+            pass
+
+        if bot_token and admin_ids:
+            try:
+                stars_str = '⭐️' * review.rating
+                text = (
+                    f"💬 <b>YANGI MIJOZ SHARHI!</b>\n\n"
+                    f"👤 <b>Mijoz:</b> {review.client_name}\n"
+                    f"📱 <b>Model:</b> {review.device_model}\n"
+                    f"🔧 <b>Xizmat:</b> {review.service_type}\n"
+                    f"⭐️ <b>Baho:</b> {stars_str} ({review.rating}/5)\n"
+                    f"📝 <b>Fikr:</b> \"<i>{review.comment}</i>\"\n"
+                    f"🌐 <b>IP:</b> <code>{client_ip}</code>"
+                )
+                url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                for aid in admin_ids:
+                    try:
+                        requests.post(url, json={
+                            'chat_id': aid,
+                            'text': text,
+                            'parse_mode': 'HTML'
+                        }, timeout=3)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        success_msg = {
+            'ru': "Большое спасибо! Ваш отзыв успешно добавлен и опубликован.",
+            'en': "Thank you very much! Your review has been successfully published.",
+            'uz': "Katta rahmat! Sizning fikringiz muvaffaqiyatli qabul qilindi va saytda e'lon qilindi."
+        }.get(lang, "Fikringiz muvaffaqiyatli saqlandi.")
+
+        return JsonResponse({
+            'success': True,
+            'message': success_msg,
+            'review': {
+                'id': review.id,
+                'client_name': review.client_name,
+                'device_model': review.device_model,
+                'service_type': review.service_type,
+                'rating': review.rating,
+                'comment': review.comment,
+                'created_at': review.created_at.strftime('%d.%m.%Y'),
+            }
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
 

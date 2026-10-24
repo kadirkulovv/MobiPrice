@@ -1,0 +1,48 @@
+<!-- Our Team / Bizning Jamoamiz Section -->
+<section class="team-section container">
+  <div class="section-header">
+    <div class="section-badge">
+      <span>👨‍🔧</span> {% if current_lang == 'ru' %}Профессиональные мастера{% elif current_lang == 'en' %}Expert Technicians{% else %}Tajribali ustalar jamoasi{% endif %}
+    </div>
+    <h2>{{ t.team_title|safe }}</h2>
+    <p>{{ t.team_sub }}</p>
+  </div>
+
+  <div class="team-grid">
+    {% for member in team_members %}
+    <div class="team-card">
+      <div class="team-photo-wrap">
+        {% if member.photo %}
+          <img src="{{ member.photo.url }}" alt="{{ member.full_name }}" class="team-photo" loading="lazy">
+        {% else %}
+          <div class="team-avatar-placeholder">
+            <div class="avatar-circle">
+              <span class="avatar-icon">👨‍🔧</span>
+            </div>
+            <div class="avatar-brand-badge">PRO</div>
+          </div>
+        {% endif %}
+        <div class="team-exp-badge">
+          <span>⚡️</span> {{ member.experience }}
+        </div>
+      </div>
+
+      <div class="team-info">
+        <h3 class="team-name">{{ member.full_name }}</h3>
+        <div class="team-role-pill">
+          <span>🔧</span> {{ member.role }}
+        </div>
+        <p class="team-quote">
+          {% if current_lang == 'ru' %}
+            Гарантия точности и аккуратности при ремонте вашего смартфона
+          {% elif current_lang == 'en' %}
+            Precision repair with highest quality parts and zero compromises
+          {% else %}
+            Har bir detalga zargarlik aniqligida ehtiyotkorona yondashuv
+          {% endif %}
+        </p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>

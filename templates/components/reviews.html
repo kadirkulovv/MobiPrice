@@ -1,10 +1,15 @@
 <section class="container" style="padding-bottom: 60px;">
-  <div class="section-header">
-    <h2>{{ t.reviews_title|safe }}</h2>
-    <p>{{ t.reviews_sub }}</p>
+  <div class="reviews-section-header">
+    <div class="section-header" style="text-align: left; margin-bottom: 0;">
+      <h2>{{ t.reviews_title|safe }}</h2>
+      <p>{{ t.reviews_sub }}</p>
+    </div>
+    <button type="button" class="btn-leave-review" id="btn-open-review-modal">
+      <span>{{ t.leave_review_btn }}</span>
+    </button>
   </div>
 
-  <div class="reviews-grid">
+  <div class="reviews-grid" id="reviews-grid">
     {% for rev in reviews %}
     <div class="review-card">
       <div class="review-header">
@@ -12,10 +17,17 @@
           <div class="review-author">{{ rev.client_name }}</div>
           <div class="review-service">{{ rev.device_model }} • {{ rev.service_type }}</div>
         </div>
-        <div class="review-stars">★★★★★</div>
+        <div class="review-stars">
+          {% if rev.rating == 5 %}★★★★★
+          {% elif rev.rating == 4 %}★★★★☆
+          {% elif rev.rating == 3 %}★★★☆☆
+          {% elif rev.rating == 2 %}★★☆☆☆
+          {% else %}★☆☆☆☆{% endif %}
+        </div>
       </div>
       <p class="review-text">"{{ rev.comment }}"</p>
     </div>
     {% endfor %}
   </div>
 </section>
+

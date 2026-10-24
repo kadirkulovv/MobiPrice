@@ -171,6 +171,9 @@ class Review(models.Model):
     rating = models.PositiveSmallIntegerField(_("Reyting (1-5)"), default=5)
     comment = models.TextField(_("Mijoz sharhi"))
 
+    ip_address = models.GenericIPAddressField(_("IP manzil"), null=True, blank=True, db_index=True)
+    device_fingerprint = models.CharField(_("Qurilma identifikatori"), max_length=100, null=True, blank=True, db_index=True)
+
     is_verified = models.BooleanField(_("Tasdiqlangan"), default=True)
     created_at = models.DateTimeField(_("Yaratilgan sana"), auto_now_add=True)
 
@@ -181,6 +184,44 @@ class Review(models.Model):
 
     def __str__(self):
         return f"{self.client_name} - {self.device_model} ({self.rating}★)"
+
+
+class TeamMember(models.Model):
+    """Bizning jamoamiz — Tajribali ustalar va mutaxassislar"""
+    full_name = models.CharField(_("Usta / Mutaxassis ismi"), max_length=120)
+    role = models.CharField(_("Mutaxassisligi / Lavozimi"), max_length=120, help_text=_("Masalan: iPhone bo'yicha ekspert"))
+    experience = models.CharField(_("Tajribasi"), max_length=60, default="5+ yillik tajriba", help_text=_("Masalan: 7 yillik tajriba"))
+    photo = models.ImageField(_("Surati"), upload_to='masters/', blank=True, null=True)
+    order = models.PositiveIntegerField(_("Tartib raqami"), default=0)
+    is_active = models.BooleanField(_("Faol"), default=True)
+    created_at = models.DateTimeField(_("Yaratilgan vaqt"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Jamoa a'zosi / Usta")
+        verbose_name_plural = _("Jamoa a'zolari / Ustalar")
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return f"{self.full_name} ({self.role})"
+
+
+class BotAdmin(models.Model):
+    """Telegram Bot Adminlar (Dinamik qo'shish va ayirish)"""
+    telegram_id = models.BigIntegerField(_("Telegram ID"), unique=True, null=True, blank=True)
+    username = models.CharField(_("Username (@siz)"), max_length=100, blank=True, null=True, db_index=True)
+    full_name = models.CharField(_("Admin ismi"), max_length=150, blank=True)
+    added_by = models.CharField(_("Kim qo'shgan"), max_length=100, blank=True)
+    created_at = models.DateTimeField(_("Qo'shilgan sana"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Bot Admin")
+        verbose_name_plural = _("Bot Adminlar")
+        ordering = ['-created_at']
+
+    def __str__(self):
+        user_str = f"@{self.username}" if self.username else str(self.telegram_id)
+        return f"{self.full_name or user_str} ({user_str})"
+
 
 
 class ServiceOrder(models.Model):

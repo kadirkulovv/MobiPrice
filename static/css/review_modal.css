@@ -1,0 +1,164 @@
+/* ==========================================================================
+   MobiPrice — Reviews Header & Review Modal Styles
+   ========================================================================== */
+
+.reviews-section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 30px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.btn-leave-review {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 242, 254, 0.1);
+  color: var(--neon-cyan);
+  border: 1px solid var(--neon-cyan);
+  padding: 10px 22px;
+  border-radius: var(--radius-full);
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: inherit;
+}
+
+.btn-leave-review:hover {
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-blue));
+  color: #080b11;
+  box-shadow: 0 0 20px rgba(0, 242, 254, 0.5);
+  transform: translateY(-2px);
+}
+
+/* Review Modal */
+.review-modal-card {
+  max-width: 520px;
+  width: 92%;
+  padding: 30px 26px;
+  background: radial-gradient(circle at top, rgba(245, 158, 11, 0.08), transparent 70%), var(--bg-card);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(245, 158, 11, 0.15);
+  position: relative;
+  border-radius: var(--radius-lg);
+  animation: modalScaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.review-modal-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.review-modal-icon {
+  font-size: 34px;
+  margin-bottom: 6px;
+  display: inline-block;
+  animation: pulseStar 2s infinite ease-in-out;
+}
+
+@keyframes pulseStar {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.8)); }
+}
+
+.review-modal-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.review-modal-subtitle {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+.review-form-row {
+  display: flex;
+  gap: 12px;
+}
+
+/* Interactive Star Rating */
+.interactive-stars {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+}
+
+.interactive-stars .star {
+  font-size: 24px;
+  color: #4b5563;
+  cursor: pointer;
+  transition: transform 0.2s ease, color 0.2s ease;
+  user-select: none;
+}
+
+.interactive-stars .star:hover {
+  transform: scale(1.2);
+}
+
+.interactive-stars .star.active {
+  color: #f59e0b;
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+
+.star-rating-label {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.review-alert {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  margin-top: 12px;
+  text-align: center;
+}
+
+.review-alert.alert-error {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.review-alert.alert-success {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #10b981;
+}
+
+.review-anti-spam-note {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: center;
+  margin: 12px 0 0;
+  line-height: 1.4;
+}
+
+@media (max-width: 540px) {
+  .reviews-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .btn-leave-review {
+    width: 100%;
+    justify-content: center;
+  }
+  .review-form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  .review-modal-card {
+    padding: 24px 16px;
+  }
+}

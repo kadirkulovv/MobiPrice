@@ -1,0 +1,106 @@
+<!-- Customer Review Submission Modal -->
+<div id="review-modal" class="modal-backdrop" aria-hidden="true" style="display: none;">
+  <div class="modal-card review-modal-card">
+    <button type="button" class="modal-close-btn" id="btn-close-review-modal" aria-label="Yopish">&times;</button>
+    
+    <div class="review-modal-header">
+      <div class="review-modal-icon">⭐️</div>
+      <h3 class="review-modal-title">{{ t.review_modal_title }}</h3>
+      <p class="review-modal-subtitle">
+        {% if current_lang == 'ru' %}
+          Поделитесь своими впечатлениями о сервисе и качестве выполненного ремонта
+        {% elif current_lang == 'en' %}
+          Share your experience with our repair quality and service speed
+        {% else %}
+          Servisimiz sifati va tezkorligi haqidagi xolis fikringizni boshqalar bilan ulashing
+        {% endif %}
+      </p>
+    </div>
+
+    <form id="review-submission-form" class="review-form">
+      <div class="form-group">
+        <label for="review-client-name" class="form-label">
+          {% if current_lang == 'ru' %}Ваше имя *{% elif current_lang == 'en' %}Your Name *{% else %}Ismingiz *{% endif %}
+        </label>
+        <input 
+          type="text" 
+          id="review-client-name" 
+          class="form-control" 
+          placeholder="{% if current_lang == 'ru' %}Например: Алишер{% elif current_lang == 'en' %}e.g. Alex{% else %}Masalan: Alisher Karimov{% endif %}" 
+          required 
+          maxlength="60"
+        >
+      </div>
+
+      <div class="review-form-row">
+        <div class="form-group" style="flex: 1;">
+          <label for="review-device-model" class="form-label">
+            {% if current_lang == 'ru' %}Модель телефона{% elif current_lang == 'en' %}Device Model{% else %}Telefon modeli{% endif %}
+          </label>
+          <input 
+            type="text" 
+            id="review-device-model" 
+            class="form-control" 
+            placeholder="{% if current_lang == 'ru' %}iPhone 15 Pro Max{% elif current_lang == 'en' %}iPhone 15 Pro Max{% else %}iPhone 15 Pro Max{% endif %}" 
+            maxlength="60"
+          >
+        </div>
+
+        <div class="form-group" style="flex: 1;">
+          <label for="review-service-type" class="form-label">
+            {% if current_lang == 'ru' %}Услуга / Ремонт{% elif current_lang == 'en' %}Service Done{% else %}Qilingan ish{% endif %}
+          </label>
+          <input 
+            type="text" 
+            id="review-service-type" 
+            class="form-control" 
+            placeholder="{% if current_lang == 'ru' %}Замена дисплея{% elif current_lang == 'en' %}Screen replacement{% else %}Ekran almashtirish{% endif %}" 
+            maxlength="60"
+          >
+        </div>
+      </div>
+
+      <!-- Interactive 5-Star Rating -->
+      <div class="form-group">
+        <label class="form-label">
+          {% if current_lang == 'ru' %}Ваша оценка{% elif current_lang == 'en' %}Your Rating{% else %}Bahoingiz{% endif %}
+        </label>
+        <div class="interactive-stars" id="star-rating-box">
+          <span class="star active" data-val="1">★</span>
+          <span class="star active" data-val="2">★</span>
+          <span class="star active" data-val="3">★</span>
+          <span class="star active" data-val="4">★</span>
+          <span class="star active" data-val="5">★</span>
+          <input type="hidden" id="review-rating-value" value="5">
+          <span class="star-rating-label" id="star-rating-text">5 / 5 — A'lo</span>
+        </div>
+      </div>
+
+      <!-- Comment textarea -->
+      <div class="form-group">
+        <label for="review-comment-text" class="form-label">
+          {% if current_lang == 'ru' %}Ваш отзыв *{% elif current_lang == 'en' %}Your Review *{% else %}Fikringiz *{% endif %}
+        </label>
+        <textarea 
+          id="review-comment-text" 
+          class="form-control" 
+          rows="3" 
+          placeholder="{% if current_lang == 'ru' %}Опишите ваши впечатления...{% elif current_lang == 'en' %}Describe your experience...{% else %}Xizmat haqidagi fikrlaringizni yozing...{% endif %}" 
+          required 
+          maxlength="500"
+        ></textarea>
+      </div>
+
+      <div id="review-alert-msg" class="review-alert" style="display: none;"></div>
+
+      <button type="submit" id="btn-submit-review" class="btn-primary" style="width: 100%; margin-top: 10px;">
+        <span class="btn-text">{% if current_lang == 'ru' %}Отправить отзыв{% elif current_lang == 'en' %}Submit Review{% else %}Fikrni yuborish{% endif %}</span>
+        <span class="btn-spinner" style="display: none;">⏳</span>
+      </button>
+
+      <p class="review-anti-spam-note">
+        🔒 {% if current_lang == 'ru' %}С одного устройства и IP адреса разрешен только 1 отзыв в сутки.{% elif current_lang == 'en' %}Only 1 review per day is allowed per device and IP address.{% else %}1 ta qurilma va IP manzildan 24 soat ichida faqat 1 marta fikr qoldirish mumkin.{% endif %}
+      </p>
+    </form>
+  </div>
+</div>

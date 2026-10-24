@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison, RepairFAQ, Review, ServiceOrder
+from .models import Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison, RepairFAQ, Review, ServiceOrder, TeamMember, BotAdmin
+
 
 
 @admin.register(Brand)
@@ -88,3 +89,21 @@ class ServiceOrderAdmin(admin.ModelAdmin):
             obj.get_status_display()
         )
     status_badge.short_description = "Status"
+
+
+@admin.register(TeamMember)
+class TeamMemberAdmin(admin.ModelAdmin):
+    list_display = ('full_name', 'role', 'experience', 'order', 'is_active')
+    list_editable = ('order', 'is_active')
+    search_fields = ('full_name', 'role')
+
+
+@admin.register(BotAdmin)
+class BotAdminAdmin(admin.ModelAdmin):
+    list_display = ('user_display', 'telegram_id', 'added_by', 'created_at')
+    search_fields = ('username', 'full_name', 'telegram_id')
+
+    def user_display(self, obj):
+        return f"@{obj.username}" if obj.username else (obj.full_name or str(obj.telegram_id))
+    user_display.short_description = "Admin"
+

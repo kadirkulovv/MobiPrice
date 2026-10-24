@@ -1,0 +1,160 @@
+/* ==========================================================================
+   MobiPrice — Team Section Styles
+   ========================================================================== */
+
+.team-section {
+  padding: 60px 0 40px;
+}
+
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  margin-top: 36px;
+}
+
+.team-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: var(--transition);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.team-card:hover {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4), 0 0 25px rgba(0, 242, 254, 0.15);
+  transform: translateY(-4px);
+}
+
+.team-photo-wrap {
+  width: 100%;
+  height: 260px;
+  position: relative;
+  background: radial-gradient(circle at center, rgba(0, 242, 254, 0.1), #080b11 75%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.team-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  transition: transform 0.4s ease;
+}
+
+.team-card:hover .team-photo {
+  transform: scale(1.05);
+}
+
+.team-avatar-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.avatar-circle {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px dashed rgba(0, 242, 254, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 50px;
+  box-shadow: 0 0 25px rgba(0, 242, 254, 0.15);
+  animation: floatAvatar 3s ease-in-out infinite alternate;
+}
+
+@keyframes floatAvatar {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-6px); }
+}
+
+.avatar-brand-badge {
+  position: absolute;
+  bottom: 24px;
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-blue));
+  color: #080b11;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  padding: 3px 12px;
+  border-radius: var(--radius-full);
+}
+
+.team-exp-badge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: rgba(14, 19, 31, 0.85);
+  border: 1px solid rgba(0, 242, 254, 0.4);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.team-info {
+  padding: 20px 22px 24px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.team-name {
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 8px;
+}
+
+.team-role-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 242, 254, 0.1);
+  color: var(--neon-cyan);
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 700;
+  width: fit-content;
+  margin-bottom: 12px;
+}
+
+.team-quote {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin: 0;
+  margin-top: auto;
+}
+
+@media (max-width: 640px) {
+  .team-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .team-photo-wrap {
+    height: 220px;
+  }
+}

@@ -10,5 +10,7 @@ urlpatterns = [
     path('phones/search/', views.api_search_phones, name='api_search_phones'),
     path('orders/submit/', views.api_submit_order, name='api_submit_order'),
     path('orders/track/', views.api_track_order, name='api_track_order'),
+    path('reviews/submit/', views.api_submit_review, name='api_submit_review'),
 ]
+
 
