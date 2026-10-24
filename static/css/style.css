@@ -1,5 +1,6 @@
 /* MobiPrice — Master Stylesheet Orchestrator */
 @import 'variables.css';
+@import 'animations.css';
 @import 'navbar.css';
 @import 'hero.css';
 @import 'calculator.css';
