@@ -84,3 +84,10 @@ class AdminAddStates(StatesGroup):
     waiting_for_identifier = State()
     waiting_for_name = State()
 
+
+# --- EXCEL BULK STATES ---
+
+class ExcelImportStates(StatesGroup):
+    waiting_for_file = State()
+
+

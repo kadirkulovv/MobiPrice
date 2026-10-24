@@ -18,14 +18,16 @@ def get_main_menu() -> ReplyKeyboardMarkup:
             KeyboardButton(text="⚖️ Solishtirish (Narxlar)"),
         ],
         [
+            KeyboardButton(text="📁 Excel Import / Export"),
             KeyboardButton(text="👨‍🔧 Ustalar (Jamoa)"),
-            KeyboardButton(text="👥 Adminlar"),
         ],
         [
+            KeyboardButton(text="👥 Adminlar"),
             KeyboardButton(text="🔄 Yangilash"),
         ]
     ]
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
+
 
 
 
