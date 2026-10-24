@@ -116,3 +116,25 @@ async def show_stats(message: Message):
         parse_mode="HTML"
     )
 
+
+@router.message(Command("backup"))
+@router.message(F.text == "💾 Zaxira (Backup)")
+async def trigger_manual_backup(message: Message, bot: Bot):
+    """Admin buyrug'i orqali tezkor zaxira nusxasini yuborish"""
+    if not await is_admin(message.from_user.id, message.from_user.username):
+        return
+
+    from core.backup_service import send_backup_to_admins
+
+    wait_msg = await message.answer("⏳ <i>Ma'lumotlar bazasi zaxira nusxasi (Gzip) tayyorlanmoqda...</i>", parse_mode="HTML")
+    res = await send_backup_to_admins(bot, trigger=f"Qo‘lda so‘raldi (@{message.from_user.username or message.from_user.id})")
+
+    if res.get('success'):
+        try:
+            await wait_msg.delete()
+        except Exception:
+            pass
+    else:
+        await wait_msg.edit_text(f"❌ Zaxira nusxasini olishda xatolik: {res.get('error')}")
+
+

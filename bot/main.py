@@ -29,6 +29,7 @@ async def set_bot_commands(bot: Bot):
     commands = [
         BotCommand(command="start", description="🚀 Botni ishga tushirish / Bosh menyu"),
         BotCommand(command="menu", description="📱 Asosiy Admin menyusi"),
+        BotCommand(command="backup", description="💾 Zaxira nusxasini olish (DB Backup)"),
         BotCommand(command="cancel", description="❌ Jarayonni bekor qilish"),
     ]
     await bot.set_my_commands(commands)
@@ -38,6 +39,11 @@ async def on_startup(bot: Bot):
     logger.info("MobiPrice Admin Bot ishga tushdi!")
     logger.info(f"Ruxsat berilgan Admin IDlar: {ADMIN_IDS}")
     await set_bot_commands(bot)
+
+    # Start daily 00:00 (Asia/Tashkent) database backup scheduler
+    from core.backup_service import daily_backup_scheduler_task
+    asyncio.create_task(daily_backup_scheduler_task(bot))
+
     for admin_id in ADMIN_IDS:
         try:
             await bot.send_message(

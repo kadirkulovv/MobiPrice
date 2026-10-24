@@ -23,6 +23,9 @@ def get_main_menu() -> ReplyKeyboardMarkup:
         ],
         [
             KeyboardButton(text="👥 Adminlar"),
+            KeyboardButton(text="💾 Zaxira (Backup)"),
+        ],
+        [
             KeyboardButton(text="🔄 Yangilash"),
         ]
     ]

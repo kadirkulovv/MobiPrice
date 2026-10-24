@@ -191,8 +191,8 @@
   - Saytni 80-port (HTTP) va 443-port (HTTPS) orqali Gunicorn'ga ulash, statik va media fayllarni 30 kunlik kesh bilan to'g'ridan-to'g'ri tarqatish (`deploy/nginx_mobiprice.conf`).
 - [✅] **Let's Encrypt SSL/HTTPS:**
   - Bepul xavfsiz yashil qulf (SSL sertifikati) va avtomatik yangilanishi bo'yicha ko'rsatmalar (`deploy/README.md`).
-- [✅] **Avtomatik Backup (Zaxiralash) skripti:**
-  - Har kechasi `db.sqlite3` va `media/` papkasini xavfsiz hot backup (`sqlite3 .backup`) orqali arxivlab 14 kunlik saqlash skripti (`deploy/backup_db.sh`).
+- [✅] **Avtomatik Backup (Zaxiralash) va Telegram Bot orqali har kuni 00:00 da adminlarga yuborish:**
+  - `Asia/Tashkent` vaqti bilan har kuni 00:00 da xavfsiz hot backup (`sqlite3.backup` + Gzip) yaratilib, bot orqali barcha adminlarga `.sqlite3.gz` fayli avtomatik yuboriladi, hamda botda `💾 Zaxira (Backup)` tugmasi va `/backup` komandasi orqali istalgan paytda zaxira olish imkoniyati yaratildi (`core/backup_service.py`, `deploy/backup_db.sh`).
 
 ---
 
