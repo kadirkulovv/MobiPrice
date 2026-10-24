@@ -154,10 +154,10 @@
 ---
 
 ### 6-BOSQICH: OMMAVIY MA'LUMOT BOSHQARUVI (EXCEL IMPORT / EXPORT)
-- [ ] **Excel / CSV orqali ommaviy yuklash (Bulk Import):**
-  - Yuzlab telefonlar, seriyalar va ehtiyot qismlar narxlarini 1 ta Excel fayli orqali bazaga avtomatik kiritish.
-- [ ] **Excel orqali eksport va narxlarni yoppasiga yangilash:**
-  - Hamma narxlarni Excel jadval ko‘rinishida yuklab olish va o‘zgartirib qayta yuklash imkoniyati.
+- [✅] **Excel / CSV orqali ommaviy yuklash (Bulk Import):**
+  - Yuzlab telefonlar, seriyalar va ehtiyot qismlar narxlarini 1 ta Excel fayli orqali bazaga avtomatik kiritish (`core/excel_manager.py`).
+- [✅] **Excel orqali eksport va narxlarni yoppasiga yangilash:**
+  - Hamma narxlarni Excel jadval ko‘rinishida yuklab olish va o‘zgartirib qayta yuklash imkoniyati hamda botda namuna shablon yuklab olish (`bot/handlers/excel.py`).
 
 ---
 
