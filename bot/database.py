@@ -16,7 +16,7 @@ django.setup()
 # Import Django models after setup
 from core.models import (
     Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison,
-    RepairFAQ, Review, ServiceOrder
+    RepairFAQ, Review, ServiceOrder, TeamMember, BotAdmin
 )
 from asgiref.sync import sync_to_async
 
@@ -29,5 +29,8 @@ __all__ = [
     'RepairFAQ',
     'Review',
     'ServiceOrder',
+    'TeamMember',
+    'BotAdmin',
     'sync_to_async',
 ]
+

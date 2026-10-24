@@ -2,7 +2,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 
 def get_main_menu() -> ReplyKeyboardMarkup:
-    """Asosiy admin paneli menyusi (1-qatorda 3 ta, 2-qatorda 2 ta)"""
+    """Asosiy admin paneli menyusi"""
     keyboard = [
         [
             KeyboardButton(text="🏷 Brendlar"),
@@ -14,11 +14,16 @@ def get_main_menu() -> ReplyKeyboardMarkup:
             KeyboardButton(text="⚖️ Solishtirish (Narxlar)"),
         ],
         [
+            KeyboardButton(text="👨‍🔧 Ustalar (Jamoa)"),
+            KeyboardButton(text="👥 Adminlar"),
+        ],
+        [
             KeyboardButton(text="📊 Statistika"),
             KeyboardButton(text="🔄 Yangilash"),
         ]
     ]
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
+
 
 
 def get_section_crud_menu(section_title: str) -> ReplyKeyboardMarkup:

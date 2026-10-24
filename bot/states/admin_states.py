@@ -63,3 +63,24 @@ class ComparisonEditStates(StatesGroup):
 
 class DeleteStates(StatesGroup):
     waiting_for_confirm = State()
+
+
+# --- MASTER / TEAM STATES ---
+
+class MasterAddStates(StatesGroup):
+    waiting_for_name = State()
+    waiting_for_role = State()
+    waiting_for_experience = State()
+    waiting_for_photo = State()
+
+
+class MasterEditStates(StatesGroup):
+    waiting_for_new_data = State()
+
+
+# --- ADMIN MANAGEMENT STATES ---
+
+class AdminAddStates(StatesGroup):
+    waiting_for_identifier = State()
+    waiting_for_name = State()
+
