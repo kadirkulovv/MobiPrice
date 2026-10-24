@@ -162,13 +162,12 @@
 ---
 
 ### 7-BOSQICH: YUQORI YUKLAMA (HIGH-LOAD 10,000+), KESH VA XAVFSIZLIK
-- [ ] **SQLite3 WAL (Write-Ahead Logging) rejimi:**
-  - Bir vaqtda yuzlab o‘qish (read) so‘rovlarini bloklanmasdan o‘ta tez ishlashini ta'minlash (`PRAGMA journal_mode=WAL;`).
-- [ ] **Tezkor xotira keshi (In-Memory / File Caching):**
-  - Brendlar, Seriyalar, Telefonlar va Narxlar API javoblarini keshda saqlash (so‘rovlar tezligini < 5ms darajasiga tushirish).
-- [ ] **Spam va Hujumlardan Himoya (Rate Limiting):**
-  - Buyurtma formasiga 1 ta IP manzildan daqiqasiga 2 tadan ortiq so‘rov yuborishni cheklash (Anti-spam protection).
-  - CSRF va XSS himoyasi.
+- [✅] **SQLite3 WAL (Write-Ahead Logging) rejimi:**
+  - Bir vaqtda yuzlab o‘qish (read) so‘rovlarini bloklanmasdan o‘ta tez ishlashini ta'minlash (`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=30000;`).
+- [✅] **Tezkor xotira keshi (In-Memory / File Caching):**
+  - Brendlar, Seriyalar, Telefonlar va Narxlar API javoblarini `django.core.cache` orqali keshda saqlash va ma'lumot yangilanganda avtomatik keshni tozalash (`core/views.py`, `core/apps.py`).
+- [✅] **Spam va Hujumlardan Himoya (Rate Limiting):**
+  - Buyurtma formasiga 1 ta IP manzildan daqiqasiga 2 tadan ortiq so‘rov yuborishni cheklash (429 Too Many Requests), Sharhlar uchun 1 IP + 1 Device / 24 soat cheklovi, hamda CSRF va XSS himoyasi (`escape()`).
 
 ---
 
