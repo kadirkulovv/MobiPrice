@@ -248,9 +248,12 @@ class ServiceOrder(models.Model):
 
     service_type = models.CharField(_("Xizmat turi"), max_length=50, choices=SERVICE_CHOICES, default='in_service')
     status = models.CharField(_("Holati"), max_length=50, choices=STATUS_CHOICES, default='new')
+    master = models.ForeignKey(TeamMember, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Biriktirilgan usta"))
 
-    notes = models.TextField(_("Izohlar"), blank=True)
+    notes = models.TextField(_("Mijoz izohi"), blank=True)
+    admin_notes = models.TextField(_("Admin / Usta qaydlari"), blank=True)
     created_at = models.DateTimeField(_("Yaratilgan vaqt"), auto_now_add=True)
+
 
     class Meta:
         verbose_name = _("Buyurtma / Ariza")

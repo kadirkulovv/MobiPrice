@@ -12,7 +12,8 @@ from aiogram.types import BotCommand
 import bot.database  # noqa: F401
 
 from bot.config import BOT_TOKEN, ADMIN_IDS
-from bot.handlers import start, brands, series, phones, issues, comparisons, masters, admins
+from bot.handlers import start, brands, series, phones, issues, comparisons, masters, admins, crm
+
 
 
 # Configure logging
@@ -79,6 +80,8 @@ async def main():
     dp.include_router(comparisons.router)
     dp.include_router(masters.router)
     dp.include_router(admins.router)
+    dp.include_router(crm.router)
+
 
 
     dp.startup.register(on_startup)

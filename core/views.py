@@ -382,10 +382,18 @@ def api_submit_order(request):
             service_type=service_type,
         )
 
-        # Telegram notification to all configured admins
+        # Telegram notification to all configured admins and dynamic BotAdmins
         bot_token = settings.TELEGRAM_BOT_TOKEN
         admin_chat_ids_raw = getattr(settings, 'TELEGRAM_ADMIN_CHAT_ID', '') or ''
         admin_ids = [i.strip() for i in str(admin_chat_ids_raw).split(',') if i.strip()]
+
+        try:
+            db_admin_ids = list(BotAdmin.objects.exclude(telegram_id__isnull=True).values_list('telegram_id', flat=True))
+            for aid in db_admin_ids:
+                if str(aid) not in admin_ids:
+                    admin_ids.append(str(aid))
+        except Exception:
+            pass
 
         if bot_token and admin_ids:
             try:
@@ -394,14 +402,32 @@ def api_submit_order(request):
                 price_str = f"{order.comparison.total_price_uzs:,} so'm" if order.comparison else "-"
 
                 text = (
-                    f"🚨 <b>YANGI BUYURTMA! #{order.order_id}</b>\n\n"
+                    f"🚨 <b>YANGI TA'MIRLASH BUYURTMASI! #{order.order_id}</b>\n\n"
                     f"👤 <b>Mijoz:</b> {client_name}\n"
-                    f"📞 <b>Telefon:</b> {phone_number}\n"
-                    f"📱 <b>Telefon:</b> {phone_str}\n"
-                    f"🔧 <b>Xizmat:</b> {part_str}\n"
-                    f"💵 <b>Narx:</b> {price_str}\n"
+                    f"📞 <b>Telefon:</b> <code>{phone_number}</code>\n"
+                    f"📱 <b>Model:</b> {phone_str}\n"
+                    f"🔧 <b>Muammo / Qism:</b> {part_str}\n"
+                    f"💵 <b>Narxi:</b> {price_str}\n"
+                    f"📦 <b>Holati:</b> 🔴 Yangi ariza\n"
                     f"📍 <b>Format:</b> {order.get_service_type_display()}"
                 )
+
+                inline_kb = {
+                    'inline_keyboard': [
+                        [
+                            {'text': "✅ Qabul qilish", 'callback_data': f"crm_st:{order.id}:contacted"},
+                            {'text': "👨‍🔧 Ustaga biriktirish", 'callback_data': f"crm_assign:{order.id}"},
+                        ],
+                        [
+                            {'text': "📞 Bog‘lanildi", 'callback_data': f"crm_st:{order.id}:contacted"},
+                            {'text': "🎉 Tayyor", 'callback_data': f"crm_st:{order.id}:ready"},
+                        ],
+                        [
+                            {'text': "❌ Bekor qilish", 'callback_data': f"crm_st:{order.id}:cancelled"}
+                        ]
+                    ]
+                }
+
                 url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
 
                 for aid in admin_ids:
@@ -409,7 +435,8 @@ def api_submit_order(request):
                         requests.post(url, json={
                             'chat_id': aid,
                             'text': text,
-                            'parse_mode': 'HTML'
+                            'parse_mode': 'HTML',
+                            'reply_markup': inline_kb
                         }, timeout=4)
                     except Exception:
                         pass
@@ -423,6 +450,7 @@ def api_submit_order(request):
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
 
 
 @require_GET

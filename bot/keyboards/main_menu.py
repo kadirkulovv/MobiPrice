@@ -5,6 +5,10 @@ def get_main_menu() -> ReplyKeyboardMarkup:
     """Asosiy admin paneli menyusi"""
     keyboard = [
         [
+            KeyboardButton(text="📦 Buyurtmalar (CRM)"),
+            KeyboardButton(text="📊 Statistika"),
+        ],
+        [
             KeyboardButton(text="🏷 Brendlar"),
             KeyboardButton(text="📂 Modellar"),
             KeyboardButton(text="📱 Telefonlar"),
@@ -18,11 +22,11 @@ def get_main_menu() -> ReplyKeyboardMarkup:
             KeyboardButton(text="👥 Adminlar"),
         ],
         [
-            KeyboardButton(text="📊 Statistika"),
             KeyboardButton(text="🔄 Yangilash"),
         ]
     ]
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
+
 
 
 
