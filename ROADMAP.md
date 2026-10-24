@@ -120,6 +120,14 @@
   - Saytdan topilmagan har qanday smartfon va ehtiyot qismlari uchun tajribali ustalar bilan bog'lanish vitrinasi, orqa fonga laboratoriya ustaxonasi surati (`static/img/team_workshop_bg.jpg`).
 - [✅] **Instagram QR-kod kartasi va 2 ta rasmiy telefon raqami:**
   - `@MURODJONMILYAZOV_` Instagram skaner kartasi, `+998 (90) 919-76-00` va `+998 (90) 918-76-00` raqamlari hamda Telegram/Instagram havolalari.
+- [✅] **"Bizning jamoamiz!" Mutaxassislar vitrinasi:**
+  - Saytda tajribali ustalar jamoasi kartalari (Ismi, lavozimi, tajribasi, surati va kafolati) (`templates/components/team.html`, `static/css/team.css`).
+- [✅] **Mijozlar fikri va Anti-Spam (1 IP + 1 Qurilma / 24 soat):**
+  - Saytda mijozlar uchun 5 yulduzli interaktiv sharh qoldirish modali (`templates/components/review_modal.html`), IP va doimiy qurilma identifikatori (fingerprint) orqali kunda faqat 1 marta sharh yozish cheklovi (`/api/reviews/submit/`) hamda Telegram botga lahzada xabar yuborish.
+- [✅] **Bot: Dinamik Adminlar boshqaruvi (`👥 Adminlar`):**
+  - Username (masalan `@username`) yoki Telegram ID orqali yangi adminlarni botdan to‘g‘ridan-to‘g‘ri qo‘shish va o‘chirish mexanizmi (`bot/handlers/admins.py`).
+- [✅] **Bot: Jamoa ustalarini boshqarish CRUD (`👨‍🔧 Ustalar (Jamoa)`):**
+  - Bot orqali yangi usta (ismi, roli, ish staji va surati) qo‘shish, ro‘yxat ko‘rish va o‘chirish (`bot/handlers/masters.py`).
 
 ---
 
