@@ -76,6 +76,7 @@ class MasterAddStates(StatesGroup):
 
 class MasterEditStates(StatesGroup):
     waiting_for_new_data = State()
+    waiting_for_new_photo = State()
 
 
 # --- ADMIN MANAGEMENT STATES ---
