@@ -89,7 +89,7 @@ sudo nginx -t
 sudo systemctl restart nginx
 
 # Bepul SSL sertifikatini olish (Avtomatik HTTPS):
-sudo certbot --nginx -d mobiprice.uz -d www.mobiprice.uz
+sudo certbot --nginx -d mobi-price.uz -d www.mobi-price.uz
 ```
 
 ---
