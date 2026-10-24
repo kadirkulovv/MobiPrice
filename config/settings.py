@@ -27,12 +27,28 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-mobiprice-dev-secret-key-s
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*').split(',') if h.strip()]
+
 CSRF_TRUSTED_ORIGINS = [
     'https://*.ngrok-free.app',
     'https://*.ngrok.io',
     'http://localhost:8000',
     'http://127.0.0.1:8000',
 ]
+
+# Auto-add allowed hosts to CSRF trusted origins for production domains
+for host in ALLOWED_HOSTS:
+    if host and host != '*':
+        for proto in ('https://', 'http://'):
+            origin = f"{proto}{host}"
+            if origin not in CSRF_TRUSTED_ORIGINS:
+                CSRF_TRUSTED_ORIGINS.append(origin)
+
+env_trusted = os.getenv('CSRF_TRUSTED_ORIGINS', '')
+if env_trusted:
+    for origin in env_trusted.split(','):
+        origin = origin.strip()
+        if origin and origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(origin)
 
 
 # Application definition
