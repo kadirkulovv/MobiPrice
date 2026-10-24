@@ -172,9 +172,12 @@
 ---
 
 ### 8-BOSQICH: SEO VA QIDIRUV TIZIMLARIDA PESHQADAMLIK
-- [ ] Har bir model va muammo uchun avtomatik generatsiya qilinadigan SEO meta-teglar (Title, Meta Description, OpenGraph).
-- [ ] Dinamik `sitemap.xml` va `robots.txt` generatsiyasi.
-- [ ] **Schema.org mikroformati:** Google qidiruv natijalarida to‘g‘ridan-to‘g‘ri yulduzchalar (reyting) va ta'mirlash narxi ko‘rinib turishi uchun `Product` / `Service` JSON-LD formatini integratsiya qilish.
+- [✅] **Har bir model va muammo uchun SEO meta-teglar (Title, Meta Description, OpenGraph, Twitter Cards):**
+  - Ko'p tilli sarlavhalar, ta'riflar, kalit so'zlar, kanonik va hreflang havolalari (`templates/base.html`).
+- [✅] **Dinamik `sitemap.xml` va `robots.txt` generatsiyasi:**
+  - Barcha tillardagi sahifalar va brend kataloglari uchun avtomatik XML sitemap va qidiruv botlari direktivasi (`core/views.py`, `config/urls.py`).
+- [✅] **Schema.org mikroformati (Rich Snippets JSON-LD):**
+  - Google qidiruv tizimida reyting yulduzlari (4.9/5), ish vaqtlari, narx toifasi va muallif ma'lumotlari uchun `LocalBusiness`, hamda savol-javoblar uchun `FAQPage` JSON-LD formatlari to'liq integratsiya qilindi.
 
 ---
 
