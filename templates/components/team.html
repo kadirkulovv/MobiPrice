@@ -1,3 +1,71 @@
+<style>
+.team-grid {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  align-items: stretch !important;
+  gap: 28px !important;
+  margin-top: 36px !important;
+}
+
+.team-card {
+  width: 360px !important;
+  max-width: 360px !important;
+  flex: 0 0 360px !important;
+  background: #0f172a !important;
+  border: 1px solid rgba(0, 242, 254, 0.25) !important;
+  border-radius: 24px !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 25px rgba(0, 242, 254, 0.1) !important;
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease !important;
+}
+
+.team-card:hover {
+  border-color: #00f2fe !important;
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.7), 0 0 35px rgba(0, 242, 254, 0.25) !important;
+  transform: translateY(-6px) !important;
+}
+
+.team-photo-wrap {
+  width: 100% !important;
+  height: 360px !important;
+  aspect-ratio: 1 / 1 !important;
+  position: relative !important;
+  background: radial-gradient(circle at center, rgba(0, 242, 254, 0.18), #080b11 75%) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.team-photo {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center 15% !important;
+  display: block !important;
+  transition: transform 0.4s ease !important;
+}
+
+.team-card:hover .team-photo {
+  transform: scale(1.04) !important;
+}
+
+@media (max-width: 480px) {
+  .team-card {
+    width: 100% !important;
+    max-width: 330px !important;
+    flex: 0 0 100% !important;
+  }
+  .team-photo-wrap {
+    height: 330px !important;
+  }
+}
+</style>
+
 <!-- Our Team / Bizning Jamoamiz Section -->
 <section class="team-section container">
   <div class="section-header">

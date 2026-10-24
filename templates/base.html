@@ -99,8 +99,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <!-- Main Stylesheet (with cache-busting) -->
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v={% now 'U' %}">
   <link rel="icon" type="image/jpeg" href="{% static 'img/logo.jpg' %}">
 </head>
 <body>
