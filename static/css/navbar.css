@@ -85,6 +85,31 @@
   font-weight: 600;
 }
 
+/* Track Order Desktop Button */
+.btn-header-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: 8px 14px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  font-family: inherit;
+  transition: var(--transition);
+}
+
+.btn-header-track:hover {
+  background: rgba(0, 242, 254, 0.1);
+  border-color: var(--neon-cyan);
+  color: #fff;
+  box-shadow: 0 0 15px rgba(0, 242, 254, 0.3);
+  transform: translateY(-2px);
+}
+
 /* Telegram Desktop Button */
 .btn-header-tg {
   display: inline-flex;
@@ -105,6 +130,30 @@
   background: #24a1de;
   color: #fff;
   box-shadow: 0 0 15px rgba(36, 161, 222, 0.5);
+  transform: translateY(-2px);
+}
+
+/* Instagram Desktop Button */
+.btn-header-ig {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(225, 48, 108, 0.12);
+  color: #e1306c;
+  border: 1px solid rgba(225, 48, 108, 0.35);
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 13px;
+  transition: var(--transition);
+}
+
+.btn-header-ig:hover {
+  background: linear-gradient(45deg, #f09433, #dc2743, #bc1888);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 0 16px rgba(220, 39, 67, 0.5);
   transform: translateY(-2px);
 }
 
@@ -172,13 +221,24 @@
     align-items: center;
     justify-content: center;
     text-decoration: none;
+    border: none;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-main);
     transition: var(--transition);
+    font-size: 15px;
   }
 
   .btn-icon-tg {
     background: rgba(36, 161, 222, 0.15);
     color: #24a1de;
     border: 1px solid rgba(36, 161, 222, 0.3);
+  }
+
+  .btn-icon-ig {
+    background: rgba(225, 48, 108, 0.15);
+    color: #e1306c;
+    border: 1px solid rgba(225, 48, 108, 0.35);
   }
 
   .btn-icon-call {
