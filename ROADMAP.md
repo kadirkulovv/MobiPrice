@@ -182,17 +182,17 @@
 ---
 
 ### 9-BOSQICH: LINUX SYSTEMD SERVUSLARI VA SERVERGA JOYLASH (DEPLOY)
-- [ ] **Gunicorn sozlamalari:** Veb-saytni barqaror ko‘p ishchi oqimlar (workers) bilan yurgizish.
-- [ ] **`mobiprice_web.service` yaratish:**
-  - Linux `systemd` servisi orqali Gunicorn'ni fonda doimiy ishlatish (`systemctl enable --now mobiprice_web`).
-- [ ] **`mobiprice_bot.service` yaratish:**
-  - Telegram botni fonda uzluksiz ishlatish va server o‘chib yonganda avtomatik qayta tiklanishi (`Restart=always`).
-- [ ] **Nginx Reverse Proxy:**
-  - Saytni 80-port (HTTP) va 443-port (HTTPS) orqali Gunicorn'ga ulash, barcha statik va media fayllarni Nginx orqali maksimal tezlikda tarqatish.
-- [ ] **Let's Encrypt SSL/HTTPS:**
-  - Bepul xavfsiz yashil qulf (SSL sertifikati) va avtomatik yangilanishi (`certbot --nginx`).
-- [ ] **Avtomatik Backup (Zaxiralash) skripti:**
-  - Har kechasi `db.sqlite3` va `media/` papkasini zaxira arxiviga nusxalab qo‘yish cron skripti.
+- [✅] **Gunicorn sozlamalari:** Veb-saytni barqaror ko‘p ishchi oqimlar bilan yurgizish (`deploy/gunicorn.conf.py`).
+- [✅] **`mobiprice_web.service` yaratish:**
+  - Linux `systemd` servisi orqali Gunicorn'ni fonda doimiy ishlatish va avtomatik qayta tiklanishi (`deploy/mobiprice_web.service`).
+- [✅] **`mobiprice_bot.service` yaratish:**
+  - Telegram botni fonda uzluksiz ishlatish va server o‘chib yonganda avtomatik qayta tiklanishi (`deploy/mobiprice_bot.service`, `Restart=always`).
+- [✅] **Nginx Reverse Proxy:**
+  - Saytni 80-port (HTTP) va 443-port (HTTPS) orqali Gunicorn'ga ulash, statik va media fayllarni 30 kunlik kesh bilan to'g'ridan-to'g'ri tarqatish (`deploy/nginx_mobiprice.conf`).
+- [✅] **Let's Encrypt SSL/HTTPS:**
+  - Bepul xavfsiz yashil qulf (SSL sertifikati) va avtomatik yangilanishi bo'yicha ko'rsatmalar (`deploy/README.md`).
+- [✅] **Avtomatik Backup (Zaxiralash) skripti:**
+  - Har kechasi `db.sqlite3` va `media/` papkasini xavfsiz hot backup (`sqlite3 .backup`) orqali arxivlab 14 kunlik saqlash skripti (`deploy/backup_db.sh`).
 
 ---
 
@@ -203,9 +203,10 @@
 | **5-Bosqichli Baza Modeli** | ✅ **Bajarildi** | `Brand` -> `Series` -> `Phone` -> `Issue` -> `Comparison` to‘liq tayyor |
 | **Aiogram 3 Admin Bot** | ✅ **Bajarildi** | 5 ta bo‘lim uchun to‘liq CRUD, 30 ta SVG ikonka, avto-tarjima, 3-tugmali menyu |
 | **Kalkulyator UI (Web)** | ✅ **Bajarildi** | 5 ta bosqich, Before/After slider, Dark UI, 3 ta til faol |
-| **Trek Tekshirish (Track Order)** | ✅ **Bajarildi** | `#ORD-XXXX` kodi bilan 4 bosqichli status stepper va modal |
+| **Trek Tekshirish (Track Order)** | ✅ **Bajarildi** | `#MP-XXXXXX` kodi bilan 4 bosqichli status stepper va modal |
 | **Scroll Animatsiyalar & Konsultatsiya** | ✅ **Bajarildi** | IntersectionObserver animatsiyalari, QR kod, 2 ta telefon raqami |
 | **Telegram CRM & Xabarnomalar** | ✅ **Bajarildi** | Saytdan tushgan buyurtmani botga lahzada uzatish, inline boshqaruv va ustaga biriktirish |
-| **Excel Import / Export** | ⏳ **Keyingi navbatda** | Ommaviy ma'lumot kiritish |
-| **Tezkor Kesh & Anti-Spam** | ⏳ **Rejada** | SQLite WAL rejimi, xotira keshi va cheklovlar |
-| **Serverga Joylash (Deploy)** | ⏳ **Rejada** | Linux systemd (`.service`), Gunicorn, Nginx, SSL, SQLite3 |
+| **Excel Import / Export** | ✅ **Bajarildi** | openpyxl orqali ommaviy narxlar importi, eksporti va namuna shablon |
+| **Tezkor Kesh & Anti-Spam** | ✅ **Bajarildi** | SQLite WAL rejimi, xotira keshi, 429 rate limiter va XSS himoyasi |
+| **SEO & Schema.org** | ✅ **Bajarildi** | OpenGraph, Twitter Cards, sitemap.xml, robots.txt, LocalBusiness & FAQPage JSON-LD |
+| **Serverga Joylash (Deploy)** | ✅ **Bajarildi** | Linux systemd (`.service`), Gunicorn, Nginx, SSL, avtomatik backup |
