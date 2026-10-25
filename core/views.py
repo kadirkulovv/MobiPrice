@@ -426,8 +426,14 @@ def api_submit_order(request):
         admin_ids = [i.strip() for i in str(admin_chat_ids_raw).split(',') if i.strip()]
 
         try:
-            db_admin_ids = list(BotAdmin.objects.exclude(telegram_id__isnull=True).values_list('telegram_id', flat=True))
-            for aid in db_admin_ids:
+            # Faqat Menejerlar va ikkala rolga ega xodimlarga zayavka boradi (oddiy sayt adminlariga bormaydi)
+            db_manager_ids = list(
+                BotAdmin.objects.filter(
+                    is_active=True,
+                    role__in=['manager', 'both']
+                ).exclude(telegram_id__isnull=True).values_list('telegram_id', flat=True)
+            )
+            for aid in db_manager_ids:
                 if str(aid) not in admin_ids:
                     admin_ids.append(str(aid))
         except Exception:

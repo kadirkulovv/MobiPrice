@@ -70,10 +70,13 @@ async def get_all_admin_ids() -> list[int]:
         if item.isdigit():
             admin_ids.append(int(item))
 
-    # BotAdmin modelidan dinamik qo'shilganlar
+    # BotAdmin modelidan faqat sayt adminlari (menejerlar bazani olmasligi kerak)
     try:
         db_admins = await sync_to_async(list)(
-            BotAdmin.objects.exclude(telegram_id__isnull=True).values_list('telegram_id', flat=True)
+            BotAdmin.objects.filter(
+                is_active=True,
+                role__in=['admin', 'both']
+            ).exclude(telegram_id__isnull=True).values_list('telegram_id', flat=True)
         )
         for tid in db_admins:
             if tid and tid not in admin_ids:

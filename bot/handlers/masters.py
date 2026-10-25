@@ -7,7 +7,7 @@ from bot.keyboards.main_menu import get_section_crud_menu, get_cancel_menu
 from bot.states.admin_states import MasterAddStates, MasterEditStates
 from bot.database import TeamMember, sync_to_async
 from bot.config import BASE_DIR
-from bot.handlers.start import is_admin
+from bot.handlers.start import is_admin, is_site_admin
 
 router = Router()
 MASTERS_MEDIA_DIR = BASE_DIR / 'media' / 'masters'
@@ -26,7 +26,8 @@ def get_skip_menu() -> ReplyKeyboardMarkup:
 @router.message(F.text == "👨‍🔧 Ustalar (Jamoa)")
 async def masters_menu(message: Message, state: FSMContext):
     """Ustalar boshqaruv menyusi"""
-    if not await is_admin(message.from_user.id, message.from_user.username):
+    if not await is_site_admin(message.from_user.id, message.from_user.username):
+        await message.answer("⛔️ Bu bo‘lim faqat Sayt Administratorlari va Bosh Admin uchun!")
         return
 
     await state.clear()

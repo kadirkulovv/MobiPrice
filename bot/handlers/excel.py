@@ -8,7 +8,7 @@ from bot.keyboards.main_menu import get_main_menu, get_cancel_menu
 from bot.states.admin_states import ExcelImportStates
 from bot.database import sync_to_async
 from bot.config import BASE_DIR
-from bot.handlers.start import is_admin
+from bot.handlers.start import is_admin, is_site_admin
 from core.excel_manager import export_prices_to_excel, import_prices_from_excel
 
 router = Router()
@@ -34,7 +34,8 @@ def get_excel_menu() -> ReplyKeyboardMarkup:
 @router.message(F.text == "📁 Excel Import / Export")
 async def excel_home(message: Message, state: FSMContext):
     """Excel bo'limi bosh menyusi"""
-    if not await is_admin(message.from_user.id, message.from_user.username):
+    if not await is_site_admin(message.from_user.id, message.from_user.username):
+        await message.answer("⛔️ Bu bo‘lim faqat Sayt Administratorlari va Bosh Admin uchun!")
         return
 
     await state.clear()

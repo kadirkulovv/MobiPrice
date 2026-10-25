@@ -206,21 +206,51 @@ class TeamMember(models.Model):
 
 
 class BotAdmin(models.Model):
-    """Telegram Bot Adminlar (Dinamik qo'shish va ayirish)"""
+    """Telegram Bot Admin va Menejerlari (Dinamik huquqlar bilan)"""
+    ROLE_CHOICES = [
+        ('admin', _('Admin (Sayt va resurslar boshqaruvi)')),
+        ('manager', _('Menejer (Faqat zayavkalar va CRM)')),
+        ('both', _('Admin + Menejer (Ikkala huquq ham)')),
+    ]
+
     telegram_id = models.BigIntegerField(_("Telegram ID"), unique=True, null=True, blank=True)
     username = models.CharField(_("Username (@siz)"), max_length=100, blank=True, null=True, db_index=True)
-    full_name = models.CharField(_("Admin ismi"), max_length=150, blank=True)
+    full_name = models.CharField(_("Xodim ismi / Izoh"), max_length=150, blank=True)
+    role = models.CharField(
+        _("Vazifasi / Roli"),
+        max_length=20,
+        choices=ROLE_CHOICES,
+        default='both',
+        help_text=_("admin = sayt resurslari; manager = zayavkalar; both = ikkalasi")
+    )
+    is_active = models.BooleanField(_("Faol"), default=True)
     added_by = models.CharField(_("Kim qo'shgan"), max_length=100, blank=True)
     created_at = models.DateTimeField(_("Qo'shilgan sana"), auto_now_add=True)
 
     class Meta:
-        verbose_name = _("Bot Admin")
-        verbose_name_plural = _("Bot Adminlar")
+        verbose_name = _("Bot Admin / Menejer")
+        verbose_name_plural = _("Bot Adminlar va Menejerlar")
         ordering = ['-created_at']
 
     def __str__(self):
         user_str = f"@{self.username}" if self.username else str(self.telegram_id)
-        return f"{self.full_name or user_str} ({user_str})"
+        return f"{self.full_name or user_str} [{self.get_role_display()}]"
+
+    @property
+    def can_manage_site(self) -> bool:
+        return self.is_active and self.role in ('admin', 'both')
+
+    @property
+    def can_handle_leads(self) -> bool:
+        return self.is_active and self.role in ('manager', 'both')
+
+    @property
+    def role_badge(self) -> str:
+        if self.role == 'admin':
+            return "🛠️ Admin (Sayt)"
+        elif self.role == 'manager':
+            return "📋 Menejer (Zayavka)"
+        return "🌟 Admin + Menejer"
 
 
 

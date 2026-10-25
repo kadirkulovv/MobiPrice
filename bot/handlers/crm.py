@@ -5,9 +5,27 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from bot.keyboards.main_menu import get_main_menu, get_cancel_menu
 from bot.database import ServiceOrder, TeamMember, DevicePhone, IssueComparison, sync_to_async
-from bot.handlers.start import is_admin
+from bot.permissions import get_user_permissions
 
 router = Router()
+
+
+async def check_crm_access(message_or_call) -> bool:
+    """Faqat zayavkalar huquqiga ega bo'lganlar (Menejer, Superadmin, Both) uchun ruxsat"""
+    user = message_or_call.from_user
+    perms = await get_user_permissions(user.id, user.username)
+    if not perms.can_handle_leads:
+        denial = (
+            "⛔️ <b>Ruxsat yo‘q!</b>\n\n"
+            "Buyurtmalar (CRM) bo‘limi faqat <b>Menejerlar</b> va <b>Bosh Admin</b> uchun mo‘ljallangan.\n"
+            "Sizning vazifangiz sayt resurslarini boshqarishdan iborat."
+        )
+        if isinstance(message_or_call, Message):
+            await message_or_call.answer(denial, parse_mode="HTML")
+        elif isinstance(message_or_call, CallbackQuery):
+            await message_or_call.answer("Ruxsat yo'q! Bu bo'lim faqat menejerlar uchun.", show_alert=True)
+        return False
+    return True
 
 
 class OrderSearchStates(StatesGroup):
@@ -99,7 +117,7 @@ def format_order_card(order: ServiceOrder) -> str:
 @router.message(F.text == "📦 Buyurtmalar (CRM)")
 async def crm_home(message: Message, state: FSMContext):
     """CRM bosh menyusi"""
-    if not await is_admin(message.from_user.id, message.from_user.username):
+    if not await check_crm_access(message):
         return
 
     await state.clear()
@@ -122,7 +140,7 @@ async def crm_home(message: Message, state: FSMContext):
 @router.message(F.text == "🔴 Yangi arizalar")
 async def list_new_orders(message: Message):
     """Yangi arizalar ro'yxati"""
-    if not await is_admin(message.from_user.id, message.from_user.username):
+    if not await check_crm_access(message):
         return
 
     orders = await sync_to_async(list)(
@@ -142,7 +160,7 @@ async def list_new_orders(message: Message):
 @router.message(F.text == "⏳ Jarayondagilar")
 async def list_in_progress_orders(message: Message):
     """Hozir ta'mirlanayotgan arizalar"""
-    if not await is_admin(message.from_user.id, message.from_user.username):
+    if not await check_crm_access(message):
         return
 
     orders = await sync_to_async(list)(
@@ -162,7 +180,7 @@ async def list_in_progress_orders(message: Message):
 @router.message(F.text == "✅ Tayyor bo‘lganlar")
 async def list_ready_orders(message: Message):
     """Tayyor bo'lgan arizalar"""
-    if not await is_admin(message.from_user.id, message.from_user.username):
+    if not await check_crm_access(message):
         return
 
     orders = await sync_to_async(list)(
@@ -182,7 +200,7 @@ async def list_ready_orders(message: Message):
 @router.message(F.text == "🔍 Buyurtma qidirish")
 async def search_order_start(message: Message, state: FSMContext):
     """Buyurtma qidirishni boshlash"""
-    if not await is_admin(message.from_user.id, message.from_user.username):
+    if not await check_crm_access(message):
         return
 
     await state.set_state(OrderSearchStates.waiting_for_query)
@@ -233,6 +251,8 @@ async def process_order_search(message: Message, state: FSMContext):
 @router.callback_query(F.data.startswith("crm_st:"))
 async def process_crm_status_change(callback: CallbackQuery):
     """Buyurtma holatini bitta tugma bilan o'zgartirish"""
+    if not await check_crm_access(callback):
+        return
     parts = callback.data.split(":")
     order_id = int(parts[1])
     new_status = parts[2]
@@ -264,6 +284,8 @@ async def process_crm_status_change(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("crm_assign:"))
 async def process_crm_assign_start(callback: CallbackQuery):
     """Ustalar ro'yxatini chiqarish"""
+    if not await check_crm_access(callback):
+        return
     order_id = int(callback.data.split(":")[1])
     masters = await sync_to_async(list)(TeamMember.objects.filter(is_active=True).order_by('order'))
 
@@ -284,6 +306,8 @@ async def process_crm_assign_start(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("crm_set_m:"))
 async def process_crm_set_master(callback: CallbackQuery):
     """Buyurtmaga aniq ustani biriktirish"""
+    if not await check_crm_access(callback):
+        return
     parts = callback.data.split(":")
     order_id = int(parts[1])
     master_id = int(parts[2])
@@ -317,6 +341,8 @@ async def process_crm_set_master(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("crm_refresh:"))
 async def process_crm_refresh(callback: CallbackQuery):
     """Buyurtma menyusini dastlabki holatga qaytarish"""
+    if not await check_crm_access(callback):
+        return
     order_id = int(callback.data.split(":")[1])
     order = await sync_to_async(
         ServiceOrder.objects.filter(id=order_id).select_related('phone', 'comparison', 'master').first

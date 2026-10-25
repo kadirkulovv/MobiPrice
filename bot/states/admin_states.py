@@ -84,6 +84,7 @@ class MasterEditStates(StatesGroup):
 class AdminAddStates(StatesGroup):
     waiting_for_identifier = State()
     waiting_for_name = State()
+    waiting_for_role = State()
 
 
 # --- EXCEL BULK STATES ---

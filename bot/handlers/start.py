@@ -1,9 +1,10 @@
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from bot.config import ADMIN_IDS
 from bot.keyboards.main_menu import get_main_menu, get_section_crud_menu
+from bot.permissions import get_user_permissions, UserPermissions
 from bot.database import (
     Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison,
     ServiceOrder, TeamMember, BotAdmin, sync_to_async
@@ -12,67 +13,79 @@ from bot.database import (
 router = Router()
 
 
-@sync_to_async
-def check_admin_access_db(user_id: int, username: str = None) -> bool:
-    """Foydalanuvchi admin ekanligini bazadan va sozlamalardan tekshirish"""
-    if ADMIN_IDS and user_id in ADMIN_IDS:
-        return True
-
-    # 1. Telegram ID bo'yicha tekshirish
-    if BotAdmin.objects.filter(telegram_id=user_id).exists():
-        return True
-
-    # 2. Username bo'yicha tekshirish (agar @username bilan kiritilgan bo'lsa)
-    if username:
-        clean_user = username.replace('@', '').strip().lower()
-        matched_admin = BotAdmin.objects.filter(username__iexact=clean_user).first()
-        if matched_admin:
-            # Telegram ID sini avtomatik biriktirib qo'yamiz
-            if not matched_admin.telegram_id:
-                matched_admin.telegram_id = user_id
-                matched_admin.save(update_fields=['telegram_id'])
-            return True
-
-    return False
-
-
 async def is_admin(user_id: int, username: str = None) -> bool:
-    return await check_admin_access_db(user_id, username)
+    """Umumiy kirish huquqi mavjudligini tekshirish (Admin, Menejer yoki Superadmin)"""
+    perms = await get_user_permissions(user_id, username)
+    return perms.has_any_access
+
+
+async def is_site_admin(user_id: int, username: str = None) -> bool:
+    """Sayt resurslarini boshqarish huquqini tekshirish (Admin, Superadmin, Both)"""
+    perms = await get_user_permissions(user_id, username)
+    return perms.can_manage_site
 
 
 @router.message(CommandStart())
+@router.message(F.text == "🔄 Yangilash")
 async def cmd_start(message: Message, state: FSMContext):
-    """Start komandasi va admin tekshiruvi"""
+    """Start komandasi va rolga mos panelni ochish"""
     await state.clear()
     user_id = message.from_user.id
     username = message.from_user.username
 
-    has_access = await is_admin(user_id, username)
-    if not has_access:
+    perms: UserPermissions = await get_user_permissions(user_id, username)
+    if not perms.has_any_access:
         await message.answer(
             f"⛔️ <b>Ruxsat yo‘q!</b>\n\n"
             f"Assalomu alaykum, {message.from_user.full_name}!\n"
-            f"Ushbu bot faqat <b>MobiPrice</b> adminlari uchun mo‘ljallangan.\n\n"
+            f"Ushbu bot faqat <b>MobiPrice</b> admin va menejerlari uchun mo‘ljallangan.\n\n"
             f"Sizning Telegram ID: <code>{user_id}</code>\n"
             f"Username: @{username or 'mavjud emas'}\n\n"
-            f"Botdan foydalanish uchun Telegram ID yoki username'ingizni bosh adminga yuboring.",
+            f"Botdan foydalanish uchun Telegram ID yoki username'ingizni Bosh Adminga yuboring.",
             parse_mode="HTML"
         )
         return
 
+    # Rolga mos tavsif xabari
+    if perms.is_superadmin:
+        desc = (
+            "👑 <b>Bosh Admin (Superadmin) Paneli:</b>\n\n"
+            "Sizda tizim bo‘yicha to‘liq cheklovsiz huquqlar mavjud:\n"
+            "• 📦 <b>Zayavkalar (CRM):</b> Mijozlar arizalari va konsultatsiyalar\n"
+            "• 🛠 <b>Sayt resurslari:</b> Brendlar, modellar, narxlar, ustalar, Excel\n"
+            "• 👥 <b>Xodimlar:</b> Yangi admin va menejerlar qo‘shish/o‘chirish\n"
+            "• 💾 <b>Zaxira:</b> SQLite bazani arxivlash va yuklab olish"
+        )
+    elif perms.role == 'both':
+        desc = (
+            "🌟 <b>Admin + Menejer Paneli:</b>\n\n"
+            "Sizga sayt resurslari va buyurtmalar bo‘yicha to‘liq ruxsat berilgan:\n"
+            "• 📦 <b>Zayavkalar (CRM):</b> Buyurtmalar bilan ishlash\n"
+            "• 🛠 <b>Sayt resurslari:</b> Brendlar, modellar, narxlar, ustalar, Excel\n"
+            "<i>(Eslatma: Yangi admin qo‘shish faqat Bosh Admin vakolatida)</i>"
+        )
+    elif perms.role == 'admin':
+        desc = (
+            "🛠️ <b>Sayt Administratori Paneli:</b>\n\n"
+            "Siz sayt resurslarini to‘liq boshqarishingiz mumkin:\n"
+            "• 🏷 <b>Brendlar, Modellar, Telefonlar</b>\n"
+            "• 🔧 <b>Muammolar va Narxlar (Solishtirish)</b>\n"
+            "• 📁 <b>Excel Import / Export</b>\n"
+            "• 👨‍🔧 <b>Ustalar va mutaxassislar vitrinasi</b>\n"
+            "<i>(Zayavkalar faqat menejerlarga keladi)</i>"
+        )
+    else:  # manager
+        desc = (
+            "📋 <b>Menejer Paneli:</b>\n\n"
+            "Siz mijozlardan kelib tushadigan zayavkalarni qabul qilasiz va CRM da ishlaysiz:\n"
+            "• 📦 <b>Buyurtmalar (CRM):</b> Yangi arizalar, mijozlar bilan bog‘lanish, holatni yangilash\n"
+            "• 📊 <b>Statistika:</b> Buyurtmalar soni va hisoboti"
+        )
+
     await message.answer(
-        f"👑 <b>MobiPrice Boshqaruv Paneliga Xush Kelibsiz!</b>\n\n"
-        f"Assalomu alaykum, <b>{message.from_user.first_name}</b>!\n\n"
-        f"Ushbu bot orqali saytning barcha bo‘limlarini to‘liq boshqarishingiz mumkin:\n"
-        f"1️⃣ <b>Brendlar</b> (Apple, Samsung, Xiaomi...)\n"
-        f"2️⃣ <b>Modellar</b> (Pro seriya, S seriya...)\n"
-        f"3️⃣ <b>Telefonlar</b> (iPhone 16 Pro Max, S24 Ultra...)\n"
-        f"4️⃣ <b>Muammolar</b> (30 ta maxsus vektor ikonka bilan)\n"
-        f"5️⃣ <b>Solishtirish</b> (Original va dublikat narxlari)\n"
-        f"6️⃣ <b>Ustalar (Jamoa)</b> (Mutaxassislar va ustalar vitrinasi)\n"
-        f"7️⃣ <b>Adminlar</b> (Yangi admin qo‘shish va boshqarish)\n\n"
-        f"Kerakli bo‘limni tanlang 👇",
-        reply_markup=get_main_menu(),
+        f"{desc}\n\n"
+        f"Xush kelibsiz, <b>{message.from_user.first_name}</b>! Kerakli bo‘limni tanlang 👇",
+        reply_markup=get_main_menu(perms),
         parse_mode="HTML"
     )
 
@@ -82,9 +95,10 @@ async def cmd_start(message: Message, state: FSMContext):
 async def back_to_main(message: Message, state: FSMContext):
     """Har qanday holatdan asosiy menyuga qaytish"""
     await state.clear()
+    perms = await get_user_permissions(message.from_user.id, message.from_user.username)
     await message.answer(
         "🏠 Asosiy menyuga qaytdingiz. Kerakli bo‘limni tanlang:",
-        reply_markup=get_main_menu()
+        reply_markup=get_main_menu(perms)
     )
 
 

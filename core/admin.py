@@ -100,10 +100,12 @@ class TeamMemberAdmin(admin.ModelAdmin):
 
 @admin.register(BotAdmin)
 class BotAdminAdmin(admin.ModelAdmin):
-    list_display = ('user_display', 'telegram_id', 'added_by', 'created_at')
+    list_display = ('user_display', 'full_name', 'role', 'is_active', 'telegram_id', 'added_by', 'created_at')
+    list_filter = ('role', 'is_active')
+    list_editable = ('role', 'is_active')
     search_fields = ('username', 'full_name', 'telegram_id')
 
     def user_display(self, obj):
         return f"@{obj.username}" if obj.username else (obj.full_name or str(obj.telegram_id))
-    user_display.short_description = "Admin"
+    user_display.short_description = "Admin / Menejer"
 
