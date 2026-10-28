@@ -73,24 +73,32 @@ async def process_brand_name(message: Message, state: FSMContext):
     )
 
 
-@router.message(BrandAddStates.waiting_for_logo, F.document)
+@router.message(BrandAddStates.waiting_for_logo, F.document | F.photo)
 async def process_brand_logo(message: Message, state: FSMContext, bot: Bot):
-    doc: Document = message.document
-    if not doc.file_name.lower().endswith(('.svg', '.png', '.jpg', '.jpeg')):
-        await message.answer("⚠️ Iltimos, faqat <b>.svg</b> (yoki .png) formatidagi fayl yuboring:")
-        return
-
     data = await state.get_data()
-    brand_name = data.get('brand_name')
+    brand_name = data.get('brand_name', 'brend')
 
-    # Download file to media/brands/
-    file = await bot.get_file(doc.file_id)
-    ext = os.path.splitext(doc.file_name)[1].lower() or '.svg'
-    safe_slug = brand_name.lower().replace(' ', '_')
+    if message.document:
+        doc: Document = message.document
+        ext = os.path.splitext(doc.file_name)[1].lower() if doc.file_name else '.svg'
+        if not ext.endswith(('.svg', '.png', '.jpg', '.jpeg', '.webp')):
+            await message.answer("⚠️ Iltimos, faqat <b>.svg</b> yoki .png formatidagi fayl yuboring:", parse_mode="HTML")
+            return
+        file_obj = doc
+    else:
+        file_obj = message.photo[-1]
+        ext = '.png'
+
+    from django.utils.text import slugify
+    safe_slug = slugify(brand_name).replace('-', '_')
     save_filename = f"{safe_slug}{ext}"
     dest_path = MEDIA_BRANDS_DIR / save_filename
 
-    await bot.download_file(file.file_path, destination=dest_path)
+    try:
+        await bot.download(file_obj, destination=dest_path)
+    except Exception as e:
+        await message.answer(f"Logotipni yuklab olishda xatolik: {e}\nQaytadan yuboring:")
+        return
 
     # Save to database
     rel_path = f"brands/{save_filename}"
@@ -100,12 +108,22 @@ async def process_brand_logo(message: Message, state: FSMContext, bot: Bot):
     )
 
     await state.clear()
+    import html
     await message.answer(
         f"🎉 <b>Yangi brend muvaffaqiyatli saqlandi!</b>\n\n"
-        f"🏷 Nomi: <b>{brand.name}</b>\n"
+        f"🏷 Nomi: <b>{html.escape(brand.name)}</b>\n"
         f"📁 Fayl: <code>{save_filename}</code>",
         reply_markup=get_section_crud_menu("Brend"),
         parse_mode="HTML"
+    )
+
+
+@router.message(BrandAddStates.waiting_for_logo)
+async def invalid_brand_logo(message: Message):
+    await message.answer(
+        "⚠️ Iltimos, brend logotipini (.svg yoki rasm fayli) yuboring:\n"
+        "(Yoki '❌ Bekor qilish' tugmasini bosing)",
+        reply_markup=get_cancel_menu()
     )
 
 
@@ -205,30 +223,35 @@ async def process_edit_brand_name(message: Message, state: FSMContext):
         await message.answer(f"Xatolik: {e}")
 
 
-@router.message(BrandEditStates.waiting_for_new_data, F.document)
+@router.message(BrandEditStates.waiting_for_new_data, F.document | F.photo)
 async def process_edit_brand_logo(message: Message, state: FSMContext, bot: Bot):
-    doc: Document = message.document
-    if not doc.file_name.lower().endswith(('.svg', '.png', '.jpg')):
-        await message.answer("Iltimos faqat .svg formatdagi logotip yuboring:")
-        return
+    if message.document:
+        doc: Document = message.document
+        ext = os.path.splitext(doc.file_name)[1].lower() if doc.file_name else '.svg'
+        if not ext.endswith(('.svg', '.png', '.jpg', '.jpeg', '.webp')):
+            await message.answer("Iltimos faqat .svg yoki rasm formatidagi logotip yuboring:")
+            return
+        file_obj = doc
+    else:
+        file_obj = message.photo[-1]
+        ext = '.png'
 
     data = await state.get_data()
     brand_id = data.get('edit_brand_id')
 
     try:
         brand = await sync_to_async(Brand.objects.get)(id=brand_id)
-        file = await bot.get_file(doc.file_id)
-        ext = os.path.splitext(doc.file_name)[1].lower() or '.svg'
         save_filename = f"{brand.slug}{ext}"
         dest_path = MEDIA_BRANDS_DIR / save_filename
-        await bot.download_file(file.file_path, destination=dest_path)
+        await bot.download(file_obj, destination=dest_path)
 
         brand.logo = f"brands/{save_filename}"
         await sync_to_async(brand.save)()
 
         await state.clear()
+        import html
         await message.answer(
-            f"✅ <b>'{brand.name}' logotipi yangilandi!</b>",
+            f"✅ <b>'{html.escape(brand.name)}' logotipi yangilandi!</b>",
             reply_markup=get_section_crud_menu("Brend"),
             parse_mode="HTML"
         )

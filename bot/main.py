@@ -9,7 +9,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand
 
 # Bootstrap Django ORM before importing any handlers
-import bot.database  # noqa: F401
+import bot.database
 
 from bot.config import BOT_TOKEN, ADMIN_IDS
 from bot.handlers import start, brands, series, phones, issues, comparisons, masters, admins, crm, excel

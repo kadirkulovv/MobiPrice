@@ -1,7 +1,10 @@
 import os
+import time
+import html
+import logging
 from pathlib import Path
 from aiogram import Router, F, Bot
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, Document, PhotoSize
 from aiogram.fsm.context import FSMContext
 from bot.keyboards.main_menu import get_section_crud_menu, get_cancel_menu
 from bot.states.admin_states import MasterAddStates, MasterEditStates
@@ -10,6 +13,8 @@ from bot.config import BASE_DIR
 from bot.handlers.start import is_admin, is_site_admin
 
 router = Router()
+logger = logging.getLogger("mobiprice_bot")
+
 MASTERS_MEDIA_DIR = BASE_DIR / 'media' / 'masters'
 os.makedirs(MASTERS_MEDIA_DIR, exist_ok=True)
 
@@ -59,10 +64,13 @@ async def list_masters(message: Message):
     for idx, m in enumerate(masters, 1):
         photo_info = "📷 Surat bor" if m.photo else "👤 Standart avatar"
         status_info = "🟢 Faol" if m.is_active else "🔴 Nofaol"
+        clean_name = html.escape(m.full_name or '')
+        clean_role = html.escape(m.role or '')
+        clean_exp = html.escape(m.experience or '')
         text += (
-            f"{idx}. <b>{m.full_name}</b> ({status_info})\n"
-            f"   ├ 🔧 <b>Lavozim:</b> {m.role}\n"
-            f"   ├ ⚡️ <b>Tajriba:</b> {m.experience}\n"
+            f"{idx}. <b>{clean_name}</b> ({status_info})\n"
+            f"   ├ 🔧 <b>Lavozim:</b> {clean_role}\n"
+            f"   ├ ⚡️ <b>Tajriba:</b> {clean_exp}\n"
             f"   └ {photo_info}\n\n"
         )
 
@@ -94,8 +102,9 @@ async def process_master_name(message: Message, state: FSMContext):
     await state.update_data(name=name)
     await state.set_state(MasterAddStates.waiting_for_role)
     await message.answer(
-        f"🔧 <b>{name} uchun mutaxassislik / lavozimni kiriting:</b>\n"
+        f"🔧 <b>{html.escape(name)} uchun mutaxassislik / lavozimni kiriting:</b>\n"
         "(Masalan: <i>iPhone bo'yicha ekspert</i>, <i>Android va plata ustasi</i>, <i>Lazer va orqa oyna mutaxassisi</i>):",
+        reply_markup=get_cancel_menu(),
         parse_mode="HTML"
     )
 
@@ -103,11 +112,16 @@ async def process_master_name(message: Message, state: FSMContext):
 @router.message(MasterAddStates.waiting_for_role, F.text)
 async def process_master_role(message: Message, state: FSMContext):
     role = message.text.strip()
+    if len(role) < 2:
+        await message.answer("Lavozim kamida 2 ta belgidan iborat bo‘lishi kerak. Qaytadan kiriting:")
+        return
+
     await state.update_data(role=role)
     await state.set_state(MasterAddStates.waiting_for_experience)
     await message.answer(
         "⚡️ <b>Ushbu mutaxassisning ish stajini (tajribasini) kiriting:</b>\n"
         "(Masalan: <i>7 yillik tajriba</i> yoki <i>5+ yillik tajriba</i>):",
+        reply_markup=get_cancel_menu(),
         parse_mode="HTML"
     )
 
@@ -120,7 +134,7 @@ async def process_master_experience(message: Message, state: FSMContext):
 
     await message.answer(
         "📷 <b>Usta fotosuratini yuboring:</b>\n"
-        "(Format: rasm yoki hujjat ko'rinishida yuborishingiz mumkin)\n\n"
+        "(Format: rasm yoki fayl ko'rinishida yuborishingiz mumkin)\n\n"
         "<i>Agar surati hali tayyor bo'lmasa, quyidagi tugmani bosing:</i>",
         reply_markup=get_skip_menu(),
         parse_mode="HTML"
@@ -131,9 +145,9 @@ async def process_master_experience(message: Message, state: FSMContext):
 async def process_master_skip_photo(message: Message, state: FSMContext):
     """Suratsiz saqlash"""
     data = await state.get_data()
-    name = data['name']
-    role = data['role']
-    exp = data['experience']
+    name = data.get('name', 'Noma\'lum')
+    role = data.get('role', 'Mutaxassis')
+    exp = data.get('experience', '5+ yillik tajriba')
 
     new_order = await sync_to_async(TeamMember.objects.count)() + 1
 
@@ -148,9 +162,9 @@ async def process_master_skip_photo(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(
         f"✅ <b>Yangi usta muvaffaqiyatli saqlandi!</b>\n\n"
-        f"👤 <b>Ism:</b> {name}\n"
-        f"🔧 <b>Lavozim:</b> {role}\n"
-        f"⚡️ <b>Tajriba:</b> {exp}\n\n"
+        f"👤 <b>Ism:</b> {html.escape(name)}\n"
+        f"🔧 <b>Lavozim:</b> {html.escape(role)}\n"
+        f"⚡️ <b>Tajriba:</b> {html.escape(exp)}\n\n"
         f"Saytda <b>'Bizning jamoamiz!'</b> bo'limida avtomatik chiqdi.",
         reply_markup=get_section_crud_menu("Usta"),
         parse_mode="HTML"
@@ -161,26 +175,46 @@ async def process_master_skip_photo(message: Message, state: FSMContext):
 async def process_master_photo(message: Message, state: FSMContext, bot: Bot):
     """Suratni yuklab olib saqlash"""
     data = await state.get_data()
-    name = data['name']
-    role = data['role']
-    exp = data['experience']
+    name = data.get('name', 'usta')
+    role = data.get('role', 'Mutaxassis')
+    exp = data.get('experience', '5+ yillik tajriba')
+
+    # Resolve photo or document
+    if message.photo:
+        file_obj = message.photo[-1]
+        ext = ".jpg"
+    elif message.document:
+        doc: Document = message.document
+        mime = (doc.mime_type or "").lower()
+        fname = (doc.file_name or "").lower()
+        if not (mime.startswith("image/") or fname.endswith(('.jpg', '.jpeg', '.png', '.webp', '.heic'))):
+            await message.answer("⚠️ Iltimos, faqat rasm faylini yuboring (JPG, PNG, WEBP):")
+            return
+        file_obj = doc
+        ext = os.path.splitext(doc.file_name)[1].lower() if doc.file_name else ".jpg"
+        if ext not in ('.jpg', '.jpeg', '.png', '.webp', '.heic'):
+            ext = ".jpg"
+    else:
+        await message.answer("⚠️ Iltimos, usta fotosuratini yuboring:")
+        return
 
     new_order = await sync_to_async(TeamMember.objects.count)() + 1
     safe_slug = "".join(c if c.isalnum() else "_" for c in name.lower())
-    filename = f"master_{safe_slug}_{new_order}.jpg"
+    timestamp = int(time.time())
+    filename = f"master_{safe_slug}_{new_order}_{timestamp}{ext}"
     dest_path = MASTERS_MEDIA_DIR / filename
 
     try:
-        if message.photo:
-            file_id = message.photo[-1].file_id
-        else:
-            file_id = message.document.file_id
-
-        file = await bot.get_file(file_id)
-        await bot.download_file(file.file_path, dest_path)
+        await bot.download(file_obj, destination=dest_path)
         rel_photo_path = f"masters/{filename}"
     except Exception as e:
-        rel_photo_path = None
+        logger.error(f"Usta rasmini saqlashda xatolik: {e}", exc_info=True)
+        await message.answer(
+            f"⚠️ Suratni yuklab olishda xatolik yuz berdi: {e}\n"
+            f"Iltimos, qaytadan yuboring yoki '⏩ Surat qo‘ymasdan saqlash' tugmasini bosing:",
+            reply_markup=get_skip_menu()
+        )
+        return
 
     await sync_to_async(TeamMember.objects.create)(
         full_name=name,
@@ -194,13 +228,23 @@ async def process_master_photo(message: Message, state: FSMContext, bot: Bot):
     await state.clear()
     await message.answer(
         f"✅ <b>Yangi usta fotosurati bilan saqlandi!</b>\n\n"
-        f"👤 <b>Ism:</b> {name}\n"
-        f"🔧 <b>Lavozim:</b> {role}\n"
-        f"⚡️ <b>Tajriba:</b> {exp}\n"
-        f"📷 <b>Surat:</b> Yuklandi\n\n"
+        f"👤 <b>Ism:</b> {html.escape(name)}\n"
+        f"🔧 <b>Lavozim:</b> {html.escape(role)}\n"
+        f"⚡️ <b>Tajriba:</b> {html.escape(exp)}\n"
+        f"📷 <b>Surat:</b> Muvaffaqiyatli yuklandi\n\n"
         f"Saytda <b>'Bizning jamoamiz!'</b> bo'limida yangilandi.",
         reply_markup=get_section_crud_menu("Usta"),
         parse_mode="HTML"
+    )
+
+
+@router.message(MasterAddStates.waiting_for_photo)
+async def invalid_master_add_photo(message: Message):
+    """Kutilmagan matn kelganda ogohlantirish"""
+    await message.answer(
+        "📷 Iltimos, usta fotosuratini (rasm yoki fayl ko‘rinishida) yuboring,\n"
+        "yoki suratsiz davom etish uchun '⏩ Surat qo‘ymasdan saqlash' tugmasini bosing:",
+        reply_markup=get_skip_menu()
     )
 
 
@@ -241,17 +285,23 @@ async def process_select_master_for_edit(call: CallbackQuery, state: FSMContext 
     status_str = "🟢 Faol (Saytda ko‘rinadi)" if master.is_active else "🔴 Nofaol (Yashiringan)"
     photo_str = "📷 Yuklangan" if master.photo else "👤 Standart avatar"
 
+    clean_name = html.escape(master.full_name or '')
+    clean_role = html.escape(master.role or '')
+    clean_exp = html.escape(master.experience or '')
+
     text = (
         f"👨‍🔧 <b>Usta ma'lumotlari:</b>\n\n"
-        f"👤 <b>Ism:</b> {master.full_name}\n"
-        f"🔧 <b>Lavozim:</b> {master.role}\n"
-        f"⚡️ <b>Tajriba:</b> {master.experience}\n"
+        f"👤 <b>Ism:</b> {clean_name}\n"
+        f"🔧 <b>Lavozim:</b> {clean_role}\n"
+        f"⚡️ <b>Tajriba:</b> {clean_exp}\n"
         f"🚦 <b>Holat:</b> {status_str}\n"
         f"🖼 <b>Surat:</b> {photo_str}\n\n"
-        f"<i>Qaysi ma'lumotni o‘zgartirmoqchisiz? Quyidagi tugmalardan birini tanlang 👇</i>"
+        f"Qaysi ma'lumotni o‘zgartirmoqchisiz? Quyidagi tugmalardan birini tanlang 👇"
     )
 
-    kb = InlineKeyboardMarkup(inline_keyboard=[
+    toggle_btn_text = "🔴 Nofaol qilish" if master.is_active else "🟢 Faol qilish"
+
+    buttons = [
         [
             InlineKeyboardButton(text="👤 Ismni o‘zgartirish", callback_data=f"medit_field:{master.id}:name"),
             InlineKeyboardButton(text="🔧 Lavozimni o‘zgartirish", callback_data=f"medit_field:{master.id}:role"),
@@ -261,21 +311,22 @@ async def process_select_master_for_edit(call: CallbackQuery, state: FSMContext 
             InlineKeyboardButton(text="📷 Suratni yangilash", callback_data=f"medit_field:{master.id}:photo"),
         ],
         [
-            InlineKeyboardButton(
-                text="🔴 Nofaol qilish" if master.is_active else "🟢 Faol qilish",
-                callback_data=f"medit_toggle:{master.id}"
-            ),
+            InlineKeyboardButton(text=toggle_btn_text, callback_data=f"mtoggle:{master.id}")
         ],
         [
             InlineKeyboardButton(text="🔙 Ustalar ro‘yxatiga qaytish", callback_data="medit_list_back")
         ]
-    ])
+    ]
 
-    await call.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+    kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+    try:
+        await call.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+    except Exception:
+        await call.message.answer(text, reply_markup=kb, parse_mode="HTML")
     await call.answer()
 
 
-@router.callback_query(F.data.startswith("medit_toggle:"))
+@router.callback_query(F.data.startswith("mtoggle:"))
 async def process_toggle_master_active(call: CallbackQuery):
     """Usta holatini (Faol/Nofaol) bir zumda o'zgartirish"""
     master_id = int(call.data.split(":")[1])
@@ -308,19 +359,25 @@ async def process_edit_master_back(call: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data.startswith("medit_field:"))
 async def process_medit_field(call: CallbackQuery, state: FSMContext):
     """Qaysi maydonni tahrirlashni boshlash"""
-    _, master_id, field = call.data.split(":")
+    parts = call.data.split(":")
+    if len(parts) != 3:
+        await call.answer("Xato so‘rov.", show_alert=True)
+        return
+
+    _, master_id, field = parts
     master = await sync_to_async(TeamMember.objects.filter(id=int(master_id)).first)()
     if not master:
         await call.answer("Usta topilmadi.", show_alert=True)
         return
 
+    clean_name = html.escape(master.full_name or '')
     await state.update_data(edit_master_id=int(master_id), edit_field=field)
 
     prompts = {
-        'name': f"✍️ <b>'{master.full_name}' uchun yangi ismni yozing:</b>",
-        'role': f"🔧 <b>'{master.full_name}' uchun yangi lavozim / mutaxassislikni yozing:</b>\n(Masalan: <i>iPhone bo'yicha ekspert</i>)",
-        'exp': f"⚡️ <b>'{master.full_name}' uchun yangi ish stajini (tajribasini) yozing:</b>\n(Masalan: <i>8 yillik tajriba</i>)",
-        'photo': f"📷 <b>'{master.full_name}' uchun yangi fotosurat yuboring:</b>\n(Rasm yoki hujjat sifatida)",
+        'name': f"✍️ <b>'{clean_name}' uchun yangi ismni yozing:</b>",
+        'role': f"🔧 <b>'{clean_name}' uchun yangi lavozim / mutaxassislikni yozing:</b>\n(Masalan: <i>iPhone bo'yicha ekspert</i>)",
+        'exp': f"⚡️ <b>'{clean_name}' uchun yangi ish stajini (tajribasini) yozing:</b>\n(Masalan: <i>8 yillik tajriba</i>)",
+        'photo': f"📷 <b>'{clean_name}' uchun yangi fotosurat yuboring:</b>\n(Rasm yoki hujjat sifatida)",
     }
 
     if field == 'photo':
@@ -351,19 +408,15 @@ async def process_save_master_text(message: Message, state: FSMContext):
         return
 
     if field == 'name':
-        old_val = master.full_name
         master.full_name = new_val
         field_label = "Ism"
     elif field == 'role':
-        old_val = master.role
         master.role = new_val
         field_label = "Lavozim"
     elif field == 'exp':
-        old_val = master.experience
         master.experience = new_val
         field_label = "Tajriba"
     else:
-        old_val = ""
         field_label = "Ma'lumot"
 
     await sync_to_async(master.save)()
@@ -371,9 +424,9 @@ async def process_save_master_text(message: Message, state: FSMContext):
 
     await message.answer(
         f"✅ <b>Usta ma'lumoti muvaffaqiyatli yangilandi!</b>\n\n"
-        f"👤 <b>Usta:</b> {master.full_name}\n"
+        f"👤 <b>Usta:</b> {html.escape(master.full_name)}\n"
         f"📝 <b>O‘zgartirildi:</b> {field_label}\n"
-        f"🔄 <b>Yangi qiymat:</b> {new_val}\n\n"
+        f"🔄 <b>Yangi qiymat:</b> {html.escape(new_val)}\n\n"
         f"Saytda <b>'Bizning jamoamiz!'</b> bo‘limida avtomatik yangilandi.",
         reply_markup=get_section_crud_menu("Usta"),
         parse_mode="HTML"
@@ -391,30 +444,58 @@ async def process_save_master_photo(message: Message, state: FSMContext, bot: Bo
         await message.answer("Usta topilmadi.", reply_markup=get_section_crud_menu("Usta"))
         return
 
+    # Resolve photo or document
+    if message.photo:
+        file_obj = message.photo[-1]
+        ext = ".jpg"
+    elif message.document:
+        doc: Document = message.document
+        mime = (doc.mime_type or "").lower()
+        fname = (doc.file_name or "").lower()
+        if not (mime.startswith("image/") or fname.endswith(('.jpg', '.jpeg', '.png', '.webp', '.heic'))):
+            await message.answer("⚠️ Iltimos, faqat rasm faylini yuboring (JPG, PNG, WEBP):")
+            return
+        file_obj = doc
+        ext = os.path.splitext(doc.file_name)[1].lower() if doc.file_name else ".jpg"
+        if ext not in ('.jpg', '.jpeg', '.png', '.webp', '.heic'):
+            ext = ".jpg"
+    else:
+        await message.answer("⚠️ Iltimos, fotosurat yuboring:")
+        return
+
     safe_slug = "".join(c if c.isalnum() else "_" for c in master.full_name.lower())
-    filename = f"master_{safe_slug}_{master.id}_updated.jpg"
+    timestamp = int(time.time())
+    filename = f"master_{safe_slug}_{master.id}_{timestamp}{ext}"
     dest_path = MASTERS_MEDIA_DIR / filename
 
     try:
-        if message.photo:
-            file_id = message.photo[-1].file_id
-        else:
-            file_id = message.document.file_id
-
-        file = await bot.get_file(file_id)
-        await bot.download_file(file.file_path, dest_path)
+        await bot.download(file_obj, destination=dest_path)
         master.photo = f"masters/{filename}"
         await sync_to_async(master.save)()
 
         await state.clear()
         await message.answer(
-            f"✅ <b>'{master.full_name}' fotosurati muvaffaqiyatli yangilandi!</b>\n\n"
+            f"✅ <b>'{html.escape(master.full_name)}' fotosurati muvaffaqiyatli yangilandi!</b>\n\n"
             f"Saytda <b>'Bizning jamoamiz!'</b> bo‘limida yangi surat bilan chiqdi.",
             reply_markup=get_section_crud_menu("Usta"),
             parse_mode="HTML"
         )
     except Exception as e:
-        await message.answer(f"Suratni saqlashda xatolik: {e}")
+        logger.error(f"Suratni saqlashda xatolik: {e}", exc_info=True)
+        await message.answer(
+            f"⚠️ Suratni saqlashda xatolik: {e}\nIltimos qaytadan yuboring:",
+            reply_markup=get_cancel_menu()
+        )
+
+
+@router.message(MasterEditStates.waiting_for_new_photo)
+async def invalid_master_edit_photo(message: Message):
+    """Fotosurat kutilganda matn yuborilsa ogohlantirish"""
+    await message.answer(
+        "📷 Iltimos, usta uchun yangi fotosurat yuboring (rasm yoki fayl ko‘rinishida).\n"
+        "Yoki jarayonni to‘xtatish uchun '❌ Bekor qilish' tugmasini bosing:",
+        reply_markup=get_cancel_menu()
+    )
 
 
 @router.message(F.text.in_(["🗑 Usta o‘chirish", "🗑 Usta o'chirish"]))
@@ -449,8 +530,7 @@ async def process_delete_master(callback: CallbackQuery):
     await sync_to_async(master_obj.delete)()
 
     await callback.message.edit_text(
-        f"✅ <b>Usta o‘chirildi:</b> {name}",
+        f"✅ <b>Usta o‘chirildi:</b> {html.escape(name)}",
         parse_mode="HTML"
     )
     await callback.answer("O'chirildi!")
-
