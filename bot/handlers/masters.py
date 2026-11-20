@@ -2,15 +2,14 @@ import os
 import time
 import html
 import logging
-from pathlib import Path
 from aiogram import Router, F, Bot
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, Document, PhotoSize
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, Document
 from aiogram.fsm.context import FSMContext
 from bot.keyboards.main_menu import get_section_crud_menu, get_cancel_menu
 from bot.states.admin_states import MasterAddStates, MasterEditStates
 from bot.database import TeamMember, sync_to_async
 from bot.config import BASE_DIR
-from bot.handlers.start import is_admin, is_site_admin
+from bot.handlers.start import require_site_admin
 
 router = Router()
 logger = logging.getLogger("mobiprice_bot")
@@ -31,8 +30,7 @@ def get_skip_menu() -> ReplyKeyboardMarkup:
 @router.message(F.text == "👨‍🔧 Ustalar (Jamoa)")
 async def masters_menu(message: Message, state: FSMContext):
     """Ustalar boshqaruv menyusi"""
-    if not await is_site_admin(message.from_user.id, message.from_user.username):
-        await message.answer("⛔️ Bu bo‘lim faqat Sayt Administratorlari va Bosh Admin uchun!")
+    if not await require_site_admin(message):
         return
 
     await state.clear()
@@ -51,7 +49,7 @@ async def masters_menu(message: Message, state: FSMContext):
 @router.message(F.text.in_(["📋 Usta ro‘yxati", "📋 Usta ro'yxati"]))
 async def list_masters(message: Message):
     """Barcha ustalar ro'yxatini ko'rish"""
-    if not await is_admin(message.from_user.id, message.from_user.username):
+    if not await require_site_admin(message):
         return
 
     masters = await sync_to_async(list)(TeamMember.objects.all().order_by('order', 'id'))
@@ -80,7 +78,7 @@ async def list_masters(message: Message):
 @router.message(F.text.in_(["➕ Yangi Usta qo‘shish", "➕ Yangi Usta qo'shish"]))
 async def add_master_start(message: Message, state: FSMContext):
     """Yangi usta qo'shish jarayoni"""
-    if not await is_admin(message.from_user.id, message.from_user.username):
+    if not await require_site_admin(message):
         return
 
     await state.set_state(MasterAddStates.waiting_for_name)
@@ -94,6 +92,8 @@ async def add_master_start(message: Message, state: FSMContext):
 
 @router.message(MasterAddStates.waiting_for_name, F.text)
 async def process_master_name(message: Message, state: FSMContext):
+    if not await require_site_admin(message):
+        return
     name = message.text.strip()
     if len(name) < 2:
         await message.answer("Ism kamida 2 ta belgidan iborat bo‘lishi kerak. Qaytadan kiriting:")
@@ -111,6 +111,8 @@ async def process_master_name(message: Message, state: FSMContext):
 
 @router.message(MasterAddStates.waiting_for_role, F.text)
 async def process_master_role(message: Message, state: FSMContext):
+    if not await require_site_admin(message):
+        return
     role = message.text.strip()
     if len(role) < 2:
         await message.answer("Lavozim kamida 2 ta belgidan iborat bo‘lishi kerak. Qaytadan kiriting:")
@@ -128,6 +130,8 @@ async def process_master_role(message: Message, state: FSMContext):
 
 @router.message(MasterAddStates.waiting_for_experience, F.text)
 async def process_master_experience(message: Message, state: FSMContext):
+    if not await require_site_admin(message):
+        return
     exp = message.text.strip()
     await state.update_data(experience=exp)
     await state.set_state(MasterAddStates.waiting_for_photo)
@@ -144,6 +148,8 @@ async def process_master_experience(message: Message, state: FSMContext):
 @router.message(MasterAddStates.waiting_for_photo, F.text == "⏩ Surat qo‘ymasdan saqlash")
 async def process_master_skip_photo(message: Message, state: FSMContext):
     """Suratsiz saqlash"""
+    if not await require_site_admin(message):
+        return
     data = await state.get_data()
     name = data.get('name', 'Noma\'lum')
     role = data.get('role', 'Mutaxassis')
@@ -174,6 +180,8 @@ async def process_master_skip_photo(message: Message, state: FSMContext):
 @router.message(MasterAddStates.waiting_for_photo, F.photo | F.document)
 async def process_master_photo(message: Message, state: FSMContext, bot: Bot):
     """Suratni yuklab olib saqlash"""
+    if not await require_site_admin(message):
+        return
     data = await state.get_data()
     name = data.get('name', 'usta')
     role = data.get('role', 'Mutaxassis')
@@ -241,6 +249,8 @@ async def process_master_photo(message: Message, state: FSMContext, bot: Bot):
 @router.message(MasterAddStates.waiting_for_photo)
 async def invalid_master_add_photo(message: Message):
     """Kutilmagan matn kelganda ogohlantirish"""
+    if not await require_site_admin(message):
+        return
     await message.answer(
         "📷 Iltimos, usta fotosuratini (rasm yoki fayl ko‘rinishida) yuboring,\n"
         "yoki suratsiz davom etish uchun '⏩ Surat qo‘ymasdan saqlash' tugmasini bosing:",
@@ -251,7 +261,7 @@ async def invalid_master_add_photo(message: Message):
 @router.message(F.text.func(lambda t: t and "Usta" in t and "tahrirlash" in t))
 async def edit_master_start(message: Message, state: FSMContext):
     """Ustani tahrirlashni boshlash"""
-    if not await is_admin(message.from_user.id, message.from_user.username):
+    if not await require_site_admin(message):
         return
 
     await state.clear()
@@ -276,6 +286,8 @@ async def edit_master_start(message: Message, state: FSMContext):
 @router.callback_query(F.data.startswith("edit_m:"))
 async def process_select_master_for_edit(call: CallbackQuery, state: FSMContext = None):
     """Tanlangan usta tafsilotlari va tahrirlash menyusi"""
+    if not await require_site_admin(call):
+        return
     master_id = int(call.data.split(":")[1])
     master = await sync_to_async(TeamMember.objects.filter(id=master_id).first)()
     if not master:
@@ -329,6 +341,8 @@ async def process_select_master_for_edit(call: CallbackQuery, state: FSMContext 
 @router.callback_query(F.data.startswith("mtoggle:"))
 async def process_toggle_master_active(call: CallbackQuery):
     """Usta holatini (Faol/Nofaol) bir zumda o'zgartirish"""
+    if not await require_site_admin(call):
+        return
     master_id = int(call.data.split(":")[1])
     master = await sync_to_async(TeamMember.objects.filter(id=master_id).first)()
     if not master:
@@ -345,6 +359,8 @@ async def process_toggle_master_active(call: CallbackQuery):
 @router.callback_query(F.data == "medit_list_back")
 async def process_edit_master_back(call: CallbackQuery, state: FSMContext):
     """Tahrirlashda ro'yxatga qaytish"""
+    if not await require_site_admin(call):
+        return
     await state.clear()
     masters = await sync_to_async(list)(TeamMember.objects.all().order_by('order', 'id'))
     buttons = []
@@ -359,6 +375,8 @@ async def process_edit_master_back(call: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data.startswith("medit_field:"))
 async def process_medit_field(call: CallbackQuery, state: FSMContext):
     """Qaysi maydonni tahrirlashni boshlash"""
+    if not await require_site_admin(call):
+        return
     parts = call.data.split(":")
     if len(parts) != 3:
         await call.answer("Xato so‘rov.", show_alert=True)
@@ -396,6 +414,8 @@ async def process_medit_field(call: CallbackQuery, state: FSMContext):
 @router.message(MasterEditStates.waiting_for_new_data, F.text)
 async def process_save_master_text(message: Message, state: FSMContext):
     """Matnli maydonlarni saqlash (Ism, Lavozim, Tajriba)"""
+    if not await require_site_admin(message):
+        return
     new_val = message.text.strip()
     data = await state.get_data()
     master_id = data.get('edit_master_id')
@@ -436,6 +456,8 @@ async def process_save_master_text(message: Message, state: FSMContext):
 @router.message(MasterEditStates.waiting_for_new_photo, F.photo | F.document)
 async def process_save_master_photo(message: Message, state: FSMContext, bot: Bot):
     """Yangi fotosuratni saqlash"""
+    if not await require_site_admin(message):
+        return
     data = await state.get_data()
     master_id = data.get('edit_master_id')
     master = await sync_to_async(TeamMember.objects.filter(id=master_id).first)()
@@ -491,6 +513,8 @@ async def process_save_master_photo(message: Message, state: FSMContext, bot: Bo
 @router.message(MasterEditStates.waiting_for_new_photo)
 async def invalid_master_edit_photo(message: Message):
     """Fotosurat kutilganda matn yuborilsa ogohlantirish"""
+    if not await require_site_admin(message):
+        return
     await message.answer(
         "📷 Iltimos, usta uchun yangi fotosurat yuboring (rasm yoki fayl ko‘rinishida).\n"
         "Yoki jarayonni to‘xtatish uchun '❌ Bekor qilish' tugmasini bosing:",
@@ -501,7 +525,7 @@ async def invalid_master_edit_photo(message: Message):
 @router.message(F.text.in_(["🗑 Usta o‘chirish", "🗑 Usta o'chirish"]))
 async def delete_master_start(message: Message):
     """Ustani o'chirish"""
-    if not await is_admin(message.from_user.id, message.from_user.username):
+    if not await require_site_admin(message):
         return
 
     masters = await sync_to_async(list)(TeamMember.objects.all().order_by('order', 'id'))
@@ -519,6 +543,8 @@ async def delete_master_start(message: Message):
 
 @router.callback_query(F.data.startswith("del_master:"))
 async def process_delete_master(callback: CallbackQuery):
+    if not await require_site_admin(callback):
+        return
     master_id = int(callback.data.split(":")[1])
     master_obj = await sync_to_async(TeamMember.objects.filter(id=master_id).first)()
 

@@ -1,7 +1,7 @@
 .PHONY: run bot migrate makemigrations shell check
 
 run:
-	python3 manage.py runserver 0.0.0.0:8000
+	python3 manage.py runserver 0.0.0.0:8080
 
 bot:
 	python3 -m bot.main

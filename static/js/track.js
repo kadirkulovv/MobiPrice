@@ -14,9 +14,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!trackModal) return;
 
   function openTrackModal(prefillCode) {
-    trackModal.style.display = 'flex';
+    trackModal.classList.add('is-open');
     trackModal.setAttribute('aria-hidden', 'false');
-    document.body.style.overflow = 'hidden';
+    document.body.classList.add('modal-open');
 
     if (prefillCode && trackInput) {
       trackInput.value = prefillCode.replace('#', '').trim();
@@ -27,11 +27,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function closeTrackModal() {
-    trackModal.style.display = 'none';
+    trackModal.classList.remove('is-open');
     trackModal.setAttribute('aria-hidden', 'true');
-    document.body.style.overflow = '';
+    document.body.classList.remove('modal-open');
     if (errorBox) {
-      errorBox.style.display = 'none';
+      errorBox.classList.add('hidden');
       errorBox.textContent = '';
     }
   }
@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Close on Escape key
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && trackModal.style.display === 'flex') {
+    if (e.key === 'Escape' && trackModal.classList.contains('is-open')) {
       closeTrackModal();
     }
   });
@@ -75,22 +75,44 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const lang = document.documentElement.lang || 'uz';
+  const trackText = {
+    uz: {
+      notFound: 'Buyurtma topilmadi',
+      error: 'Xatolik yuz berdi',
+      currency: " so'm",
+    },
+    ru: {
+      notFound: 'Заказ не найден',
+      error: 'Произошла ошибка',
+      currency: ' сум',
+    },
+    en: {
+      notFound: 'Order not found',
+      error: 'An error occurred',
+      currency: ' UZS',
+    },
+  }[lang] || {
+    notFound: 'Buyurtma topilmadi',
+    error: 'Xatolik yuz berdi',
+    currency: " so'm",
+  };
+
   async function submitTracking(code) {
-    const lang = document.documentElement.lang || 'uz';
     const btnText = btnSubmit.querySelector('.btn-text');
     const btnSpinner = btnSubmit.querySelector('.btn-spinner');
 
     if (errorBox) {
-      errorBox.style.display = 'none';
+      errorBox.classList.add('hidden');
       errorBox.textContent = '';
     }
     if (resultBox) {
-      resultBox.style.display = 'none';
+      resultBox.classList.add('hidden');
     }
 
     if (btnText && btnSpinner) {
-      btnText.style.display = 'none';
-      btnSpinner.style.display = 'inline-block';
+      btnText.classList.add('hidden');
+      btnSpinner.classList.remove('hidden');
       btnSubmit.disabled = true;
     }
 
@@ -100,19 +122,19 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
 
       if (!res.ok || !data.found) {
-        throw new Error(data.error || 'Buyurtma topilmadi');
+        throw new Error(data.error || trackText.notFound);
       }
 
       renderTrackingResult(data);
     } catch (err) {
       if (errorBox) {
-        errorBox.textContent = err.message || 'Xatolik yuz berdi';
-        errorBox.style.display = 'block';
+        errorBox.textContent = err.message || trackText.error;
+        errorBox.classList.remove('hidden');
       }
     } finally {
       if (btnText && btnSpinner) {
-        btnText.style.display = 'inline-block';
-        btnSpinner.style.display = 'none';
+        btnText.classList.remove('hidden');
+        btnSpinner.classList.add('hidden');
         btnSubmit.disabled = false;
       }
     }
@@ -131,43 +153,52 @@ document.addEventListener('DOMContentLoaded', () => {
       pill.classList.add('status-ready');
     } else if (order.status === 'cancelled') {
       pill.classList.add('status-cancelled');
+    } else if (order.status === 'pending_location') {
+      pill.classList.add('status-pending');
     }
 
     document.getElementById('track-res-client').textContent = order.client_masked || '-';
     document.getElementById('track-res-service').textContent = order.issue_title || '-';
-    
+
     const priceEl = document.getElementById('track-res-price');
-    if (order.price_uzs) {
-      priceEl.textContent = `${Number(order.price_uzs).toLocaleString('uz-UZ')} so'm`;
+    const displayPrice = order.final_total_uzs != null ? order.final_total_uzs : order.price_uzs;
+    if (displayPrice != null) {
+      let priceStr = `${Number(displayPrice).toLocaleString('uz-UZ')}${trackText.currency}`;
+      if (order.delivery_fee_uzs != null && order.delivery_fee_uzs > 0 && order.distance_km != null) {
+        priceStr += ` (+${Number(order.delivery_fee_uzs).toLocaleString('uz-UZ')} / ${Number(order.distance_km).toFixed(1)} km)`;
+      }
+      priceEl.textContent = priceStr;
     } else {
-      priceEl.textContent = "-";
+      priceEl.textContent = '-';
     }
 
     document.getElementById('track-res-date').textContent = order.created_at || '-';
 
     // Update Stepper
-    const currentStep = order.current_step || 1;
+    const currentStep = typeof order.current_step === 'number' ? order.current_step : 1;
     const steps = resultBox.querySelectorAll('.stepper-step');
     const lines = resultBox.querySelectorAll('.stepper-line');
 
-    steps.forEach(stepEl => {
+    steps.forEach((stepEl) => {
       const stepNum = parseInt(stepEl.getAttribute('data-step'), 10);
       stepEl.classList.remove('completed', 'active');
-      if (stepNum < currentStep) {
-        stepEl.classList.add('completed');
-      } else if (stepNum === currentStep) {
-        stepEl.classList.add('active');
+      if (currentStep > 0) {
+        if (stepNum < currentStep) {
+          stepEl.classList.add('completed');
+        } else if (stepNum === currentStep) {
+          stepEl.classList.add('active');
+        }
       }
     });
 
-    lines.forEach(lineEl => {
+    lines.forEach((lineEl) => {
       const lineNum = parseInt(lineEl.getAttribute('data-line'), 10);
       lineEl.classList.remove('completed');
-      if (lineNum < currentStep) {
+      if (currentStep > 0 && lineNum < currentStep) {
         lineEl.classList.add('completed');
       }
     });
 
-    resultBox.style.display = 'block';
+    resultBox.classList.remove('hidden');
   }
 });

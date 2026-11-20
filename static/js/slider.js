@@ -42,25 +42,13 @@ document.addEventListener('DOMContentLoaded', () => {
     baBefore.style.width = `${pos}%`;
     baHandle.style.left = `${pos}%`;
 
-    // Smooth badge visibility handling
+    // Smooth badge visibility handling via CSS class
     if (badgeBefore) {
-      if (pos < 18) {
-        badgeBefore.style.opacity = '0';
-        badgeBefore.style.transform = 'scale(0.9)';
-      } else {
-        badgeBefore.style.opacity = '1';
-        badgeBefore.style.transform = 'scale(1)';
-      }
+      badgeBefore.classList.toggle('is-hidden', pos < 18);
     }
 
     if (badgeAfter) {
-      if (pos > 82) {
-        badgeAfter.style.opacity = '0';
-        badgeAfter.style.transform = 'scale(0.9)';
-      } else {
-        badgeAfter.style.opacity = '1';
-        badgeAfter.style.transform = 'scale(1)';
-      }
+      badgeAfter.classList.toggle('is-hidden', pos > 82);
     }
   }
 

@@ -1,0 +1,139 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: MobiPrice 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-21 01:45+0500\n"
+"PO-Revision-Date: 2026-11-21 01:45+0500\n"
+"Last-Translator: MobiPrice Team\n"
+"Language-Team: Russian\n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Close"
+msgstr "Закрыть"
+
+msgid "Language"
+msgstr "Язык"
+
+msgid "Telegram orqali kirish"
+msgstr "Войти через Telegram"
+
+msgid "Kirish"
+msgstr "Войти"
+
+msgid "Chiqish"
+msgstr "Выйти"
+
+msgid "Buyurtma berish va fikr qoldirish uchun Telegram bot orqali O'zbekiston (+998) raqamingizni tasdiqlang."
+msgstr "Подтвердите ваш номер Узбекистана (+998) через Telegram-бота, чтобы оформить заказ или оставить отзыв."
+
+msgid "100% Xavfsiz (Faqat +998 raqamlar)"
+msgstr "100% Безопасно (Только номера +998)"
+
+msgid "Biz Telegram akkountingizga kira olmaymiz va sizning nomingizdan hech kimga xabar yubora olmaymiz. Faqat ochiq profil ma'lumotlaringiz va buyurtma uchun tasdiqlangan telefon raqamingiz olinadi."
+msgstr "Мы не получаем доступ к вашему аккаунту Telegram и не можем отправлять сообщения от вашего имени. Используются только открытые данные профиля и подтвержденный номер телефона для связи по заказу."
+
+msgid "Botda Start bosing va «📱 Telefon raqamni yuborish» tugmasini bosing"
+msgstr "Нажмите Start в боте и кнопку «📱 Telefon raqamni yuborish»"
+
+msgid "O'zbekiston (+998) raqamingiz tasdiqlangach, sahifa avtomatik ochiladi"
+msgstr "После подтверждения номера (+998) вход выполнится автоматически"
+
+msgid "Telegram Bot orqali kirish"
+msgstr "Войти через Telegram-бота"
+
+msgid "Telegram botda Start bosing va «📱 Telefon raqamni yuborish» tugmasi orqali +998 raqamingizni tasdiqlang..."
+msgstr "Нажмите Start в Telegram-боте и подтвердите номер +998 кнопкой «📱 Telefon raqamni yuborish»..."
+
+msgid "Telegram botni ochish →"
+msgstr "Открыть Telegram-бота →"
+
+msgid "Yangi havola olish"
+msgstr "Получить новую ссылку"
+
+msgid "Telegram profili"
+msgstr "Профиль Telegram"
+
+msgid "Buyurtmangiz qabul qilindi!"
+msgstr "Ваша заявка принята!"
+
+msgid "Holatni kuzatish →"
+msgstr "Проверить статус →"
+
+msgid "Arizangiz ustalarimizga yuborildi. Quyidagi manzil orqali servis markazimizga kelishingiz mumkin:"
+msgstr "Ваша заявка передана мастерам. Ждем вас по адресу нашего сервисного центра:"
+
+msgid "Servis markazi manzili"
+msgstr "Адрес сервисного центра"
+
+msgid "Ish vaqti: 09:00 – 21:00 (har kuni)"
+msgstr "Время работы: 09:00 – 21:00 (ежедневно)"
+
+msgid "Yopish"
+msgstr "Закрыть"
+
+msgid "Lokatsiyani botga yuboring"
+msgstr "Отправьте геолокацию в бот"
+
+msgid "Kuryer narxini masofa asosida aniq hisoblash va buyurtmani tasdiqlash uchun Telegram botga o'tib lokatsiyangizni yuboring."
+msgstr "Перейдите в Telegram-бот и отправьте вашу геолокацию, чтобы рассчитать точную стоимость курьера и подтвердить заказ."
+
+msgid "Pastdagi tugmani bosib Telegram botni oching"
+msgstr "Нажмите кнопку ниже, чтобы открыть Telegram-бота"
+
+msgid "Botda Start bosing va lokatsiyangizni yuboring"
+msgstr "Нажмите Start в боте и отправьте геолокацию"
+
+msgid "Kuryer narxi va jami chek darhol hisoblanadi"
+msgstr "Стоимость курьера и итоговый чек рассчитаются мгновенно"
+
+msgid "Botga o'tib lokatsiya yuborish"
+msgstr "Перейти в бот и отправить локацию"
+
+msgid "Lokatsiya kutilmoqda"
+msgstr "Ожидается геолокация"
+
+msgid "Yangi ariza"
+msgstr "Новая заявка"
+
+msgid "Bog‘lanildi"
+msgstr "Связались"
+
+msgid "Ta’mirlanmoqda"
+msgstr "В ремонте"
+
+msgid "Tayyor"
+msgstr "Готов"
+
+msgid "Topshirildi"
+msgstr "Выдан"
+
+msgid "Bekor qilindi"
+msgstr "Отменен"
+
+msgid "O'zim boraman (Servis markaziga)"
+msgstr "Приеду сам (в сервисный центр)"
+
+msgid "Kuryer orqali olib ketish"
+msgstr "Забрать через курьера"
+
+msgid "Original Zavod (Service Pack)"
+msgstr "Оригинал Завод (Service Pack)"
+
+msgid "Original Donar (Yechib olingan)"
+msgstr "Оригинал Донор (Снятый)"
+
+msgid "OLED GX / ZY (Originalga eng yaqin)"
+msgstr "OLED GX / ZY (Максимально близко к оригиналу)"
+
+msgid "Incell / TFT (Hamyonbop Kopiya)"
+msgstr "Incell / TFT (Доступная копия)"
+
+msgid "Telegram foydalanuvchi"
+msgstr "Пользователь Telegram"
+
+msgid "Telefon raqami"
+msgstr "Номер телефона"
+

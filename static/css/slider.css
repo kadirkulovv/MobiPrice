@@ -1,43 +1,27 @@
-/* Before & After Interactive Slider Module */
+/* ==========================================================================
+   MobiPrice — Precision Tech-Lab Before & After Interactive Slider Module
+   ========================================================================== */
+
 .comparison-section {
-  padding: 50px 0;
+  padding: 28px 0 36px;
 }
 
-.section-header {
-  text-align: center;
-  margin-bottom: 36px;
-}
-
-.section-header h2 {
-  font-size: 32px;
-  font-weight: 800;
-  margin-bottom: 12px;
-}
-
-.section-header h2 span {
-  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-blue));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.section-header p {
-  color: var(--text-sub);
-  font-size: 15px;
-  max-width: 650px;
-  margin: 0 auto;
+.ba-top-badge {
+  margin-bottom: 10px;
 }
 
 .ba-slider-container {
   max-width: 460px;
-  height: 560px;
+  width: 100%;
+  height: 520px;
   margin: 0 auto;
   position: relative;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 2px solid rgba(0, 242, 254, 0.3);
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 242, 254, 0.15);
+  border: 1.5px solid rgba(0, 242, 254, 0.35);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75), 0 0 28px rgba(0, 242, 254, 0.14);
   user-select: none;
-  touch-action: none;
+  touch-action: pan-y;
   cursor: ew-resize;
 }
 
@@ -63,7 +47,7 @@
   left: 0;
   bottom: 0;
   z-index: 2;
-  border-right: 3px solid var(--neon-cyan);
+  border-right: 2.5px solid var(--neon-cyan);
   pointer-events: none;
 }
 
@@ -84,14 +68,16 @@
 
 .ba-badge {
   position: absolute;
-  top: 18px;
-  padding: 6px 14px;
+  top: 14px;
+  padding: 5px 12px;
   border-radius: var(--radius-full);
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 800;
   z-index: 3;
   backdrop-filter: blur(8px);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
   white-space: nowrap;
   pointer-events: none;
   user-select: none;
@@ -99,18 +85,23 @@
   transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.ba-badge.is-hidden {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
 .ba-badge.before {
-  left: 18px;
-  background: rgba(239, 68, 68, 0.9);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  left: 14px;
+  background: rgba(239, 68, 68, 0.92);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
 }
 
 .ba-badge.after {
-  right: 18px;
-  background: rgba(16, 185, 129, 0.9);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  right: 14px;
+  background: rgba(16, 185, 129, 0.92);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
 }
 
 .ba-handle {
@@ -122,13 +113,13 @@
   height: 44px;
   border-radius: 50%;
   background: var(--neon-cyan);
-  color: #080b11;
+  color: #060911;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
   font-size: 18px;
-  box-shadow: 0 0 20px rgba(0, 242, 254, 0.6);
+  box-shadow: 0 0 20px rgba(0, 242, 254, 0.65);
   z-index: 5;
   pointer-events: none;
   user-select: none;
@@ -136,10 +127,33 @@
 
 @media (max-width: 640px) {
   .ba-slider-container {
-    height: 440px;
+    height: 420px;
     max-width: 100%;
   }
-  .section-header h2 {
-    font-size: 24px;
+
+  .ba-badge {
+    top: 12px;
+    padding: 4px 10px;
+    font-size: 10px;
+  }
+
+  .ba-badge.before {
+    left: 10px;
+  }
+
+  .ba-badge.after {
+    right: 10px;
+  }
+}
+
+@media (max-width: 400px) {
+  .ba-slider-container {
+    height: 340px;
+  }
+
+  .ba-badge {
+    top: 8px;
+    padding: 3px 8px;
+    font-size: 9.5px;
   }
 }

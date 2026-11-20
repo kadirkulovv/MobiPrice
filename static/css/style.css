@@ -1,15 +1,18 @@
-/* MobiPrice — Master Stylesheet Orchestrator */
-@import 'variables.css';
+/* ==========================================================================
+   MobiPrice — Master Stylesheet Orchestrator
+   ========================================================================== */
+@import 'base.css';
 @import 'animations.css';
 @import 'navbar.css';
 @import 'hero.css';
 @import 'calculator.css';
 @import 'slider.css';
 @import 'consultation.css';
-@import 'track_modal.css';
 @import 'team.css';
+@import 'faq.css';
+@import 'reviews.css';
+@import 'footer.css';
+@import 'order_modal.css';
+@import 'track_modal.css';
 @import 'review_modal.css';
-@import 'components.css';
-
-
-
+@import 'auth_modal.css';

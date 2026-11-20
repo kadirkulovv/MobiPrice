@@ -51,6 +51,4 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
-
-  console.log('MobiPrice App Initialized: Language =', document.documentElement.lang);
 });

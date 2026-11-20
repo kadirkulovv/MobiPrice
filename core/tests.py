@@ -1,3 +1,773 @@
-from django.test import TestCase
+import asyncio
+import hashlib
+import hmac
+import json
+import time
+from datetime import timedelta
+from decimal import Decimal
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
-# Create your tests here.
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.storage.base import StorageKey
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import ReplyKeyboardMarkup, ReplyKeyboardRemove
+from django.core.cache import cache
+from django.test import Client, TestCase, TransactionTestCase, override_settings
+from django.utils import timezone
+from django.utils.translation import activate, gettext
+
+from bot.handlers.client import (
+    _confirm_login_token,
+    _finalize_courier_order,
+    cmd_start_login_deeplink,
+    process_login_phone_contact,
+    reject_manual_login_phone,
+    validate_verified_own_contact,
+)
+from bot.states.client_states import LoginAuthStates
+from core.distance import (
+    HAVERSINE_ROAD_FACTOR,
+    calculate_courier_fee_uzs,
+    calculate_road_distance_km,
+    haversine_distance_km,
+)
+from core.models import (
+    AuthToken,
+    Brand,
+    DeviceIssue,
+    DevicePhone,
+    DeviceSeries,
+    IssueComparison,
+    Review,
+    ServiceOrder,
+    TelegramUser,
+)
+from core.telegram_auth import (
+    is_uzbek_phone_number,
+    normalize_phone_number,
+    normalize_uzbek_phone_number,
+    sanitize_photo_url,
+    upsert_telegram_user,
+    verify_telegram_widget_data,
+)
+
+TEST_BOT_TOKEN = "123456789:TEST_SECRET_BOT_TOKEN_XYZ"
+TEST_BOT_USERNAME = "MobiPriceTestBot"
+
+
+def make_widget_payload(bot_token: str = TEST_BOT_TOKEN, **overrides) -> dict:
+    payload = {
+        'id': 777001122,
+        'first_name': 'Ali',
+        'last_name': 'Valiyev',
+        'username': 'alivaliyev',
+        'photo_url': 'https://t.me/i/userpic/320/alivaliyev.jpg',
+        'auth_date': int(time.time()),
+    }
+    payload.update(overrides)
+    check_parts = [
+        f"{k}={payload[k]}"
+        for k in sorted(payload.keys())
+        if k != 'hash' and payload[k] not in (None, '')
+    ]
+    data_check_string = "\n".join(check_parts)
+    secret_key = hashlib.sha256(bot_token.encode('utf-8')).digest()
+    payload['hash'] = hmac.new(
+        secret_key,
+        data_check_string.encode('utf-8'),
+        hashlib.sha256,
+    ).hexdigest()
+    return payload
+
+
+def make_fake_bot_message(
+    user_id: int = 555111222,
+    first_name: str = "Sardor",
+    last_name: str = "Karimov",
+    username: str = "sardor_k",
+    chat_type: str = "private",
+    text: str = None,
+    contact=None,
+    forward_origin=None,
+    forward_date=None,
+    forward_from=None,
+    forward_from_chat=None,
+    forward_sender_name=None,
+    is_automatic_forward=None,
+    via_bot=None,
+):
+    msg = SimpleNamespace(
+        chat=SimpleNamespace(id=user_id, type=chat_type),
+        from_user=SimpleNamespace(
+            id=user_id,
+            first_name=first_name,
+            last_name=last_name,
+            username=username,
+        ),
+        text=text,
+        contact=contact,
+        forward_origin=forward_origin,
+        forward_date=forward_date,
+        forward_from=forward_from,
+        forward_from_chat=forward_from_chat,
+        forward_sender_name=forward_sender_name,
+        is_automatic_forward=is_automatic_forward,
+        via_bot=via_bot,
+        answer=AsyncMock(),
+    )
+    return msg
+
+
+def make_fsm_context(user_id: int = 555111222) -> FSMContext:
+    storage = MemoryStorage()
+    key = StorageKey(bot_id=999, chat_id=user_id, user_id=user_id)
+    return FSMContext(storage=storage, key=key)
+
+
+@override_settings(
+    TELEGRAM_BOT_TOKEN=TEST_BOT_TOKEN,
+    TELEGRAM_BOT_USERNAME=TEST_BOT_USERNAME,
+    TELEGRAM_ADMIN_CHAT_ID="999000111",
+    CACHES={'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}},
+)
+class TelegramWidgetAuthTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.client = Client()
+
+    def test_verify_widget_valid_invalid_and_expired(self):
+        valid_payload = make_widget_payload()
+        ok, reason = verify_telegram_widget_data(valid_payload, TEST_BOT_TOKEN)
+        self.assertTrue(ok)
+        self.assertEqual(reason, "ok")
+
+        # Tampered field invalidates HMAC
+        tampered = dict(valid_payload, first_name="Hacker")
+        ok, reason = verify_telegram_widget_data(tampered, TEST_BOT_TOKEN)
+        self.assertFalse(ok)
+        self.assertIn("signature", reason.lower())
+
+        # Wrong hash fails
+        bad_hash = dict(valid_payload, hash="0" * 64)
+        ok, _ = verify_telegram_widget_data(bad_hash, TEST_BOT_TOKEN)
+        self.assertFalse(ok)
+
+        # Expired auth_date fails
+        expired = make_widget_payload(auth_date=int(time.time()) - 600)
+        ok, reason = verify_telegram_widget_data(expired, TEST_BOT_TOKEN)
+        self.assertFalse(ok)
+        self.assertIn("expired", reason.lower())
+
+        # Future auth_date fails
+        future = make_widget_payload(auth_date=int(time.time()) + 300)
+        ok, reason = verify_telegram_widget_data(future, TEST_BOT_TOKEN)
+        self.assertFalse(ok)
+        self.assertIn("future", reason.lower())
+
+    def test_widget_endpoint_is_disabled_bot_only_auth(self):
+        # Method 1 (Telegram Login Widget) is completely removed — bot-only verified +998 auth!
+        res = self.client.post(
+            '/api/auth/telegram/widget/',
+            data=json.dumps(make_widget_payload(id=777001122)),
+            content_type='application/json',
+        )
+        self.assertEqual(res.status_code, 404)
+
+    def test_session_without_verified_uz_phone_is_rejected(self):
+        # Empty phone user -> rejected
+        no_phone_user = TelegramUser.objects.create(
+            telegram_id=666111222,
+            first_name="NoPhoneUser",
+            phone_number="",
+        )
+        session = self.client.session
+        session['telegram_user_id'] = no_phone_user.id
+        session.save()
+
+        me = self.client.get('/api/auth/me/').json()
+        self.assertFalse(me['authenticated'])
+
+        # Foreign non-+998 phone user -> rejected
+        foreign_user = TelegramUser.objects.create(
+            telegram_id=666111223,
+            first_name="Foreign",
+            phone_number="+79161234567",
+        )
+        session = self.client.session
+        session['telegram_user_id'] = foreign_user.id
+        session.save()
+
+        me2 = self.client.get('/api/auth/me/').json()
+        self.assertFalse(me2['authenticated'])
+
+        # Verified Uzbekistan +998 user -> accepted!
+        uz_user = TelegramUser.objects.create(
+            telegram_id=666111224,
+            first_name="UzClient",
+            phone_number="+998902520703",
+        )
+        session = self.client.session
+        session['telegram_user_id'] = uz_user.id
+        session.save()
+
+        me3 = self.client.get('/api/auth/me/').json()
+        self.assertTrue(me3['authenticated'])
+        self.assertEqual(me3['user']['phone_number'], '+998902520703')
+
+    def test_sanitize_photo_url_blocks_bot_token_urls_and_upsert_preserves_phone(self):
+        self.assertEqual(
+            sanitize_photo_url(f"https://api.telegram.org/file/bot{TEST_BOT_TOKEN}/photos/1.jpg"),
+            "",
+        )
+        self.assertEqual(
+            sanitize_photo_url("https://t.me/i/userpic/320/demo.jpg"),
+            "https://t.me/i/userpic/320/demo.jpg",
+        )
+
+        tg_user = upsert_telegram_user({
+            'id': 888001,
+            'first_name': 'Dilshod',
+            'username': 'dilshod',
+            'phone_number': '998902520703',
+        })
+        self.assertEqual(tg_user.phone_number, '+998902520703')
+
+        # Subsequent widget upsert without phone_number must preserve verified phone_number
+        tg_user_updated = upsert_telegram_user({
+            'id': 888001,
+            'first_name': 'Dilshodjon',
+            'username': 'dilshod',
+        })
+        self.assertEqual(tg_user_updated.first_name, 'Dilshodjon')
+        self.assertEqual(tg_user_updated.phone_number, '+998902520703')
+
+
+@override_settings(
+    TELEGRAM_BOT_TOKEN=TEST_BOT_TOKEN,
+    TELEGRAM_BOT_USERNAME=TEST_BOT_USERNAME,
+    CACHES={'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}},
+)
+class TelegramBotDeepLinkAndPhoneVerificationTests(TransactionTestCase):
+    def setUp(self):
+        cache.clear()
+        self.client = Client()
+
+    def test_phone_normalization_and_uzbekistan_only_rule(self):
+        self.assertEqual(normalize_phone_number('998902520703'), '+998902520703')
+        self.assertEqual(normalize_phone_number('+998 (90) 252-07-03'), '+998902520703')
+        self.assertEqual(normalize_phone_number('123'), '')
+        self.assertEqual(normalize_phone_number(''), '')
+
+        # Uzbekistan (+998 + 9 digits) accepted
+        self.assertTrue(is_uzbek_phone_number('+998902520703'))
+        self.assertTrue(is_uzbek_phone_number('998949980703'))
+        self.assertEqual(normalize_uzbek_phone_number('+998 (77) 123-45-67'), '+998771234567')
+
+        # Non-Uzbekistan / invalid length numbers MUST be rejected
+        for foreign in ('+79161234567', '+14155552671', '+88801234567', '+992901234567', '+99812345', '+9989012345678'):
+            self.assertFalse(is_uzbek_phone_number(foreign), f"Should reject {foreign}")
+            self.assertEqual(normalize_uzbek_phone_number(foreign), '')
+
+    def test_foreign_phone_number_is_rejected_in_bot_login_flow(self):
+        # Bot deep-link flow with Russian (+7) Telegram account -> REJECTED!
+        start_res = self.client.post('/api/auth/telegram/deeplink/start/')
+        token = start_res.json()['token']
+
+        state = make_fsm_context(user_id=777111000)
+        start_msg = make_fake_bot_message(user_id=777111000, text=f"/start login_{token}")
+        asyncio.run(cmd_start_login_deeplink(start_msg, SimpleNamespace(args=f"login_{token}"), state))
+        self.assertEqual(asyncio.run(state.get_state()), LoginAuthStates.waiting_for_phone.state)
+
+        ru_contact = SimpleNamespace(
+            phone_number="+79161234567",
+            first_name="Ivan",
+            last_name="",
+            user_id=777111000,
+            vcard=None,
+        )
+        ru_msg = make_fake_bot_message(user_id=777111000, contact=ru_contact)
+        asyncio.run(process_login_phone_contact(ru_msg, state))
+
+        # State cleared, token marked rejected, polling returns 403 rejected!
+        self.assertIsNone(asyncio.run(state.get_state()))
+        self.assertIn("+998", ru_msg.answer.call_args.args[0])
+        auth_token = AuthToken.objects.get(token=token)
+        self.assertFalse(auth_token.is_confirmed)
+        self.assertEqual(auth_token.rejected_reason, 'non_uz_phone')
+
+        poll_rej = self.client.get(f'/api/auth/telegram/deeplink/status/?token={token}&lang=uz')
+        self.assertEqual(poll_rej.status_code, 403)
+        self.assertEqual(poll_rej.json()['status'], 'rejected')
+        self.assertEqual(poll_rej.json()['reason'], 'non_uz_phone')
+        self.assertFalse(poll_rej.json()['authenticated'])
+
+    def test_bot_login_requires_verified_reply_keyboard_contact_and_rejects_spoofs(self):
+        # 1. Start deep-link auth from browser
+        start_res = self.client.post(
+            '/api/auth/telegram/deeplink/start/',
+            data=json.dumps({'lang': 'uz'}),
+            content_type='application/json',
+        )
+        self.assertEqual(start_res.status_code, 200)
+        start_data = start_res.json()
+        token = start_data['token']
+        self.assertTrue(start_data['bot_url'].startswith(f"https://t.me/{TEST_BOT_USERNAME}?start=login_"))
+        self.assertLessEqual(len(f"login_{token}"), 64)
+
+        # Polling before bot start -> pending
+        poll1 = self.client.get(f'/api/auth/telegram/deeplink/status/?token={token}').json()
+        self.assertEqual(poll1['status'], 'pending')
+        self.assertFalse(poll1['authenticated'])
+
+        # 2. User sends /start login_<token> to bot
+        state = make_fsm_context(user_id=555111222)
+        start_msg = make_fake_bot_message(user_id=555111222, text=f"/start login_{token}")
+        command = SimpleNamespace(args=f"login_{token}")
+
+        asyncio.run(cmd_start_login_deeplink(start_msg, command, state))
+
+        # Must enter waiting_for_phone state and send request_contact=True ReplyKeyboardMarkup
+        self.assertEqual(asyncio.run(state.get_state()), LoginAuthStates.waiting_for_phone.state)
+        self.assertTrue(start_msg.answer.called)
+        kb = start_msg.answer.call_args.kwargs.get('reply_markup')
+        self.assertIsInstance(kb, ReplyKeyboardMarkup)
+        self.assertTrue(kb.keyboard[0][0].request_contact)
+
+        # Token MUST still be unconfirmed before button press!
+        auth_token_obj = AuthToken.objects.get(token=token)
+        self.assertFalse(auth_token_obj.is_confirmed)
+
+        # 3. Attack A: Manual text input (+998902520703) -> MUST BE REJECTED
+        manual_msg = make_fake_bot_message(user_id=555111222, text="+998902520703")
+        asyncio.run(reject_manual_login_phone(manual_msg, state))
+        auth_token_obj.refresh_from_db()
+        self.assertFalse(auth_token_obj.is_confirmed)
+        self.assertEqual(asyncio.run(state.get_state()), LoginAuthStates.waiting_for_phone.state)
+        self.assertIn("qabul qilinmaydi", manual_msg.answer.call_args.args[0].lower())
+
+        # 4. Attack B: Sharing ANOTHER person's contact (different user_id) -> MUST BE REJECTED
+        other_contact = SimpleNamespace(
+            phone_number="+998901112233",
+            first_name="Other",
+            last_name="",
+            user_id=999888777,
+            vcard=None,
+        )
+        other_msg = make_fake_bot_message(user_id=555111222, contact=other_contact)
+        asyncio.run(process_login_phone_contact(other_msg, state))
+        auth_token_obj.refresh_from_db()
+        self.assertFalse(auth_token_obj.is_confirmed)
+        self.assertEqual(asyncio.run(state.get_state()), LoginAuthStates.waiting_for_phone.state)
+        self.assertIn("boshqa odam", other_msg.answer.call_args.args[0].lower())
+
+        # 5. Attack C: Sharing unregistered contact (user_id=None) -> MUST BE REJECTED
+        unreg_contact = SimpleNamespace(
+            phone_number="+998902520703",
+            first_name="Fake",
+            last_name="",
+            user_id=None,
+            vcard=None,
+        )
+        unreg_msg = make_fake_bot_message(user_id=555111222, contact=unreg_contact)
+        asyncio.run(process_login_phone_contact(unreg_msg, state))
+        auth_token_obj.refresh_from_db()
+        self.assertFalse(auth_token_obj.is_confirmed)
+
+        # 6. Attack D: Sharing contact via address book with vCard -> MUST BE REJECTED
+        vcard_contact = SimpleNamespace(
+            phone_number="+998902520703",
+            first_name="Sardor",
+            last_name="Karimov",
+            user_id=555111222,
+            vcard="BEGIN:VCARD\nVERSION:3.0\nTEL:+998902520703\nEND:VCARD",
+        )
+        vcard_msg = make_fake_bot_message(user_id=555111222, contact=vcard_contact)
+        asyncio.run(process_login_phone_contact(vcard_msg, state))
+        auth_token_obj.refresh_from_db()
+        self.assertFalse(auth_token_obj.is_confirmed)
+        self.assertIn("share contact", vcard_msg.answer.call_args.args[0].lower())
+
+        # 7. Attack E: Forwarding a contact message -> MUST BE REJECTED
+        fwd_contact = SimpleNamespace(
+            phone_number="+998902520703",
+            first_name="Sardor",
+            last_name="Karimov",
+            user_id=555111222,
+            vcard=None,
+        )
+        fwd_msg = make_fake_bot_message(
+            user_id=555111222,
+            contact=fwd_contact,
+            forward_date=int(time.time()),
+            forward_origin=SimpleNamespace(type="user"),
+        )
+        asyncio.run(process_login_phone_contact(fwd_msg, state))
+        auth_token_obj.refresh_from_db()
+        self.assertFalse(auth_token_obj.is_confirmed)
+        self.assertIn("forward", fwd_msg.answer.call_args.args[0].lower())
+
+        # 8. Defense in depth: _confirm_login_token without phone_number MUST fail
+        ok_no_phone, st_no_phone = _confirm_login_token(token, {'id': 555111222, 'first_name': 'Sardor'})
+        self.assertFalse(ok_no_phone)
+        self.assertEqual(st_no_phone, 'phone_required')
+
+        # 9. Legitimate ReplyKeyboard button press (own Telegram account, no vcard, no forward) -> ACCEPTED!
+        real_contact = SimpleNamespace(
+            phone_number="998902520703",
+            first_name="Sardor",
+            last_name="Karimov",
+            user_id=555111222,
+            vcard=None,
+        )
+        real_msg = make_fake_bot_message(user_id=555111222, contact=real_contact)
+        valid_flag, valid_reason, norm_phone = validate_verified_own_contact(real_msg)
+        self.assertTrue(valid_flag)
+        self.assertEqual(valid_reason, "ok")
+        self.assertEqual(norm_phone, "+998902520703")
+
+        asyncio.run(process_login_phone_contact(real_msg, state))
+
+        auth_token_obj.refresh_from_db()
+        self.assertTrue(auth_token_obj.is_confirmed)
+        self.assertIsNotNone(auth_token_obj.telegram_user)
+        self.assertEqual(auth_token_obj.telegram_user.phone_number, "+998902520703")
+        self.assertIsNone(asyncio.run(state.get_state()))
+        self.assertIsInstance(real_msg.answer.call_args.kwargs.get('reply_markup'), ReplyKeyboardRemove)
+
+        # 10. Different browser session MUST NOT consume this token
+        other_browser = Client()
+        other_browser.get('/api/auth/me/')
+        steal_res = other_browser.get(f'/api/auth/telegram/deeplink/status/?token={token}')
+        self.assertIn(steal_res.status_code, (403, 404))
+
+        # 11. Original browser polls and logs in atomically (one-time use)
+        poll_ok = self.client.get(f'/api/auth/telegram/deeplink/status/?token={token}')
+        self.assertEqual(poll_ok.status_code, 200)
+        poll_data = poll_ok.json()
+        self.assertEqual(poll_data['status'], 'confirmed')
+        self.assertTrue(poll_data['authenticated'])
+        self.assertEqual(poll_data['user']['phone_number'], '+998902520703')
+
+        # 12. Token is marked used and cannot be replayed (cycle_key + is_used=True)
+        auth_token_obj.refresh_from_db()
+        self.assertTrue(auth_token_obj.is_used)
+        poll_reuse = self.client.get(f'/api/auth/telegram/deeplink/status/?token={token}')
+        self.assertIn(poll_reuse.status_code, (404, 410))
+        self.assertFalse(poll_reuse.json()['authenticated'])
+
+        # Bot also rejects reusing the already-used token
+        reuse_state = make_fsm_context(user_id=555111222)
+        reuse_msg = make_fake_bot_message(user_id=555111222, text=f"/start login_{token}")
+        asyncio.run(cmd_start_login_deeplink(reuse_msg, SimpleNamespace(args=f"login_{token}"), reuse_state))
+        self.assertIsNone(asyncio.run(reuse_state.get_state()))
+        self.assertIn("ishlatilgan", reuse_msg.answer.call_args.args[0].lower())
+
+        # 13. Logout clears session
+        logout_res = self.client.post('/api/auth/logout/')
+        self.assertEqual(logout_res.status_code, 200)
+        self.assertFalse(self.client.get('/api/auth/me/').json()['authenticated'])
+
+    def test_expired_deeplink_token(self):
+        start_res = self.client.post('/api/auth/telegram/deeplink/start/')
+        token = start_res.json()['token']
+        AuthToken.objects.filter(token=token).update(expires_at=timezone.now() - timedelta(minutes=1))
+
+        poll_res = self.client.get(f'/api/auth/telegram/deeplink/status/?token={token}')
+        self.assertEqual(poll_res.status_code, 200)
+        self.assertEqual(poll_res.json()['status'], 'expired')
+
+        # Bot also rejects expired link without entering waiting state
+        state = make_fsm_context(user_id=444333222)
+        msg = make_fake_bot_message(user_id=444333222, text=f"/start login_{token}")
+        asyncio.run(cmd_start_login_deeplink(msg, SimpleNamespace(args=f"login_{token}"), state))
+        self.assertIsNone(asyncio.run(state.get_state()))
+        self.assertIn("muddati o'tgan", msg.answer.call_args.args[0].lower())
+
+
+@override_settings(
+    TELEGRAM_BOT_TOKEN=TEST_BOT_TOKEN,
+    TELEGRAM_BOT_USERNAME=TEST_BOT_USERNAME,
+    TELEGRAM_ADMIN_CHAT_ID="999000111",
+    CACHES={'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}},
+)
+class OrdersReviewsAndCourierTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.client = Client()
+        self.brand = Brand.objects.create(name="Apple", order=1)
+        self.series = DeviceSeries.objects.create(brand=self.brand, name="iPhone 15", order=1)
+        self.phone = DevicePhone.objects.create(series=self.series, name="iPhone 15 Pro", order=1)
+        self.issue = DeviceIssue.objects.create(phone=self.phone, title="Ekran almashtirish", icon_number=1)
+        self.comp = IssueComparison.objects.create(
+            issue=self.issue,
+            quality_type='original_service_pack',
+            title="Original Service Pack",
+            part_price_uzs=Decimal("1000000"),
+            service_fee_uzs=Decimal("200000"),
+            price_usd=Decimal("95"),
+        )
+
+    def _login_user(self, telegram_id=123456789, phone_number='+998902520703'):
+        tg_user = TelegramUser.objects.create(
+            telegram_id=telegram_id,
+            first_name="Murodjon",
+            last_name="Test",
+            username="murodjon_test",
+            phone_number=phone_number,
+        )
+        session = self.client.session
+        session['telegram_user_id'] = tg_user.id
+        session.save()
+        return tg_user
+
+    def test_unauthenticated_order_and_review_return_401(self):
+        order_res = self.client.post(
+            '/api/orders/submit/',
+            data=json.dumps({
+                'phone_id': self.phone.id,
+                'comparison_id': self.comp.id,
+                'service_type': 'in_service',
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(order_res.status_code, 401)
+        self.assertTrue(order_res.json()['auth_required'])
+
+        review_res = self.client.post(
+            '/api/reviews/submit/',
+            data=json.dumps({
+                'device_model': 'iPhone 15 Pro',
+                'service_type': 'Ekran',
+                'rating': 5,
+                'comment': 'Zo‘r servis!',
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(review_res.status_code, 401)
+        self.assertTrue(review_res.json()['auth_required'])
+
+    def test_review_uses_session_user_and_enforces_24h_limit(self):
+        tg_user = self._login_user()
+        with patch('core.views._send_telegram_notifications_async'):
+            res1 = self.client.post(
+                '/api/reviews/submit/',
+                data=json.dumps({
+                    'client_name': 'Spoofed Name',
+                    'device_model': 'iPhone 15 Pro',
+                    'service_type': 'Ekran',
+                    'rating': 5,
+                    'comment': 'Juda tez va sifatli!',
+                    'device_fingerprint': 'fp_test_1',
+                }),
+                content_type='application/json',
+            )
+            self.assertEqual(res1.status_code, 200)
+            self.assertEqual(res1.json()['review']['client_name'], tg_user.full_name)
+            self.assertEqual(Review.objects.get().telegram_user_id, tg_user.id)
+
+            res2 = self.client.post(
+                '/api/reviews/submit/',
+                data=json.dumps({
+                    'device_model': 'iPhone 15 Pro',
+                    'service_type': 'Batareya',
+                    'rating': 5,
+                    'comment': 'Yana bitta sharh',
+                    'device_fingerprint': 'fp_test_2',
+                }),
+                content_type='application/json',
+            )
+            self.assertEqual(res2.status_code, 429)
+
+    def test_call_master_is_rejected(self):
+        self._login_user()
+        res = self.client.post(
+            '/api/orders/submit/',
+            data=json.dumps({
+                'phone_id': self.phone.id,
+                'comparison_id': self.comp.id,
+                'service_type': 'call_master',
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(res.json()['success'])
+
+    def test_unverified_phone_user_cannot_place_order_and_spoofed_json_phone_ignored(self):
+        # User without verified +998 phone cannot place an order (401)
+        self._login_user(telegram_id=333444555, phone_number='')
+        res_unverified = self.client.post(
+            '/api/orders/submit/',
+            data=json.dumps({
+                'phone_id': self.phone.id,
+                'comparison_id': self.comp.id,
+                'service_type': 'in_service',
+                'phone_number': '+998901112233',  # spoofed manual phone must NOT bypass auth!
+                'lang': 'uz',
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(res_unverified.status_code, 401)
+        self.assertTrue(res_unverified.json().get('auth_required'))
+
+        # Verified +998 user always uses their bot-verified phone, ignoring manual JSON phone
+        self._login_user(telegram_id=333444556, phone_number='+998902520703')
+        with patch('core.views._send_telegram_notifications_async'):
+            res_ok = self.client.post(
+                '/api/orders/submit/',
+                data=json.dumps({
+                    'phone_id': self.phone.id,
+                    'comparison_id': self.comp.id,
+                    'service_type': 'in_service',
+                    'phone_number': '+998999999999',
+                    'lang': 'uz',
+                }),
+                content_type='application/json',
+            )
+            self.assertEqual(res_ok.status_code, 200)
+            self.assertEqual(res_ok.json()['phone_number'], '+998902520703')
+            order = ServiceOrder.objects.get(order_id=res_ok.json()['order_id'])
+            self.assertEqual(order.phone_number, '+998902520703')
+
+    def test_in_service_order_returns_shop_location_and_saves_verified_phone(self):
+        self._login_user(phone_number='+998902520703')
+        with patch('core.views._send_telegram_notifications_async') as mock_notify:
+            res = self.client.post(
+                '/api/orders/submit/',
+                data=json.dumps({
+                    'phone_id': self.phone.id,
+                    'comparison_id': self.comp.id,
+                    'service_type': 'in_service',
+                    'lang': 'uz',
+                }),
+                content_type='application/json',
+            )
+            self.assertEqual(res.status_code, 200)
+            data = res.json()
+            self.assertTrue(data['success'])
+            self.assertEqual(data['service_type'], 'in_service')
+            loc = data['shop_location']
+            self.assertEqual(loc['address'], "Malika bozor, B32 do'kon")
+            self.assertIn('41.338306,69.270389', loc['google_maps_url'])
+            self.assertIn('pt=69.270389,41.338306', loc['yandex_maps_url'])
+
+            order = ServiceOrder.objects.get(order_id=data['order_id'])
+            self.assertEqual(order.status, 'new')
+            self.assertEqual(order.phone_number, '+998902520703')
+            self.assertEqual(order.final_total_uzs, Decimal('1200000'))
+
+            # Admin notification must include the verified phone number
+            self.assertTrue(mock_notify.called)
+            sent_text = mock_notify.call_args.kwargs['payload_base']['text']
+            self.assertIn('+998902520703', sent_text)
+
+    def test_courier_order_distance_formula_osrm_and_haversine_fallback(self):
+        # Fee formula check: 2.5 km -> 5000 + 25000 = 30 000 so'm
+        self.assertEqual(calculate_courier_fee_uzs(2.5), 30000)
+        self.assertEqual(calculate_courier_fee_uzs(0), 5000)
+
+        # OSRM success path
+        fake_resp = MagicMock(status_code=200)
+        fake_resp.json.return_value = {'routes': [{'distance': 2500.0}]}
+        with patch('core.distance.requests.get', return_value=fake_resp):
+            km, source = calculate_road_distance_km(41.3500, 69.2800)
+            self.assertEqual(km, 2.5)
+            self.assertEqual(source, 'osrm')
+
+        # Haversine * 1.25 fallback path
+        with patch('core.distance.requests.get', side_effect=RuntimeError("network down")):
+            km_fb, source_fb = calculate_road_distance_km(41.3500, 69.2800)
+            expected = round(
+                haversine_distance_km(41.338306, 69.270389, 41.3500, 69.2800) * HAVERSINE_ROAD_FACTOR,
+                2,
+            )
+            self.assertEqual(source_fb, 'haversine')
+            self.assertEqual(km_fb, expected)
+
+        # Full courier order creation -> pending_location -> finalize -> track
+        tg_user = self._login_user(telegram_id=987654321, phone_number='+998902520703')
+        res = self.client.post(
+            '/api/orders/submit/',
+            data=json.dumps({
+                'phone_id': self.phone.id,
+                'comparison_id': self.comp.id,
+                'service_type': 'courier',
+                'lang': 'uz',
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        self.assertEqual(body['service_type'], 'courier')
+        self.assertEqual(body['status'], 'pending_location')
+        self.assertIn(f"https://t.me/{TEST_BOT_USERNAME}?start=courier_", body['bot_url'])
+
+        order = ServiceOrder.objects.get(order_id=body['order_id'])
+        self.assertEqual(order.status, 'pending_location')
+        self.assertEqual(order.phone_number, '+998902520703')
+        self.assertLessEqual(len(f"courier_{order.courier_token}"), 64)
+
+        # Track before location
+        track_pending = self.client.get(f'/api/orders/track/?order_id={order.order_id}&lang=uz').json()
+        self.assertTrue(track_pending['found'])
+        self.assertEqual(track_pending['status'], 'pending_location')
+        self.assertNotIn('phone_number', track_pending)
+
+        # Finalize courier order with 2.5 km -> 30 000 so'm fee -> final_total = 1 230 000 so'm
+        fin_status, fin_result = _finalize_courier_order(
+            order_pk=order.id,
+            token_value=order.courier_token,
+            telegram_id=tg_user.telegram_id,
+            lat=41.3500,
+            lon=69.2800,
+            distance_km=2.5,
+            delivery_fee_uzs=calculate_courier_fee_uzs(2.5),
+        )
+        self.assertEqual(fin_status, 'ok')
+        self.assertEqual(fin_result['delivery_fee_uzs'], 30000)
+        self.assertEqual(fin_result['final_total_uzs'], 1230000)
+        self.assertEqual(fin_result['phone_number'], '+998902520703')
+
+        order.refresh_from_db()
+        self.assertEqual(order.status, 'new')
+        self.assertIsNone(order.courier_token)
+        self.assertEqual(order.distance_km, Decimal('2.50'))
+        self.assertEqual(order.delivery_fee_uzs, Decimal('30000'))
+        self.assertEqual(order.final_total_uzs, Decimal('1230000'))
+
+        # Track after location
+        track_done = self.client.get(f'/api/orders/track/?order_id={order.order_id}&lang=uz').json()
+        self.assertEqual(track_done['status'], 'new')
+        self.assertEqual(track_done['final_total_uzs'], 1230000)
+        self.assertEqual(track_done['delivery_fee_uzs'], 30000)
+
+
+class I18nAndTemplatesTests(TestCase):
+    def test_compiled_translations_load_for_uz_ru_en(self):
+        activate('ru')
+        self.assertEqual(gettext("Telegram orqali kirish"), "Войти через Telegram")
+        self.assertEqual(gettext("Chiqish"), "Выйти")
+
+        activate('en')
+        self.assertEqual(gettext("Telegram orqali kirish"), "Sign in with Telegram")
+        self.assertEqual(gettext("Buyurtmangiz qabul qilindi!"), "Order confirmed!")
+
+        activate('uz')
+        self.assertEqual(gettext("Telegram orqali kirish"), "Telegram orqali kirish")
+
+    def test_pages_render_bot_only_auth_without_inline_styles_or_widget(self):
+        client = Client()
+        for lang_code in ('uz', 'ru', 'en'):
+            resp = client.get(f'/{lang_code}/')
+            self.assertEqual(resp.status_code, 200)
+            html_content = resp.content.decode('utf-8')
+            self.assertIn('auth_modal.css?v=7', html_content)
+            self.assertIn('auth.js?v=7', html_content)
+            self.assertIn('modal.js?v=7', html_content)
+            self.assertIn('id="btn-auth-deeplink"', html_content)
+            self.assertNotIn('telegram-widget.js', html_content)
+            self.assertNotIn('onTelegramAuth', html_content)
+            self.assertNotIn('order-phone-input', html_content)
+            self.assertNotIn('style="', html_content)
+            self.assertNotIn('<style', html_content)
+            self.assertNotIn('lang-pills', html_content)

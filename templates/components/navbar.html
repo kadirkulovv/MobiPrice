@@ -1,74 +1,286 @@
-{% load static %}
-<header class="navbar">
-  <div class="container nav-container">
+{% load static i18n %}
+<!-- Mobile Drawer Backdrop -->
+<div class="sidebar-backdrop" onclick="document.body.classList.remove('drawer-open')" aria-hidden="true"></div>
+
+<!-- Left Fixed Sidebar (240px on Desktop, Slide-over Drawer on Tablet/Mobile) -->
+<aside class="app-sidebar" id="app-sidebar" aria-label="App Navigation">
+  <!-- Top: Brand Identity -->
+  <div class="sidebar-top">
     <a href="/{{ current_lang }}/" class="brand-logo">
-      <img src="{% static 'img/logo.jpg' %}" alt="MobiPrice Logo">
-      <span class="brand-text">MobiPrice</span>
+      <img src="{% static 'img/logo.jpg' %}" alt="MobiPrice Logo" onerror="this.onerror=null;this.src='{% static 'img/icons/3.svg' %}';">
+      <div class="brand-meta">
+        <span class="brand-text">MobiPrice</span>
+        <span class="brand-sub-tag">PRECISION TECH-LAB</span>
+      </div>
+    </a>
+    <button type="button" class="sidebar-close-btn" onclick="document.body.classList.remove('drawer-open')" aria-label="Close menu">&times;</button>
+  </div>
+
+  <!-- Middle: Sections Navigation Menu -->
+  <nav class="sidebar-nav">
+    <div class="sidebar-nav-label">
+      {% if current_lang == 'ru' %}НАВИГАЦИЯ / МОДУЛИ{% elif current_lang == 'en' %}NAVIGATION / MODULES{% else %}BO'LIMLAR MENYUSI{% endif %}
+    </div>
+
+    <a href="#calculator" class="sidebar-link active" onclick="document.querySelectorAll('.sidebar-link').forEach(el=>el.classList.remove('active'));this.classList.add('active');document.body.classList.remove('drawer-open');">
+      <span class="sidebar-link-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="4" y="2" width="16" height="20" rx="2"/>
+          <line x1="8" y1="6" x2="16" y2="6"/>
+          <line x1="8" y1="10" x2="10" y2="10"/>
+          <line x1="14" y1="10" x2="16" y2="10"/>
+          <line x1="8" y1="14" x2="10" y2="14"/>
+          <line x1="14" y1="14" x2="16" y2="14"/>
+          <line x1="8" y1="18" x2="16" y2="18"/>
+        </svg>
+      </span>
+      <span class="sidebar-link-text">{% if current_lang == 'ru' %}Калькулятор цен{% elif current_lang == 'en' %}Price Calculator{% else %}Kalkulyator{% endif %}</span>
+      <span class="sidebar-link-badge">01</span>
     </a>
 
-    <div class="nav-actions">
-      <!-- Track Order Button (Desktop) -->
-      <button type="button" class="btn-header-track desktop-only" id="btn-open-track-modal" title="{{ t.track_order_btn }}">
-        <span class="track-icon">🔍</span>
-        <span>{{ t.track_order_btn }}</span>
-      </button>
+    <a href="#before-after" class="sidebar-link" onclick="document.querySelectorAll('.sidebar-link').forEach(el=>el.classList.remove('active'));this.classList.add('active');document.body.classList.remove('drawer-open');">
+      <span class="sidebar-link-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <line x1="12" y1="3" x2="12" y2="21"/>
+          <polyline points="8 9 5 12 8 15"/>
+          <polyline points="16 9 19 12 16 15"/>
+        </svg>
+      </span>
+      <span class="sidebar-link-text">{% if current_lang == 'ru' %}До и После{% elif current_lang == 'en' %}Before & After{% else %}Oldin / Keyin{% endif %}</span>
+      <span class="sidebar-link-badge">02</span>
+    </a>
 
-      <!-- Compact Language Select -->
-      <div class="lang-select-box">
-        <span class="lang-globe">🌐</span>
-        <select id="lang-select" class="lang-dropdown">
-          <option value="uz" {% if current_lang == 'uz' %}selected{% endif %}>UZ</option>
-          <option value="ru" {% if current_lang == 'ru' %}selected{% endif %}>RU</option>
-          <option value="en" {% if current_lang == 'en' %}selected{% endif %}>EN</option>
-        </select>
-      </div>
+    <a href="#consultation" class="sidebar-link" onclick="document.querySelectorAll('.sidebar-link').forEach(el=>el.classList.remove('active'));this.classList.add('active');document.body.classList.remove('drawer-open');">
+      <span class="sidebar-link-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+      </span>
+      <span class="sidebar-link-text">{% if current_lang == 'ru' %}Консультация{% elif current_lang == 'en' %}Consultation{% else %}Konsultatsiya{% endif %}</span>
+      <span class="sidebar-link-badge">03</span>
+    </a>
 
-      <!-- Telegram Button (Desktop) -->
-      <a href="https://t.me/Murodjonmilyazov" target="_blank" rel="noopener" class="btn-header-tg desktop-only">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+    <a href="#team" class="sidebar-link" onclick="document.querySelectorAll('.sidebar-link').forEach(el=>el.classList.remove('active'));this.classList.add('active');document.body.classList.remove('drawer-open');">
+      <span class="sidebar-link-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </span>
+      <span class="sidebar-link-text">{% if current_lang == 'ru' %}Мастера{% elif current_lang == 'en' %}Technicians{% else %}Ustalar{% endif %}</span>
+      <span class="sidebar-link-badge">04</span>
+    </a>
+
+    <a href="#faq" class="sidebar-link" onclick="document.querySelectorAll('.sidebar-link').forEach(el=>el.classList.remove('active'));this.classList.add('active');document.body.classList.remove('drawer-open');">
+      <span class="sidebar-link-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </span>
+      <span class="sidebar-link-text">FAQ</span>
+      <span class="sidebar-link-badge">05</span>
+    </a>
+
+    <a href="#reviews" class="sidebar-link" onclick="document.querySelectorAll('.sidebar-link').forEach(el=>el.classList.remove('active'));this.classList.add('active');document.body.classList.remove('drawer-open');">
+      <span class="sidebar-link-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+      </span>
+      <span class="sidebar-link-text">{% if current_lang == 'ru' %}Отзывы{% elif current_lang == 'en' %}Reviews{% else %}Sharhlar{% endif %}</span>
+      <span class="sidebar-link-badge">06</span>
+    </a>
+  </nav>
+
+  <!-- Bottom: Telegram Auth, Order Tracking & Direct Contact -->
+  <div class="sidebar-bottom">
+    <div class="sidebar-auth">
+      <button type="button" id="btn-open-auth-sidebar" class="btn-sidebar-auth{% if tg_user %} hidden{% endif %}">
+        <svg class="auth-tg-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
         </svg>
-        <span>Telegram</span>
-      </a>
+        <span class="sidebar-auth-btn-label">{% trans "Telegram orqali kirish" %}</span>
+      </button>
 
-      <!-- Instagram Button (Desktop) -->
-      <a href="https://www.instagram.com/murodjonmilyazov_" target="_blank" rel="noopener" class="btn-header-ig desktop-only">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-        </svg>
-        <span>Instagram</span>
-      </a>
+      <div id="auth-user-sidebar" class="sidebar-user-card{% if not tg_user %} hidden{% endif %}">
+        <div class="sidebar-user-info">
+          <div class="auth-avatar auth-avatar-md">
+            <img class="auth-avatar-img{% if not tg_user or not tg_user.photo_url %} hidden{% endif %}" {% if tg_user and tg_user.photo_url %}src="{{ tg_user.photo_url }}"{% endif %} alt="{{ tg_user.full_name|default:'Telegram' }}">
+            <span class="auth-avatar-initials{% if tg_user and tg_user.photo_url %} hidden{% endif %}" data-auth-initials>{{ tg_user.initials|default:'TG' }}</span>
+          </div>
+          <div class="sidebar-user-meta">
+            <div class="sidebar-user-name" data-auth-name>{{ tg_user.full_name|default:'' }}</div>
+            <div class="sidebar-user-handle" data-auth-handle>{{ tg_user.display_handle|default:'' }}</div>
+            <div class="sidebar-user-phone{% if not tg_user or not tg_user.phone_number %} hidden{% endif %}" data-auth-phone>{% if tg_user and tg_user.phone_number %}{{ tg_user.phone_number }}{% endif %}</div>
+          </div>
+        </div>
+        <button type="button" id="btn-logout-sidebar" class="btn-logout-sidebar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          <span>{% trans "Chiqish" %}</span>
+        </button>
+      </div>
+    </div>
 
-      <!-- Primary Phone (Desktop) -->
-      <a href="tel:+998909197600" class="btn-header-call desktop-only">
+    <div class="lab-telemetry-status">
+      <span class="status-dot"></span>
+      <span>{% if current_lang == 'ru' %}Лаборатория открыта (09:00–21:00){% elif current_lang == 'en' %}Tech-Lab Open (09:00–21:00){% else %}Markaz ochiq (09:00–21:00){% endif %}</span>
+    </div>
+
+    <button type="button" class="btn-sidebar-track" id="btn-open-track-modal" onclick="document.body.classList.remove('drawer-open')" title="{{ t.track_order_btn }}">
+      <span class="track-icon">🔍</span>
+      <span class="track-btn-label">{{ t.track_order_btn }}</span>
+    </button>
+
+    <div class="sidebar-contact-group">
+      <a href="tel:+998909197600" class="btn-sidebar-call">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
         </svg>
         <span>+998 90 919 76 00</span>
       </a>
-
-      <!-- Mobile Action Icons -->
-      <button type="button" class="btn-icon-nav mobile-only" id="btn-open-track-mobile" aria-label="Trek tekshirish">
-        🔍
-      </button>
-
-      <a href="https://t.me/Murodjonmilyazov" target="_blank" rel="noopener" class="btn-icon-nav btn-icon-tg mobile-only" aria-label="Telegram">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <a href="https://t.me/Murodjonmilyazov" target="_blank" rel="noopener" class="btn-sidebar-tg" aria-label="Telegram" title="Telegram">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
-        </svg>
-      </a>
-
-      <a href="https://www.instagram.com/murodjonmilyazov_" target="_blank" rel="noopener" class="btn-icon-nav btn-icon-ig mobile-only" aria-label="Instagram">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-        </svg>
-      </a>
-
-      <a href="tel:+998909197600" class="btn-icon-nav btn-icon-call mobile-only" aria-label="Telefon qilish">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
         </svg>
       </a>
     </div>
   </div>
+</aside>
+
+<!-- Top Thin App-Bar (56px) -->
+<header class="navbar app-topbar">
+  <div class="topbar-inner">
+    <!-- Left: Mobile Brand Logo OR Desktop Breadcrumb -->
+    <div class="topbar-left">
+      <a href="/{{ current_lang }}/" class="topbar-mobile-logo">
+        <img src="{% static 'img/logo.jpg' %}" alt="MobiPrice Logo" onerror="this.onerror=null;this.src='{% static 'img/icons/3.svg' %}';">
+        <span class="brand-text">MobiPrice</span>
+      </a>
+
+      <div class="topbar-breadcrumb">
+        <span class="bc-dot"></span>
+        <span class="bc-brand">MOBIPRICE</span>
+        <span class="bc-slash">/</span>
+        <span class="bc-section">
+          {% if current_lang == 'ru' %}КАЛЬКУЛЯТОР ЦЕН{% elif current_lang == 'en' %}PRICE CALCULATOR{% else %}NARX KALKULYATORI{% endif %}
+        </span>
+      </div>
+    </div>
+
+    <!-- Right: Telegram Auth, Language Switcher, Social Icons & Mobile Drawer Button -->
+    <div class="nav-actions topbar-right">
+      <!-- Single Unified Language Selector -->
+      <div class="lang-switcher-group">
+        <div class="lang-select-box">
+          <span class="lang-globe" aria-hidden="true">🌐</span>
+          <select id="lang-select" class="lang-dropdown" aria-label="{% trans 'Language' %}">
+            <option value="uz" {% if current_lang == 'uz' %}selected{% endif %}>UZ</option>
+            <option value="ru" {% if current_lang == 'ru' %}selected{% endif %}>RU</option>
+            <option value="en" {% if current_lang == 'en' %}selected{% endif %}>EN</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Telegram Auth / Profile Block -->
+      <div class="topbar-auth">
+        <button type="button" id="btn-open-auth-topbar" class="btn-auth-topbar{% if tg_user %} hidden{% endif %}" aria-label="{% trans 'Telegram orqali kirish' %}">
+          <svg class="auth-tg-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+          </svg>
+          <span class="btn-auth-label-full">{% trans "Telegram orqali kirish" %}</span>
+          <span class="btn-auth-label-short">{% trans "Kirish" %}</span>
+        </button>
+
+        <div id="auth-user-topbar" class="topbar-user-pill{% if not tg_user %} hidden{% endif %}">
+          <div class="auth-avatar auth-avatar-sm">
+            <img class="auth-avatar-img{% if not tg_user or not tg_user.photo_url %} hidden{% endif %}" {% if tg_user and tg_user.photo_url %}src="{{ tg_user.photo_url }}"{% endif %} alt="{{ tg_user.full_name|default:'Telegram' }}">
+            <span class="auth-avatar-initials{% if tg_user and tg_user.photo_url %} hidden{% endif %}" data-auth-initials>{{ tg_user.initials|default:'TG' }}</span>
+          </div>
+          <span class="topbar-user-name" data-auth-name>{{ tg_user.full_name|default:'' }}</span>
+          <button type="button" id="btn-logout-topbar" class="btn-logout-topbar" title="{% trans 'Chiqish' %}" aria-label="{% trans 'Chiqish' %}">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            <span class="btn-logout-label">{% trans "Chiqish" %}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Compact Social & Phone Icons -->
+      <div class="topbar-socials">
+        <a href="https://t.me/Murodjonmilyazov" target="_blank" rel="noopener" class="topbar-icon-btn topbar-tg" aria-label="Telegram" title="Telegram">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+          </svg>
+        </a>
+
+        <a href="https://www.instagram.com/murodjonmilyazov_" target="_blank" rel="noopener" class="topbar-icon-btn topbar-ig" aria-label="Instagram" title="Instagram">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+          </svg>
+        </a>
+
+        <a href="tel:+998909197600" class="topbar-icon-btn topbar-call" aria-label="+998 90 919 76 00" title="+998 90 919 76 00">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+          </svg>
+        </a>
+      </div>
+
+      <!-- Mobile Menu / Drawer Trigger Button -->
+      <button type="button" class="btn-drawer-toggle" onclick="document.body.classList.toggle('drawer-open')" aria-label="Menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </div>
 </header>
+
+<!-- Mobile & Tablet Fixed Bottom Quick Action Bar (< 1024px) -->
+<nav class="mobile-bottom-nav" aria-label="Quick Actions">
+  <a href="#calculator" class="bottom-nav-item active">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="4" y="2" width="16" height="20" rx="2"/>
+      <line x1="8" y1="6" x2="16" y2="6"/>
+      <line x1="8" y1="10" x2="16" y2="10"/>
+      <line x1="8" y1="14" x2="16" y2="14"/>
+    </svg>
+    <span>{% if current_lang == 'ru' %}Цены{% elif current_lang == 'en' %}Pricing{% else %}Kalkulyator{% endif %}</span>
+  </a>
+
+  <button type="button" class="bottom-nav-item" id="btn-open-track-mobile" aria-label="{{ t.track_order_btn }}">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"/>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <span>{% if current_lang == 'ru' %}Статус{% elif current_lang == 'en' %}Status{% else %}Holat{% endif %}</span>
+  </button>
+
+  <a href="https://t.me/Murodjonmilyazov" target="_blank" rel="noopener" class="bottom-nav-item">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+    </svg>
+    <span>Telegram</span>
+  </a>
+
+  <a href="tel:+998909197600" class="bottom-nav-item bottom-nav-cta">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+    </svg>
+    <span>{% if current_lang == 'ru' %}Звонок{% elif current_lang == 'en' %}Call{% else %}Aloqa{% endif %}</span>
+  </a>
+</nav>

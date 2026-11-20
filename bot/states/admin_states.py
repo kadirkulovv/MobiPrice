@@ -61,10 +61,6 @@ class ComparisonEditStates(StatesGroup):
     waiting_for_new_qty = State()
 
 
-class DeleteStates(StatesGroup):
-    waiting_for_confirm = State()
-
-
 # --- MASTER / TEAM STATES ---
 
 class MasterAddStates(StatesGroup):

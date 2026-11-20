@@ -1,4 +1,4 @@
-import os
+import html
 from aiogram import Router, F
 from aiogram.types import (
     Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton,
@@ -6,7 +6,7 @@ from aiogram.types import (
 )
 from aiogram.fsm.context import FSMContext
 from bot.config import ADMIN_IDS
-from bot.keyboards.main_menu import get_main_menu, get_cancel_menu
+from bot.keyboards.main_menu import get_cancel_menu
 from bot.states.admin_states import AdminAddStates
 from bot.database import BotAdmin, sync_to_async
 from bot.permissions import get_user_permissions, UserPermissions
@@ -70,9 +70,9 @@ async def staff_list_view(message: Message, state: FSMContext):
     if staff_members:
         text += "📋 <b>Tayinlangan xodimlar ro‘yxati:</b>\n"
         for idx, s in enumerate(staff_members, 1):
-            u_info = f"@{s.username}" if s.username else "Username yo'q"
+            u_info = f"@{html.escape(s.username)}" if s.username else "Username yo'q"
             id_info = f"<code>{s.telegram_id}</code>" if s.telegram_id else "<i>(Start bosganda biriktiriladi)</i>"
-            name_info = f" — <b>{s.full_name}</b>" if s.full_name else ""
+            name_info = f" — <b>{html.escape(s.full_name)}</b>" if s.full_name else ""
             status_dot = "🟢 Faol" if s.is_active else "🔴 Nofaol"
 
             text += (
@@ -120,6 +120,8 @@ async def add_staff_start(message: Message, state: FSMContext):
 @router.message(AdminAddStates.waiting_for_identifier, F.text)
 async def process_staff_identifier(message: Message, state: FSMContext):
     """Identifier (username yoki ID) ni tekshirish va qabul qilish"""
+    if not await check_superadmin(message):
+        return
     raw = message.text.strip()
     is_numeric = raw.isdigit()
     username = None
@@ -160,6 +162,8 @@ async def process_staff_identifier(message: Message, state: FSMContext):
 @router.message(AdminAddStates.waiting_for_name, F.text)
 async def process_staff_name(message: Message, state: FSMContext):
     """Ismni qabul qilish va rol tanlash tugmalarini chiqarish"""
+    if not await check_superadmin(message):
+        return
     name = message.text.strip()
     if name == '-':
         name = ""
@@ -201,6 +205,8 @@ async def process_staff_name(message: Message, state: FSMContext):
 @router.callback_query(AdminAddStates.waiting_for_role, F.data.startswith("addrole:"))
 async def process_staff_role(callback: CallbackQuery, state: FSMContext):
     """Rolni saqlash va jarayonni yakunlash"""
+    if not await check_superadmin(callback):
+        return
     role_choice = callback.data.split(":")[1]
 
     if role_choice == "cancel":
@@ -227,13 +233,13 @@ async def process_staff_role(callback: CallbackQuery, state: FSMContext):
 
     await state.clear()
 
-    display_target = f"@{username}" if username else f"ID: {telegram_id}"
+    display_target = f"@{html.escape(username)}" if username else f"ID: {telegram_id}"
     await callback.message.edit_text(
         f"✅ <b>Yangi xodim muvaffaqiyatli qo‘shildi!</b>\n\n"
         f"👤 <b>Xodim:</b> {display_target}\n"
-        f"📝 <b>Ismi / Izoh:</b> {name or 'Ko‘rsatilmagan'}\n"
+        f"📝 <b>Ismi / Izoh:</b> {html.escape(name or 'Ko‘rsatilmagan')}\n"
         f"🎭 <b>Roli:</b> {new_obj.role_badge}\n"
-        f"👨‍💻 <b>Qo‘shgan shaxs:</b> {added_by_user}\n\n"
+        f"👨‍💻 <b>Qo‘shgan shaxs:</b> {html.escape(added_by_user or '')}\n\n"
         f"Endi ushbu xodim botga /start bosganida faqat o‘zining roliga mos bo‘limlarni ko‘ra oladi.",
         parse_mode="HTML"
     )
@@ -288,12 +294,12 @@ async def show_staff_detail(callback: CallbackQuery):
         await callback.answer("Xodim topilmadi!", show_alert=True)
         return
 
-    user_label = f"@{staff.username}" if staff.username else f"ID: {staff.telegram_id}"
+    user_label = f"@{html.escape(staff.username)}" if staff.username else f"ID: {staff.telegram_id}"
     status_text = "🟢 Faol" if staff.is_active else "🔴 Nofaol (Kirish bloklangan)"
 
     card_text = (
         f"👤 <b>Xodim:</b> {user_label}\n"
-        f"📝 <b>Ismi:</b> {staff.full_name or 'Ko‘rsatilmagan'}\n"
+        f"📝 <b>Ismi:</b> {html.escape(staff.full_name or 'Ko‘rsatilmagan')}\n"
         f"🎭 <b>Hozirgi roli:</b> {staff.role_badge}\n"
         f"🔘 <b>Holati:</b> {status_text}\n"
         f"📅 <b>Qo‘shilgan sana:</b> {staff.created_at.strftime('%Y-%m-%d %H:%M')}\n\n"
@@ -386,7 +392,7 @@ async def process_delete_staff(callback: CallbackQuery):
         await callback.answer("Xodim topilmadi yoki allaqachon o'chirilgan.", show_alert=True)
         return
 
-    user_label = f"@{staff.username}" if staff.username else str(staff.telegram_id)
+    user_label = f"@{html.escape(staff.username)}" if staff.username else str(staff.telegram_id)
     await sync_to_async(staff.delete)()
 
     await callback.message.edit_text(
@@ -401,6 +407,8 @@ async def process_delete_staff(callback: CallbackQuery):
 @router.callback_query(F.data == "staff_back_list")
 async def back_to_staff_list(callback: CallbackQuery):
     """Ro'yxatga qaytish"""
+    if not await check_superadmin(callback):
+        return
     staff_members = await sync_to_async(list)(BotAdmin.objects.all().order_by('-created_at'))
     if not staff_members:
         await callback.message.edit_text("Boshqarish uchun birorta ham qo‘shimcha xodim mavjud emas.")

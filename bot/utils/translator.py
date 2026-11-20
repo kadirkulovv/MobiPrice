@@ -85,17 +85,23 @@ async def auto_translate_issue_title(title_uz: str) -> tuple[str, str]:
         ru, en = REPAIR_GLOSSARY[norm]
         return ru, en
 
-    # 2. Check if any glossary key is a major substring
-    for key, (ru, en) in REPAIR_GLOSSARY.items():
-        if key == norm or key in norm:
-            # If the user typed "iPhone 15 ekran almashtirish" -> match
-            pass
+    # 2. Check if any glossary key is a major substring (for fallback if network fails)
+    fallback_ru, fallback_en = None, None
+    for key, (ru, en) in sorted(REPAIR_GLOSSARY.items(), key=lambda x: len(x[0]), reverse=True):
+        if key in norm:
+            fallback_ru, fallback_en = ru, en
+            break
 
     # 3. Perform online translation asynchronously
     try:
         ru_task = asyncio.to_thread(_http_translate, clean_uz, "ru")
         en_task = asyncio.to_thread(_http_translate, clean_uz, "en")
         title_ru, title_en = await asyncio.gather(ru_task, en_task)
+
+        if (not title_ru or title_ru == clean_uz) and fallback_ru:
+            title_ru = fallback_ru
+        if (not title_en or title_en == clean_uz) and fallback_en:
+            title_en = fallback_en
 
         # Capitalize nicely
         if title_ru and len(title_ru) > 1:
@@ -106,4 +112,4 @@ async def auto_translate_issue_title(title_uz: str) -> tuple[str, str]:
         return title_ru or clean_uz, title_en or clean_uz
     except Exception as e:
         logger.error(f"Async translation error: {e}")
-        return clean_uz, clean_uz
+        return fallback_ru or clean_uz, fallback_en or clean_uz

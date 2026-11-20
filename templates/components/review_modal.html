@@ -1,7 +1,8 @@
+{% load static i18n %}
 <!-- Customer Review Submission Modal -->
-<div id="review-modal" class="modal-backdrop" aria-hidden="true" style="display: none;">
+<div id="review-modal" class="modal-backdrop" aria-hidden="true">
   <div class="modal-card review-modal-card">
-    <button type="button" class="modal-close-btn" id="btn-close-review-modal" aria-label="Yopish">&times;</button>
+    <button type="button" class="modal-close-btn" id="btn-close-review-modal" aria-label="{% trans 'Close' %}">&times;</button>
     
     <div class="review-modal-header">
       <div class="review-modal-icon">⭐️</div>
@@ -18,22 +19,24 @@
     </div>
 
     <form id="review-submission-form" class="review-form">
-      <div class="form-group">
-        <label for="review-client-name" class="form-label">
-          {% if current_lang == 'ru' %}Ваше имя *{% elif current_lang == 'en' %}Your Name *{% else %}Ismingiz *{% endif %}
-        </label>
-        <input 
-          type="text" 
-          id="review-client-name" 
-          class="form-control" 
-          placeholder="{% if current_lang == 'ru' %}Например: Алишер{% elif current_lang == 'en' %}e.g. Alex{% else %}Masalan: Alisher Karimov{% endif %}" 
-          required 
-          maxlength="60"
-        >
+      {% csrf_token %}
+
+      <!-- Authenticated Telegram Author Badge (Read-Only) -->
+      <div class="modal-tg-profile modal-tg-profile-review" aria-label="{% trans 'Telegram profili' %}">
+        <div class="auth-avatar auth-avatar-md">
+          <img class="auth-avatar-img{% if not tg_user or not tg_user.photo_url %} hidden{% endif %}" {% if tg_user and tg_user.photo_url %}src="{{ tg_user.photo_url }}"{% endif %} alt="{{ tg_user.full_name|default:'Telegram' }}">
+          <span class="auth-avatar-initials{% if tg_user and tg_user.photo_url %} hidden{% endif %}" data-auth-initials>{{ tg_user.initials|default:'TG' }}</span>
+        </div>
+        <div class="modal-tg-profile-meta">
+          <span class="modal-tg-profile-label">{% trans "Telegram profili" %}</span>
+          <div class="modal-tg-profile-name" data-auth-name>{{ tg_user.full_name|default:'' }}</div>
+          <div class="modal-tg-profile-handle" data-auth-handle>{{ tg_user.display_handle|default:'' }}</div>
+        </div>
+        <span class="modal-tg-verified-badge" aria-hidden="true">✓</span>
       </div>
 
       <div class="review-form-row">
-        <div class="form-group" style="flex: 1;">
+        <div class="form-group form-group-col">
           <label for="review-device-model" class="form-label">
             {% if current_lang == 'ru' %}Модель телефона{% elif current_lang == 'en' %}Device Model{% else %}Telefon modeli{% endif %}
           </label>
@@ -41,12 +44,12 @@
             type="text" 
             id="review-device-model" 
             class="form-control" 
-            placeholder="{% if current_lang == 'ru' %}iPhone 15 Pro Max{% elif current_lang == 'en' %}iPhone 15 Pro Max{% else %}iPhone 15 Pro Max{% endif %}" 
+            placeholder="iPhone 15 Pro Max" 
             maxlength="60"
           >
         </div>
 
-        <div class="form-group" style="flex: 1;">
+        <div class="form-group form-group-col">
           <label for="review-service-type" class="form-label">
             {% if current_lang == 'ru' %}Услуга / Ремонт{% elif current_lang == 'en' %}Service Done{% else %}Qilingan ish{% endif %}
           </label>
@@ -72,7 +75,9 @@
           <span class="star active" data-val="4">★</span>
           <span class="star active" data-val="5">★</span>
           <input type="hidden" id="review-rating-value" value="5">
-          <span class="star-rating-label" id="star-rating-text">5 / 5 — A'lo</span>
+          <span class="star-rating-label" id="star-rating-text">
+            {% if current_lang == 'ru' %}5 / 5 — Отлично{% elif current_lang == 'en' %}5 / 5 — Excellent{% else %}5 / 5 — A'lo{% endif %}
+          </span>
         </div>
       </div>
 
@@ -91,15 +96,15 @@
         ></textarea>
       </div>
 
-      <div id="review-alert-msg" class="review-alert" style="display: none;"></div>
+      <div id="review-alert-msg" class="review-alert hidden"></div>
 
-      <button type="submit" id="btn-submit-review" class="btn-primary" style="width: 100%; margin-top: 10px;">
+      <button type="submit" id="btn-submit-review" class="btn-primary btn-submit-full">
         <span class="btn-text">{% if current_lang == 'ru' %}Отправить отзыв{% elif current_lang == 'en' %}Submit Review{% else %}Fikrni yuborish{% endif %}</span>
-        <span class="btn-spinner" style="display: none;">⏳</span>
+        <span class="btn-spinner hidden">⏳</span>
       </button>
 
       <p class="review-anti-spam-note">
-        🔒 {% if current_lang == 'ru' %}С одного устройства и IP адреса разрешен только 1 отзыв в сутки.{% elif current_lang == 'en' %}Only 1 review per day is allowed per device and IP address.{% else %}1 ta qurilma va IP manzildan 24 soat ichida faqat 1 marta fikr qoldirish mumkin.{% endif %}
+        🔒 {% if current_lang == 'ru' %}С одного Telegram-аккаунта, устройства и IP адреса разрешен только 1 отзыв в сутки.{% elif current_lang == 'en' %}Only 1 review per 24 hours is allowed per Telegram account, device, and IP address.{% else %}1 ta Telegram akkount, qurilma va IP manzildan 24 soat ichida faqat 1 marta fikr qoldirish mumkin.{% endif %}
       </p>
     </form>
   </div>

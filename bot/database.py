@@ -14,9 +14,11 @@ import django
 django.setup()
 
 # Import Django models after setup
+from django.db import close_old_connections
 from core.models import (
     Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison,
-    RepairFAQ, Review, ServiceOrder, TeamMember, BotAdmin
+    RepairFAQ, Review, ServiceOrder, TeamMember, BotAdmin, TelegramUser, AuthToken,
+    make_safe_slug
 )
 from asgiref.sync import sync_to_async
 
@@ -31,6 +33,10 @@ __all__ = [
     'ServiceOrder',
     'TeamMember',
     'BotAdmin',
+    'TelegramUser',
+    'AuthToken',
+    'make_safe_slug',
+    'close_old_connections',
     'sync_to_async',
 ]
 

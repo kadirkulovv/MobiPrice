@@ -1,10 +1,11 @@
-import os
+import html
+from django.db.models import Q
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from bot.keyboards.main_menu import get_main_menu, get_cancel_menu
-from bot.database import ServiceOrder, TeamMember, DevicePhone, IssueComparison, sync_to_async
+from bot.keyboards.main_menu import get_cancel_menu
+from bot.database import ServiceOrder, TeamMember, sync_to_async
 from bot.permissions import get_user_permissions
 
 router = Router()
@@ -54,7 +55,12 @@ def build_order_action_kb(order_id: int, current_status: str) -> InlineKeyboardM
     """Buyurtma ostidagi tezkor boshqaruv inline tugmalari"""
     buttons = []
 
-    if current_status == 'new':
+    if current_status == 'pending_location':
+        buttons.append([
+            InlineKeyboardButton(text="✅ Qabul qilish", callback_data=f"crm_st:{order_id}:contacted"),
+            InlineKeyboardButton(text="❌ Bekor qilish", callback_data=f"crm_st:{order_id}:cancelled"),
+        ])
+    elif current_status == 'new':
         buttons.append([
             InlineKeyboardButton(text="✅ Qabul qilish", callback_data=f"crm_st:{order_id}:contacted"),
             InlineKeyboardButton(text="👨‍🔧 Ustaga biriktirish", callback_data=f"crm_assign:{order_id}"),
@@ -85,12 +91,62 @@ def build_order_action_kb(order_id: int, current_status: str) -> InlineKeyboardM
 
 def format_order_card(order: ServiceOrder) -> str:
     """Buyurtma kartasi matni"""
-    phone_name = order.phone.name if order.phone else "Smartfon"
-    issue_name = order.comparison.title if order.comparison else "Umumiy konsultatsiya"
-    price_val = f"{order.comparison.total_price_uzs:,} so'm" if order.comparison else "-"
-    master_name = f"👨‍🔧 <b>Usta:</b> {order.master.full_name}\n" if order.master else "👨‍🔧 <b>Usta:</b> <i>Biriktirilmagan</i>\n"
+    phone_name = html.escape(order.phone.name) if order.phone else "Smartfon"
+    if order.comparison:
+        issue_part = order.comparison.issue.title if getattr(order.comparison, 'issue', None) else ""
+        comp_title = order.comparison.title
+        issue_name = html.escape(f"{issue_part} ({comp_title})" if issue_part else comp_title)
+        part_price_val = f"{int(order.comparison.total_price_uzs):,} so'm"
+    else:
+        issue_name = "Umumiy konsultatsiya"
+        part_price_val = "-"
+
+    tg_line = ""
+    if order.telegram_user_id and order.telegram_user:
+        tg_user = order.telegram_user
+        tg_label = f"@{html.escape(tg_user.username)}" if tg_user.username else f"ID: {tg_user.telegram_id}"
+        tg_line = f"🔗 <b>Telegram:</b> <a href=\"{html.escape(tg_user.tg_profile_url)}\">{tg_label}</a>\n"
+
+    effective_phone = order.phone_number or (
+        order.telegram_user.phone_number
+        if order.telegram_user_id and order.telegram_user
+        else ""
+    )
+    phone_num_line = (
+        f"📞 <b>Telefon:</b> <code>{html.escape(effective_phone)}</code>\n"
+        if effective_phone
+        else ""
+    )
+
+    courier_lines = ""
+    if order.distance_km is not None:
+        courier_lines += f"📏 <b>Masofa:</b> {order.distance_km:.2f} km\n"
+    if order.delivery_fee_uzs is not None:
+        courier_lines += f"🛵 <b>Kuryer narxi:</b> {int(order.delivery_fee_uzs):,} so'm\n"
+
+    if order.final_total_uzs is not None:
+        total_line = f"💰 <b>Jami summa:</b> <b>{int(order.final_total_uzs):,} so'm</b>\n"
+    else:
+        total_line = ""
+
+    location_line = ""
+    if order.has_location:
+        location_line = (
+            f"🗺 <b>Lokatsiya:</b> "
+            f"<a href=\"{html.escape(order.client_google_maps_url)}\">Google Maps</a> | "
+            f"<a href=\"{html.escape(order.client_yandex_maps_url)}\">Yandex Maps</a>\n"
+        )
+
+    master_name = (
+        f"👨‍🔧 <b>Usta:</b> {html.escape(order.master.full_name)}\n"
+        if order.master
+        else "👨‍🔧 <b>Usta:</b> <i>Biriktirilmagan</i>\n"
+    )
+    notes_line = f"📝 <b>Izoh:</b> {html.escape(order.notes)}\n" if order.notes else ""
+    admin_notes_line = f"📌 <b>Qayd:</b> <i>{html.escape(order.admin_notes)}</i>\n" if order.admin_notes else ""
 
     status_icons = {
+        'pending_location': '📍 Lokatsiya kutilmoqda',
         'new': '🔴 Yangi ariza',
         'contacted': '🟡 Bog‘lanildi (Diagnostikada)',
         'in_progress': '🔧 Ta’mirlanmoqda',
@@ -98,17 +154,23 @@ def format_order_card(order: ServiceOrder) -> str:
         'completed': '📦 Mijozga topshirildi',
         'cancelled': '❌ Bekor qilindi'
     }
-    status_label = status_icons.get(order.status, order.get_status_display())
+    status_label = status_icons.get(order.status, str(order.get_status_display()))
 
     return (
-        f"📱 <b>BUYURTMA #{order.order_id}</b>\n\n"
-        f"👤 <b>Mijoz:</b> {order.client_name}\n"
-        f"📞 <b>Telefon:</b> <code>{order.phone_number}</code>\n"
+        f"📱 <b>BUYURTMA #{html.escape(order.order_id)}</b>\n\n"
+        f"👤 <b>Mijoz:</b> {html.escape(order.client_name)}\n"
+        f"{tg_line}"
+        f"{phone_num_line}"
         f"📱 <b>Model:</b> {phone_name}\n"
         f"🔧 <b>Xizmat:</b> {issue_name}\n"
-        f"💵 <b>Narx:</b> {price_val}\n"
-        f"📍 <b>Format:</b> {order.get_service_type_display()}\n"
+        f"💵 <b>Zapchast narxi:</b> {part_price_val}\n"
+        f"{courier_lines}"
+        f"{total_line}"
+        f"📍 <b>Format:</b> {html.escape(str(order.get_service_type_display()))}\n"
+        f"{location_line}"
         f"{master_name}"
+        f"{notes_line}"
+        f"{admin_notes_line}"
         f"📊 <b>Holati:</b> {status_label}\n"
         f"🕒 <b>Vaqti:</b> {order.created_at.strftime('%d.%m.%Y %H:%M')}"
     )
@@ -121,13 +183,16 @@ async def crm_home(message: Message, state: FSMContext):
         return
 
     await state.clear()
+    pending_loc_cnt = await sync_to_async(ServiceOrder.objects.filter(status='pending_location').count)()
     new_cnt = await sync_to_async(ServiceOrder.objects.filter(status='new').count)()
     prog_cnt = await sync_to_async(ServiceOrder.objects.filter(status__in=['contacted', 'in_progress']).count)()
     ready_cnt = await sync_to_async(ServiceOrder.objects.filter(status='ready').count)()
 
+    pending_line = f"• 📍 <b>Lokatsiya kutilmoqda:</b> {pending_loc_cnt} ta\n" if pending_loc_cnt else ""
     await message.answer(
         f"📦 <b>MobiPrice Buyurtmalar Mini-CRM Paneli</b>\n\n"
         f"📊 <b>Arizalar holati:</b>\n"
+        f"{pending_line}"
         f"• 🔴 <b>Yangi arizalar:</b> {new_cnt} ta\n"
         f"• ⏳ <b>Ta’mirlanayotganlar:</b> {prog_cnt} ta\n"
         f"• ✅ <b>Olib ketishga tayyor:</b> {ready_cnt} ta\n\n"
@@ -144,7 +209,9 @@ async def list_new_orders(message: Message):
         return
 
     orders = await sync_to_async(list)(
-        ServiceOrder.objects.filter(status='new').select_related('phone', 'comparison', 'master').order_by('-created_at')[:8]
+        ServiceOrder.objects.filter(status='new')
+        .select_related('telegram_user', 'phone', 'comparison', 'comparison__issue', 'master')
+        .order_by('-created_at')[:8]
     )
 
     if not orders:
@@ -154,7 +221,7 @@ async def list_new_orders(message: Message):
     for o in orders:
         text = format_order_card(o)
         kb = build_order_action_kb(o.id, o.status)
-        await message.answer(text, reply_markup=kb, parse_mode="HTML")
+        await message.answer(text, reply_markup=kb, parse_mode="HTML", disable_web_page_preview=True)
 
 
 @router.message(F.text == "⏳ Jarayondagilar")
@@ -164,7 +231,9 @@ async def list_in_progress_orders(message: Message):
         return
 
     orders = await sync_to_async(list)(
-        ServiceOrder.objects.filter(status__in=['contacted', 'in_progress']).select_related('phone', 'comparison', 'master').order_by('-created_at')[:8]
+        ServiceOrder.objects.filter(status__in=['contacted', 'in_progress'])
+        .select_related('telegram_user', 'phone', 'comparison', 'comparison__issue', 'master')
+        .order_by('-created_at')[:8]
     )
 
     if not orders:
@@ -174,7 +243,7 @@ async def list_in_progress_orders(message: Message):
     for o in orders:
         text = format_order_card(o)
         kb = build_order_action_kb(o.id, o.status)
-        await message.answer(text, reply_markup=kb, parse_mode="HTML")
+        await message.answer(text, reply_markup=kb, parse_mode="HTML", disable_web_page_preview=True)
 
 
 @router.message(F.text == "✅ Tayyor bo‘lganlar")
@@ -184,7 +253,9 @@ async def list_ready_orders(message: Message):
         return
 
     orders = await sync_to_async(list)(
-        ServiceOrder.objects.filter(status='ready').select_related('phone', 'comparison', 'master').order_by('-created_at')[:8]
+        ServiceOrder.objects.filter(status='ready')
+        .select_related('telegram_user', 'phone', 'comparison', 'comparison__issue', 'master')
+        .order_by('-created_at')[:8]
     )
 
     if not orders:
@@ -194,7 +265,7 @@ async def list_ready_orders(message: Message):
     for o in orders:
         text = format_order_card(o)
         kb = build_order_action_kb(o.id, o.status)
-        await message.answer(text, reply_markup=kb, parse_mode="HTML")
+        await message.answer(text, reply_markup=kb, parse_mode="HTML", disable_web_page_preview=True)
 
 
 @router.message(F.text == "🔍 Buyurtma qidirish")
@@ -205,7 +276,7 @@ async def search_order_start(message: Message, state: FSMContext):
 
     await state.set_state(OrderSearchStates.waiting_for_query)
     await message.answer(
-        "🔍 <b>Buyurtma kodini (#MP-XXXXXX) yoki mijoz telefon raqamini kiriting:</b>",
+        "🔍 <b>Buyurtma kodini (#MP-XXXXXX), mijoz ismini, @username yoki telefon raqamini kiriting:</b>",
         reply_markup=get_cancel_menu(),
         parse_mode="HTML"
     )
@@ -214,26 +285,32 @@ async def search_order_start(message: Message, state: FSMContext):
 @router.message(OrderSearchStates.waiting_for_query, F.text)
 async def process_order_search(message: Message, state: FSMContext):
     """Qidiruv natijalarini ko'rsatish"""
+    if not await check_crm_access(message):
+        return
     query = message.text.replace('#', '').strip()
+    username_query = query.lstrip('@').strip()
     await state.clear()
 
+    search_filter = (
+        Q(order_id__icontains=query)
+        | Q(phone_number__icontains=query)
+        | Q(telegram_user__phone_number__icontains=query)
+        | Q(client_name__icontains=query)
+    )
+    if username_query:
+        search_filter |= Q(telegram_user__username__icontains=username_query)
+    if query.isdigit():
+        search_filter |= Q(telegram_user__telegram_id=int(query))
+
     orders = await sync_to_async(list)(
-        ServiceOrder.objects.filter(
-            order_id__icontains=query
-        ).select_related('phone', 'comparison', 'master')[:5]
+        ServiceOrder.objects.filter(search_filter)
+        .select_related('telegram_user', 'phone', 'comparison', 'comparison__issue', 'master')
+        .order_by('-created_at')[:5]
     )
 
     if not orders:
-        # Try search by phone number
-        orders = await sync_to_async(list)(
-            ServiceOrder.objects.filter(
-                phone_number__icontains=query
-            ).select_related('phone', 'comparison', 'master')[:5]
-        )
-
-    if not orders:
         await message.answer(
-            f"❌ <b>'{query}'</b> bo‘yicha hech qanday buyurtma topilmadi.",
+            f"❌ <b>'{html.escape(query)}'</b> bo‘yicha hech qanday buyurtma topilmadi.",
             reply_markup=get_crm_menu(),
             parse_mode="HTML"
         )
@@ -243,7 +320,7 @@ async def process_order_search(message: Message, state: FSMContext):
     for o in orders:
         text = format_order_card(o)
         kb = build_order_action_kb(o.id, o.status)
-        await message.answer(text, reply_markup=kb, parse_mode="HTML")
+        await message.answer(text, reply_markup=kb, parse_mode="HTML", disable_web_page_preview=True)
 
 
 # --- Callbacks: Status Updates & Master Assignment ---
@@ -258,7 +335,9 @@ async def process_crm_status_change(callback: CallbackQuery):
     new_status = parts[2]
 
     order = await sync_to_async(
-        ServiceOrder.objects.filter(id=order_id).select_related('phone', 'comparison', 'master').first
+        ServiceOrder.objects.filter(id=order_id)
+        .select_related('telegram_user', 'phone', 'comparison', 'comparison__issue', 'master')
+        .first
     )()
 
     if not order:
@@ -274,7 +353,12 @@ async def process_crm_status_change(callback: CallbackQuery):
     updated_kb = build_order_action_kb(order.id, order.status)
 
     try:
-        await callback.message.edit_text(updated_text, reply_markup=updated_kb, parse_mode="HTML")
+        await callback.message.edit_text(
+            updated_text,
+            reply_markup=updated_kb,
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+        )
     except Exception:
         pass
 
@@ -313,7 +397,9 @@ async def process_crm_set_master(callback: CallbackQuery):
     master_id = int(parts[2])
 
     order = await sync_to_async(
-        ServiceOrder.objects.filter(id=order_id).select_related('phone', 'comparison').first
+        ServiceOrder.objects.filter(id=order_id)
+        .select_related('telegram_user', 'phone', 'comparison', 'comparison__issue')
+        .first
     )()
     master = await sync_to_async(TeamMember.objects.filter(id=master_id).first)()
 
@@ -331,7 +417,12 @@ async def process_crm_set_master(callback: CallbackQuery):
     updated_kb = build_order_action_kb(order.id, order.status)
 
     try:
-        await callback.message.edit_text(updated_text, reply_markup=updated_kb, parse_mode="HTML")
+        await callback.message.edit_text(
+            updated_text,
+            reply_markup=updated_kb,
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+        )
     except Exception:
         pass
 
@@ -345,7 +436,9 @@ async def process_crm_refresh(callback: CallbackQuery):
         return
     order_id = int(callback.data.split(":")[1])
     order = await sync_to_async(
-        ServiceOrder.objects.filter(id=order_id).select_related('phone', 'comparison', 'master').first
+        ServiceOrder.objects.filter(id=order_id)
+        .select_related('telegram_user', 'phone', 'comparison', 'comparison__issue', 'master')
+        .first
     )()
     if order:
         kb = build_order_action_kb(order.id, order.status)

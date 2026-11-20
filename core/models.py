@@ -1,7 +1,30 @@
+import secrets
 import uuid
+from datetime import timedelta
 from django.db import models
+from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
+
+
+CYRILLIC_TO_LATIN = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo',
+    'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+    'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+    'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
+    'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+    'ў': 'o', 'қ': 'q', 'ғ': 'g', 'ҳ': 'h',
+}
+
+
+def make_safe_slug(value: str, max_len: int = 90) -> str:
+    """Kirill va maxsus belgilarni ham hisobga olib xavfsiz slug yaratish"""
+    raw = str(value or '').strip().lower()
+    transliterated = ''.join(CYRILLIC_TO_LATIN.get(ch, ch) for ch in raw)
+    res = slugify(transliterated)
+    if not res:
+        res = uuid.uuid4().hex[:8]
+    return res[:max_len]
 
 
 class Brand(models.Model):
@@ -17,8 +40,13 @@ class Brand(models.Model):
         ordering = ['order', 'name']
 
     def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(self.name) or str(uuid.uuid4())[:8]
+        base_slug = make_safe_slug(self.slug or self.name, max_len=90)
+        slug = base_slug
+        counter = 1
+        while Brand.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+        self.slug = slug
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -40,7 +68,10 @@ class DeviceSeries(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(f"{self.brand.slug}-{self.name}") or str(uuid.uuid4())[:8]
+            brand_part = self.brand.slug if self.brand_id and getattr(self, 'brand', None) else ''
+            self.slug = make_safe_slug(f"{brand_part}-{self.name}", max_len=140)
+        else:
+            self.slug = make_safe_slug(self.slug, max_len=140)
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -62,14 +93,13 @@ class DevicePhone(models.Model):
         ordering = ['order', 'name']
 
     def save(self, *args, **kwargs):
-        if not self.slug:
-            base_slug = slugify(self.name) or str(uuid.uuid4())[:8]
-            slug = base_slug
-            counter = 1
-            while DevicePhone.objects.filter(slug=slug).exclude(pk=self.pk).exists():
-                slug = f"{base_slug}-{counter}"
-                counter += 1
-            self.slug = slug
+        base_slug = make_safe_slug(self.slug or self.name, max_len=135)
+        slug = base_slug
+        counter = 1
+        while DevicePhone.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+        self.slug = slug
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -165,6 +195,14 @@ class RepairFAQ(models.Model):
 
 
 class Review(models.Model):
+    telegram_user = models.ForeignKey(
+        'TelegramUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviews',
+        verbose_name=_("Telegram foydalanuvchi"),
+    )
     client_name = models.CharField(_("Mijoz ismi"), max_length=100)
     device_model = models.CharField(_("Telefon modeli"), max_length=100)
     service_type = models.CharField(_("Qilingan ish"), max_length=100)
@@ -256,6 +294,7 @@ class BotAdmin(models.Model):
 
 class ServiceOrder(models.Model):
     STATUS_CHOICES = [
+        ('pending_location', _('Lokatsiya kutilmoqda')),
         ('new', _('Yangi ariza')),
         ('contacted', _('Bog‘lanildi')),
         ('in_progress', _('Ta’mirlanmoqda')),
@@ -265,20 +304,36 @@ class ServiceOrder(models.Model):
     ]
 
     SERVICE_CHOICES = [
-        ('in_service', _('Servis markaziga borish')),
-        ('call_master', _('Usta chaqirish (Manzilga)')),
-        ('courier', _('Kuryer orqali yuborish')),
+        ('in_service', _("O'zim boraman (Servis markaziga)")),
+        ('courier', _("Kuryer orqali olib ketish")),
     ]
 
     order_id = models.CharField(_("Buyurtma ID"), max_length=30, unique=True, editable=False)
+    telegram_user = models.ForeignKey(
+        'TelegramUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='orders',
+        verbose_name=_("Telegram foydalanuvchi"),
+    )
     client_name = models.CharField(_("Mijoz ismi"), max_length=100)
-    phone_number = models.CharField(_("Telefon raqami"), max_length=30)
+    phone_number = models.CharField(_("Telefon raqami"), max_length=30, blank=True, default='')
     phone = models.ForeignKey(DevicePhone, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Telefon"))
     comparison = models.ForeignKey(IssueComparison, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Tanlangan variant"))
 
     service_type = models.CharField(_("Xizmat turi"), max_length=50, choices=SERVICE_CHOICES, default='in_service')
     status = models.CharField(_("Holati"), max_length=50, choices=STATUS_CHOICES, default='new')
     master = models.ForeignKey(TeamMember, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Biriktirilgan usta"))
+
+    # Kuryer va lokatsiya maydonlari
+    courier_token = models.CharField(_("Kuryer tokeni"), max_length=64, unique=True, null=True, blank=True, db_index=True)
+    courier_token_expires_at = models.DateTimeField(_("Kuryer tokeni muddati"), null=True, blank=True)
+    latitude = models.FloatField(_("Kenglik (Latitude)"), null=True, blank=True)
+    longitude = models.FloatField(_("Uzunlik (Longitude)"), null=True, blank=True)
+    distance_km = models.DecimalField(_("Masofa (km)"), max_digits=6, decimal_places=2, null=True, blank=True)
+    delivery_fee_uzs = models.DecimalField(_("Kuryer narxi (so'm)"), max_digits=12, decimal_places=0, null=True, blank=True)
+    final_total_uzs = models.DecimalField(_("Yakuniy summa (so'm)"), max_digits=12, decimal_places=0, null=True, blank=True)
 
     notes = models.TextField(_("Mijoz izohi"), blank=True)
     admin_notes = models.TextField(_("Admin / Usta qaydlari"), blank=True)
@@ -292,8 +347,134 @@ class ServiceOrder(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.order_id:
-            self.order_id = f"MP-{uuid.uuid4().hex[:6].upper()}"
+            while True:
+                candidate = f"MP-{uuid.uuid4().hex[:6].upper()}"
+                if not ServiceOrder.objects.filter(order_id=candidate).exists():
+                    self.order_id = candidate
+                    break
         super().save(*args, **kwargs)
 
+    @property
+    def has_location(self) -> bool:
+        return self.latitude is not None and self.longitude is not None
+
+    @property
+    def client_google_maps_url(self) -> str:
+        if not self.has_location:
+            return ''
+        return f"https://www.google.com/maps/search/?api=1&query={self.latitude},{self.longitude}"
+
+    @property
+    def client_yandex_maps_url(self) -> str:
+        if not self.has_location:
+            return ''
+        return f"https://yandex.uz/maps/?pt={self.longitude},{self.latitude}&z=17&l=map"
+
     def __str__(self):
-        return f"{self.order_id} - {self.client_name} ({self.phone_number})"
+        contact = ''
+        if self.telegram_user_id and self.telegram_user:
+            contact = self.telegram_user.display_handle
+        elif self.phone_number:
+            contact = self.phone_number
+        base = f"{self.order_id} - {self.client_name}"
+        if contact:
+            base = f"{base} ({contact})"
+        if self.final_total_uzs is not None:
+            return f"{base} — {int(self.final_total_uzs):,} so'm"
+        return base
+
+
+class TelegramUser(models.Model):
+    """Saytga faqat Telegram orqali (read-only) kirgan foydalanuvchilar"""
+    telegram_id = models.BigIntegerField(_("Telegram ID"), unique=True, db_index=True)
+    first_name = models.CharField(_("Ism"), max_length=150, blank=True)
+    last_name = models.CharField(_("Familiya"), max_length=150, blank=True)
+    username = models.CharField(_("Username"), max_length=150, blank=True, db_index=True)
+    phone_number = models.CharField(_("Telefon raqami"), max_length=32, blank=True, default='', db_index=True)
+    photo_url = models.URLField(_("Avatar havolasi"), max_length=500, blank=True)
+    created_at = models.DateTimeField(_("Ro'yxatdan o'tgan vaqt"), auto_now_add=True)
+    updated_at = models.DateTimeField(_("Yangilangan vaqt"), auto_now=True)
+
+    class Meta:
+        verbose_name = _("Telegram foydalanuvchi")
+        verbose_name_plural = _("Telegram foydalanuvchilar")
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"{self.full_name} ({self.display_handle})"
+
+    @property
+    def full_name(self) -> str:
+        combined = f"{self.first_name} {self.last_name}".strip()
+        if combined:
+            return combined
+        if self.username:
+            return f"@{self.username}"
+        return f"Telegram #{self.telegram_id}"
+
+    @property
+    def display_handle(self) -> str:
+        if self.username:
+            return f"@{self.username}"
+        return f"ID: {self.telegram_id}"
+
+    @property
+    def tg_profile_url(self) -> str:
+        if self.username:
+            return f"https://t.me/{self.username}"
+        return f"tg://user?id={self.telegram_id}"
+
+    @property
+    def initials(self) -> str:
+        first = (self.first_name or '').strip()
+        last = (self.last_name or '').strip()
+        if first and last:
+            return (first[0] + last[0]).upper()
+        if first:
+            words = first.split()
+            if len(words) >= 2:
+                return (words[0][0] + words[1][0]).upper()
+            return first[:2].upper()
+        if self.username:
+            return self.username[:2].upper()
+        return "TG"
+
+
+class AuthToken(models.Model):
+    """Telegram Bot Deep-Link orqali bir martalik autentifikatsiya tokeni"""
+    token = models.CharField(_("Token"), max_length=64, unique=True, db_index=True)
+    session_key = models.CharField(_("Sessiya kaliti"), max_length=64, blank=True, db_index=True)
+    expected_telegram_id = models.BigIntegerField(_("Kutilayotgan Telegram ID"), null=True, blank=True, db_index=True)
+    telegram_user = models.ForeignKey(
+        TelegramUser,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='auth_tokens',
+        verbose_name=_("Telegram foydalanuvchi"),
+    )
+    is_confirmed = models.BooleanField(_("Botda tasdiqlangan"), default=False)
+    is_used = models.BooleanField(_("Ishlatilgan"), default=False)
+    rejected_reason = models.CharField(_("Rad etilish sababi"), max_length=64, blank=True, default='')
+    created_at = models.DateTimeField(_("Yaratilgan vaqt"), auto_now_add=True)
+    expires_at = models.DateTimeField(_("Amal qilish muddati"))
+
+    class Meta:
+        verbose_name = _("Auth token")
+        verbose_name_plural = _("Auth tokenlar")
+        ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if not self.token:
+            self.token = secrets.token_urlsafe(24)
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(minutes=5)
+        super().save(*args, **kwargs)
+
+    @property
+    def is_expired(self) -> bool:
+        return timezone.now() >= self.expires_at
+
+    def __str__(self):
+        return f"AuthToken({self.token[:8]}... | confirmed={self.is_confirmed}, used={self.is_used})"
+

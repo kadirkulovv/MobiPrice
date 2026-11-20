@@ -1,35 +1,160 @@
-<div id="order-modal" class="modal-overlay">
+{% load static i18n %}
+<div id="order-modal" class="modal-overlay" aria-hidden="true">
   <div class="modal-content">
-    <button id="modal-close" class="modal-close">&times;</button>
-    <h3 class="modal-title">{{ t.modal_title }}</h3>
+    <button type="button" id="modal-close" class="modal-close" aria-label="{% trans 'Close' %}">&times;</button>
+    <h3 class="modal-title" id="order-modal-title">{{ t.modal_title }}</h3>
     <p id="modal-model-detail" class="modal-desc">-</p>
 
-    <div id="modal-alert" class="hidden" style="padding: 10px; margin-bottom: 15px; border-radius: var(--radius-sm); background: rgba(239, 68, 68, 0.2); color: var(--neon-red); font-size: 13px;"></div>
+    <div id="modal-alert" class="modal-alert hidden"></div>
 
     <form id="order-form">
       {% csrf_token %}
-      <div class="form-group">
-        <label class="form-label" for="client-name">{{ t.name_label }}</label>
-        <input type="text" id="client-name" class="form-control" placeholder="Masalan: Sardor" required>
-      </div>
 
-      <div class="form-group">
-        <label class="form-label" for="phone-number">{{ t.phone_label }}</label>
-        <input type="tel" id="phone-number" class="form-control" placeholder="+998 90 919 76 00" required>
+      <!-- Authenticated Telegram Profile (Read-Only) -->
+      <div class="modal-tg-profile modal-tg-profile-order" aria-label="{% trans 'Telegram profili' %}">
+        <div class="auth-avatar auth-avatar-md">
+          <img class="auth-avatar-img{% if not tg_user or not tg_user.photo_url %} hidden{% endif %}" {% if tg_user and tg_user.photo_url %}src="{{ tg_user.photo_url }}"{% endif %} alt="{{ tg_user.full_name|default:'Telegram' }}">
+          <span class="auth-avatar-initials{% if tg_user and tg_user.photo_url %} hidden{% endif %}" data-auth-initials>{{ tg_user.initials|default:'TG' }}</span>
+        </div>
+        <div class="modal-tg-profile-meta">
+          <span class="modal-tg-profile-label">{% trans "Telegram profili" %}</span>
+          <div class="modal-tg-profile-name" data-auth-name>{{ tg_user.full_name|default:'' }}</div>
+          <div class="modal-tg-profile-handle" data-auth-handle>{{ tg_user.display_handle|default:'' }}</div>
+          <div class="modal-tg-profile-phone{% if not tg_user or not tg_user.phone_number %} hidden{% endif %}" data-auth-phone>{% if tg_user and tg_user.phone_number %}{{ tg_user.phone_number }}{% endif %}</div>
+        </div>
+        <span class="modal-tg-verified-badge" aria-hidden="true">✓</span>
       </div>
 
       <div class="form-group">
         <label class="form-label" for="service-type">{{ t.format_label }}</label>
-        <select id="service-type" class="form-control" style="background: #131a2a;">
+        <select id="service-type" class="form-control form-select">
           <option value="in_service">{{ t.format_opt_1 }}</option>
-          <option value="call_master">{{ t.format_opt_2 }}</option>
-          <option value="courier">{{ t.format_opt_3 }}</option>
+          <option value="courier">{{ t.format_opt_2 }}</option>
         </select>
       </div>
 
-      <button type="submit" class="btn-book" style="margin-top: 10px;">
+      <button type="submit" class="btn-book">
         {{ t.btn_submit }}
       </button>
     </form>
+
+    <!-- Result State 1: Visit Service Center (Malika bozor, B32 do'kon) -->
+    <div id="order-result-in-service" class="order-result-panel hidden" aria-live="polite">
+      <div class="order-result-head">
+        <div class="order-result-badge order-result-badge-success" aria-hidden="true">✓</div>
+        <div class="order-result-head-copy">
+          <div class="order-result-title" id="order-service-title">{% trans "Buyurtmangiz qabul qilindi!" %}</div>
+          <div class="order-result-id-row">
+            <span class="order-id-pill" id="order-service-id">#MP-000000</span>
+            <button type="button" id="btn-track-service-order" class="order-track-btn">
+              {% trans "Holatni kuzatish →" %}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <p class="order-result-note" id="order-service-message">
+        {% trans "Arizangiz ustalarimizga yuborildi. Quyidagi manzil orqali servis markazimizga kelishingiz mumkin:" %}
+      </p>
+
+      <div class="order-location-card">
+        <div class="order-location-top">
+          <span class="order-location-pin" aria-hidden="true">📍</span>
+          <div class="order-location-meta">
+            <span class="order-location-label">{% trans "Servis markazi manzili" %}</span>
+            <strong class="order-location-address" id="order-shop-address">{{ shop_info.address }}</strong>
+            <span class="order-location-hours">{% trans "Ish vaqti: 09:00 – 21:00 (har kuni)" %}</span>
+          </div>
+        </div>
+
+        <div class="order-map-actions">
+          <a
+            id="order-shop-google-maps"
+            href="{{ shop_info.google_maps_url }}"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn-map-link btn-map-google"
+          >
+            <svg class="map-link-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+            <span>Google Maps</span>
+          </a>
+          <a
+            id="order-shop-yandex-maps"
+            href="{{ shop_info.yandex_maps_url }}"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn-map-link btn-map-yandex"
+          >
+            <svg class="map-link-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+              <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+            </svg>
+            <span>Yandex Maps</span>
+          </a>
+        </div>
+      </div>
+
+      <button type="button" class="btn-order-done" data-order-close>
+        {% trans "Yopish" %}
+      </button>
+    </div>
+
+    <!-- Result State 2: Courier Pickup (Send Location via Telegram Bot) -->
+    <div id="order-result-courier" class="order-result-panel hidden" aria-live="polite">
+      <div class="order-result-head">
+        <div class="order-result-badge order-result-badge-telegram" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+          </svg>
+        </div>
+        <div class="order-result-head-copy">
+          <div class="order-result-title" id="order-courier-title">{% trans "Lokatsiyani botga yuboring" %}</div>
+          <div class="order-result-id-row">
+            <span class="order-id-pill" id="order-courier-id">#MP-000000</span>
+            <button type="button" id="btn-track-courier-order" class="order-track-btn">
+              {% trans "Holatni kuzatish →" %}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <p class="order-result-note" id="order-courier-message">
+        {% trans "Kuryer narxini masofa asosida aniq hisoblash va buyurtmani tasdiqlash uchun Telegram botga o'tib lokatsiyangizni yuboring." %}
+      </p>
+
+      <div class="order-courier-card">
+        <div class="order-courier-steps">
+          <div class="order-courier-step">
+            <span class="courier-step-num">1</span>
+            <span>{% trans "Pastdagi tugmani bosib Telegram botni oching" %}</span>
+          </div>
+          <div class="order-courier-step">
+            <span class="courier-step-num">2</span>
+            <span>{% trans "Botda Start bosing va lokatsiyangizni yuboring" %}</span>
+          </div>
+          <div class="order-courier-step">
+            <span class="courier-step-num">3</span>
+            <span>{% trans "Kuryer narxi va jami chek darhol hisoblanadi" %}</span>
+          </div>
+        </div>
+
+        <a
+          id="order-courier-bot-link"
+          href="#"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn-courier-bot"
+        >
+          <span class="courier-bot-pin" aria-hidden="true">📍</span>
+          <span id="order-courier-bot-label">{% trans "Botga o'tib lokatsiya yuborish" %}</span>
+        </a>
+      </div>
+
+      <button type="button" class="btn-order-done" data-order-close>
+        {% trans "Yopish" %}
+      </button>
+    </div>
   </div>
 </div>

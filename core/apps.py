@@ -21,10 +21,10 @@ class CoreConfig(AppConfig):
     def ready(self):
         connection_created.connect(activate_sqlite_wal)
 
-        # Invalidate API memory cache when catalog data changes
+        # Invalidate API cache when catalog data changes
         from django.db.models.signals import post_save, post_delete
         from django.core.cache import cache
-        from .models import Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison
+        from .models import Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison, RepairFAQ, Review, TeamMember
 
         def clear_catalog_cache(sender, **kwargs):
             try:
@@ -32,7 +32,7 @@ class CoreConfig(AppConfig):
             except Exception:
                 pass
 
-        for model in (Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison):
+        for model in (Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison, RepairFAQ, Review, TeamMember):
             post_save.connect(clear_catalog_cache, sender=model)
             post_delete.connect(clear_catalog_cache, sender=model)
 

@@ -1,6 +1,10 @@
-<section class="container" style="padding-bottom: 60px;">
+{% load static i18n %}
+<section class="container reviews-section" id="reviews">
   <div class="reviews-section-header">
-    <div class="section-header" style="text-align: left; margin-bottom: 0;">
+    <div class="section-header reviews-header-text">
+      <div class="section-badge">
+        <span>★ 4.9 / 5.0</span> {% if current_lang == 'ru' %}ПРОВЕРЕННЫЕ ОТЗЫВЫ{% elif current_lang == 'en' %}VERIFIED FEEDBACK{% else %}TASDIQLANGAN SHARHLAR{% endif %}
+      </div>
       <h2>{{ t.reviews_title|safe }}</h2>
       <p>{{ t.reviews_sub }}</p>
     </div>
@@ -30,4 +34,3 @@
     {% endfor %}
   </div>
 </section>
-

@@ -1,0 +1,86 @@
+/* ==========================================================================
+   MobiPrice — Precision Tech-Lab FAQ Accordion Section
+   ========================================================================== */
+
+.faq-section {
+  padding: 28px 0 36px;
+}
+
+.faq-list {
+  max-width: 860px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.faq-item {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: var(--transition);
+}
+
+.faq-item:hover {
+  border-color: rgba(0, 242, 254, 0.28);
+}
+
+.faq-question {
+  min-height: 52px;
+  padding: 15px 18px;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  user-select: none;
+  color: var(--text-main);
+  transition: var(--transition);
+}
+
+.faq-question:hover {
+  color: var(--neon-cyan);
+}
+
+.faq-arrow {
+  font-size: 18px;
+  color: var(--neon-cyan);
+  transition: transform 0.22s ease;
+  flex-shrink: 0;
+}
+
+.faq-item.open .faq-arrow {
+  transform: rotate(180deg);
+}
+
+.faq-answer {
+  padding: 0 18px 16px;
+  color: var(--text-sub);
+  font-size: 14px;
+  line-height: 1.6;
+  display: none;
+}
+
+.faq-item.open .faq-answer {
+  display: block;
+}
+
+.faq-item.open {
+  border-color: rgba(0, 242, 254, 0.38);
+  background: var(--bg-surface-elevated);
+}
+
+@media (max-width: 640px) {
+  .faq-question {
+    padding: 14px;
+    font-size: 14px;
+  }
+
+  .faq-answer {
+    padding: 0 14px 14px;
+    font-size: 13.5px;
+  }
+}

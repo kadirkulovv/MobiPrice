@@ -1,18 +1,22 @@
 import os
+import html
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, PhotoSize, Document
 from aiogram.fsm.context import FSMContext
 from bot.keyboards.main_menu import get_section_crud_menu, get_cancel_menu
 from bot.keyboards.common import build_3_row_reply_kb, build_3_row_inline_kb
 from bot.states.admin_states import PhoneAddStates, PhoneEditStates
-from bot.database import Brand, DeviceSeries, DevicePhone, sync_to_async
+from bot.database import Brand, DeviceSeries, DevicePhone, make_safe_slug, sync_to_async
 from bot.config import MEDIA_PHONES_DIR
+from bot.handlers.start import require_site_admin
 
 router = Router()
 
 
 @router.message(F.text == "📱 Telefonlar")
 async def phones_menu(message: Message, state: FSMContext):
+    if not await require_site_admin(message):
+        return
     await state.clear()
     await message.answer(
         "📱 <b>Telefonlar bo‘limi</b>\n\n"
@@ -25,6 +29,8 @@ async def phones_menu(message: Message, state: FSMContext):
 
 @router.message(F.text == "📋 Telefon ro‘yxati")
 async def list_phones(message: Message):
+    if not await require_site_admin(message):
+        return
     phones = await sync_to_async(list)(
         DevicePhone.objects.select_related('series', 'series__brand').all().order_by('series__brand__name', 'name')
     )
@@ -39,15 +45,17 @@ async def list_phones(message: Message):
         brand_name = p.series.brand.name
         if brand_name != current_brand:
             current_brand = brand_name
-            text += f"\n🏷 <b>{current_brand}:</b>\n"
+            text += f"\n🏷 <b>{html.escape(current_brand)}:</b>\n"
         img_status = "🖼 Rasm bor" if p.image else "❌ Rasmsiz"
-        text += f"  • <b>{p.name}</b> ({p.series.name}) — {img_status}\n"
+        text += f"  • <b>{html.escape(p.name)}</b> ({html.escape(p.series.name)}) — {img_status}\n"
 
     await message.answer(text, parse_mode="HTML")
 
 
 @router.message(F.text == "➕ Yangi Telefon qo‘shish")
 async def add_phone_start(message: Message, state: FSMContext):
+    if not await require_site_admin(message):
+        return
     brands = await sync_to_async(list)(Brand.objects.filter(is_active=True).order_by('name'))
     if not brands:
         await message.answer("Avval brend qo‘shishingiz kerak!")
@@ -67,6 +75,8 @@ async def add_phone_start(message: Message, state: FSMContext):
 
 @router.message(PhoneAddStates.waiting_for_brand, F.text)
 async def process_phone_brand(message: Message, state: FSMContext):
+    if not await require_site_admin(message):
+        return
     brand_name = message.text.strip()
     try:
         brand = await sync_to_async(Brand.objects.get)(name__iexact=brand_name)
@@ -91,7 +101,7 @@ async def process_phone_brand(message: Message, state: FSMContext):
     kb = build_3_row_reply_kb(series_names, add_cancel=True)
 
     await message.answer(
-        f"2️⃣ <b>'{brand.name}' brendining qaysi model seriyasiga ulanadi?</b>\n"
+        f"2️⃣ <b>'{html.escape(brand.name)}' brendining qaysi model seriyasiga ulanadi?</b>\n"
         f"Quyidagi seriyalardan birini tanlang:",
         reply_markup=kb,
         parse_mode="HTML"
@@ -100,6 +110,8 @@ async def process_phone_brand(message: Message, state: FSMContext):
 
 @router.message(PhoneAddStates.waiting_for_series, F.text)
 async def process_phone_series(message: Message, state: FSMContext):
+    if not await require_site_admin(message):
+        return
     series_name = message.text.strip()
     data = await state.get_data()
     brand_id = data.get('brand_id')
@@ -114,7 +126,7 @@ async def process_phone_series(message: Message, state: FSMContext):
     await state.set_state(PhoneAddStates.waiting_for_name)
 
     await message.answer(
-        f"✅ Tanlandi: <b>{data.get('brand_name')} → {series.name}</b>\n\n"
+        f"✅ Tanlandi: <b>{html.escape(data.get('brand_name', ''))} → {html.escape(series.name)}</b>\n\n"
         f"3️⃣ <b>Aniq telefon nomini kiriting:</b>\n"
         f"<i>(Masalan: iPhone 16 Pro Max, Galaxy S24 Ultra, Redmi Note 13 Pro...)</i>",
         reply_markup=get_cancel_menu(),
@@ -124,6 +136,8 @@ async def process_phone_series(message: Message, state: FSMContext):
 
 @router.message(PhoneAddStates.waiting_for_name, F.text)
 async def process_phone_name(message: Message, state: FSMContext):
+    if not await require_site_admin(message):
+        return
     phone_name = message.text.strip()
     if len(phone_name) < 2:
         await message.answer("Nom juda qisqa. Qaytadan kiriting:")
@@ -133,7 +147,7 @@ async def process_phone_name(message: Message, state: FSMContext):
     await state.set_state(PhoneAddStates.waiting_for_image)
 
     await message.answer(
-        f"✅ Telefon nomi: <b>{phone_name}</b>\n\n"
+        f"✅ Telefon nomi: <b>{html.escape(phone_name)}</b>\n\n"
         f"4️⃣ <b>Telefon rasmini yuboring (JPG yoki PNG):</b>\n"
         f"<i>(Rasm yoki fotosurat sifatida yuborishingiz mumkin)</i>",
         reply_markup=get_cancel_menu(),
@@ -162,6 +176,8 @@ def _save_or_update_phone(series_id, phone_name, rel_image_path):
 
 @router.message(PhoneAddStates.waiting_for_image, F.photo)
 async def process_phone_image_photo(message: Message, state: FSMContext, bot: Bot):
+    if not await require_site_admin(message):
+        return
     try:
         photo: PhotoSize = message.photo[-1]
         data = await state.get_data()
@@ -171,8 +187,7 @@ async def process_phone_image_photo(message: Message, state: FSMContext, bot: Bo
         phone_name = data.get('phone_name', 'Telefon')
 
         file = await bot.get_file(photo.file_id)
-        from django.utils.text import slugify
-        safe_slug = slugify(phone_name).replace('-', '_')
+        safe_slug = make_safe_slug(phone_name).replace('-', '_')
         save_filename = f"{safe_slug}.jpg"
         dest_path = MEDIA_PHONES_DIR / save_filename
 
@@ -187,10 +202,10 @@ async def process_phone_image_photo(message: Message, state: FSMContext, bot: Bo
         await state.clear()
         await message.answer(
             f"🎉 <b>Telefon rasmi muvaffaqiyatli saqlandi!</b>\n\n"
-            f"📱 Nomi: <b>{phone.name}</b>\n"
-            f"📂 Seriya: <b>{display_series}</b>\n"
-            f"🏷 Brend: <b>{display_brand}</b>\n"
-            f"🖼 Rasm fayli: <code>{save_filename}</code>",
+            f"📱 Nomi: <b>{html.escape(phone.name)}</b>\n"
+            f"📂 Seriya: <b>{html.escape(display_series)}</b>\n"
+            f"🏷 Brend: <b>{html.escape(display_brand)}</b>\n"
+            f"🖼 Rasm fayli: <code>{html.escape(save_filename)}</code>",
             reply_markup=get_section_crud_menu("Telefon"),
             parse_mode="HTML"
         )
@@ -206,9 +221,11 @@ async def process_phone_image_photo(message: Message, state: FSMContext, bot: Bo
 
 @router.message(PhoneAddStates.waiting_for_image, F.document)
 async def process_phone_image_doc(message: Message, state: FSMContext, bot: Bot):
+    if not await require_site_admin(message):
+        return
     try:
         doc: Document = message.document
-        if not doc.file_name.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
+        if not (doc.file_name or '').lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
             await message.answer("⚠️ Iltimos faqat JPG, PNG yoki WEBP formatdagi rasm yuboring:")
             return
 
@@ -220,8 +237,7 @@ async def process_phone_image_doc(message: Message, state: FSMContext, bot: Bot)
 
         file = await bot.get_file(doc.file_id)
         ext = os.path.splitext(doc.file_name)[1].lower() or '.jpg'
-        from django.utils.text import slugify
-        safe_slug = slugify(phone_name).replace('-', '_')
+        safe_slug = make_safe_slug(phone_name).replace('-', '_')
         save_filename = f"{safe_slug}{ext}"
         dest_path = MEDIA_PHONES_DIR / save_filename
 
@@ -236,10 +252,10 @@ async def process_phone_image_doc(message: Message, state: FSMContext, bot: Bot)
         await state.clear()
         await message.answer(
             f"🎉 <b>Telefon rasmi muvaffaqiyatli saqlandi!</b>\n\n"
-            f"📱 Nomi: <b>{phone.name}</b>\n"
-            f"📂 Seriya: <b>{display_series}</b>\n"
-            f"🏷 Brend: <b>{display_brand}</b>\n"
-            f"🖼 Rasm fayli: <code>{save_filename}</code>",
+            f"📱 Nomi: <b>{html.escape(phone.name)}</b>\n"
+            f"📂 Seriya: <b>{html.escape(display_series)}</b>\n"
+            f"🏷 Brend: <b>{html.escape(display_brand)}</b>\n"
+            f"🖼 Rasm fayli: <code>{html.escape(save_filename)}</code>",
             reply_markup=get_section_crud_menu("Telefon"),
             parse_mode="HTML"
         )
@@ -255,6 +271,8 @@ async def process_phone_image_doc(message: Message, state: FSMContext, bot: Bot)
 
 @router.message(PhoneAddStates.waiting_for_image)
 async def process_phone_image_invalid(message: Message):
+    if not await require_site_admin(message):
+        return
     await message.answer(
         "⚠️ Iltimos, telefon rasmini fotosurat yoki fayl (JPG/PNG) sifatida yuboring:\n"
         "(Yoki '❌ Bekor qilish' tugmasini bosing)",
@@ -264,6 +282,8 @@ async def process_phone_image_invalid(message: Message):
 
 @router.message(F.text == "🗑 Telefon o‘chirish")
 async def delete_phone_start(message: Message):
+    if not await require_site_admin(message):
+        return
     phones = await sync_to_async(list)(DevicePhone.objects.select_related('series', 'series__brand').all().order_by('name'))
     if not phones:
         await message.answer("O‘chirish uchun telefonlar mavjud emas.")
@@ -282,12 +302,14 @@ async def delete_phone_start(message: Message):
 
 @router.callback_query(F.data.startswith("del_phone_"))
 async def process_delete_phone(call: CallbackQuery):
+    if not await require_site_admin(call):
+        return
     phone_id = int(call.data.replace("del_phone_", ""))
     try:
         phone = await sync_to_async(DevicePhone.objects.select_related('series', 'series__brand').get)(id=phone_id)
         name = phone.name
         await sync_to_async(phone.delete)()
-        await call.message.edit_text(f"✅ <b>{name}</b> telefoni muvaffaqiyatli o‘chirildi!", parse_mode="HTML")
+        await call.message.edit_text(f"✅ <b>{html.escape(name)}</b> telefoni muvaffaqiyatli o‘chirildi!", parse_mode="HTML")
     except Exception as e:
         await call.message.edit_text(f"Xatolik: {e}")
     await call.answer()
@@ -295,6 +317,8 @@ async def process_delete_phone(call: CallbackQuery):
 
 @router.message(F.text == "✏️ Telefon tahrirlash")
 async def edit_phone_start(message: Message):
+    if not await require_site_admin(message):
+        return
     phones = await sync_to_async(list)(DevicePhone.objects.select_related('series', 'series__brand').all().order_by('name'))
     if not phones:
         await message.answer("Tahrirlash uchun telefonlar mavjud emas.")
@@ -312,6 +336,8 @@ async def edit_phone_start(message: Message):
 
 @router.callback_query(F.data.startswith("edit_phone_"))
 async def process_select_phone_for_edit(call: CallbackQuery, state: FSMContext):
+    if not await require_site_admin(call):
+        return
     phone_id = int(call.data.replace("edit_phone_", ""))
     try:
         phone = await sync_to_async(DevicePhone.objects.select_related('series', 'series__brand').get)(id=phone_id)
@@ -319,7 +345,7 @@ async def process_select_phone_for_edit(call: CallbackQuery, state: FSMContext):
         await state.set_state(PhoneEditStates.waiting_for_new_data)
 
         await call.message.edit_text(
-            f"✏️ <b>'{phone.name}' telefonini tahrirlash</b>\n\n"
+            f"✏️ <b>'{html.escape(phone.name)}' telefonini tahrirlash</b>\n\n"
             f"Yangi nomini matn sifatida yozing (yoki yangi rasmini JPG/PNG sifatida yuboring):",
             parse_mode="HTML"
         )
@@ -330,6 +356,8 @@ async def process_select_phone_for_edit(call: CallbackQuery, state: FSMContext):
 
 @router.message(PhoneEditStates.waiting_for_new_data, F.text)
 async def process_edit_phone_name(message: Message, state: FSMContext):
+    if not await require_site_admin(message):
+        return
     new_name = message.text.strip()
     if len(new_name) < 2:
         await message.answer("Nom juda qisqa. Qaytadan kiriting:")
@@ -342,15 +370,14 @@ async def process_edit_phone_name(message: Message, state: FSMContext):
         phone = await sync_to_async(DevicePhone.objects.get)(id=phone_id)
         old_name = phone.name
         phone.name = new_name
-        from django.utils.text import slugify
-        phone.slug = slugify(new_name)
+        phone.slug = ""
         await sync_to_async(phone.save)()
 
         await state.clear()
         await message.answer(
             f"✅ <b>Telefon nomi yangilandi!</b>\n\n"
-            f"Eski: <i>{old_name}</i>\n"
-            f"Yangi: <b>{new_name}</b>",
+            f"Eski: <i>{html.escape(old_name)}</i>\n"
+            f"Yangi: <b>{html.escape(new_name)}</b>",
             reply_markup=get_section_crud_menu("Telefon"),
             parse_mode="HTML"
         )
@@ -360,6 +387,8 @@ async def process_edit_phone_name(message: Message, state: FSMContext):
 
 @router.message(PhoneEditStates.waiting_for_new_data, F.photo)
 async def process_edit_phone_photo(message: Message, state: FSMContext, bot: Bot):
+    if not await require_site_admin(message):
+        return
     photo: PhotoSize = message.photo[-1]
     data = await state.get_data()
     phone_id = data.get('edit_phone_id')
@@ -376,7 +405,7 @@ async def process_edit_phone_photo(message: Message, state: FSMContext, bot: Bot
 
         await state.clear()
         await message.answer(
-            f"✅ <b>'{phone.name}' rasmi muvaffaqiyatli yangilandi!</b>",
+            f"✅ <b>'{html.escape(phone.name)}' rasmi muvaffaqiyatli yangilandi!</b>",
             reply_markup=get_section_crud_menu("Telefon"),
             parse_mode="HTML"
         )
@@ -386,8 +415,10 @@ async def process_edit_phone_photo(message: Message, state: FSMContext, bot: Bot
 
 @router.message(PhoneEditStates.waiting_for_new_data, F.document)
 async def process_edit_phone_doc(message: Message, state: FSMContext, bot: Bot):
+    if not await require_site_admin(message):
+        return
     doc: Document = message.document
-    if not doc.file_name.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
+    if not (doc.file_name or '').lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
         await message.answer("⚠️ Iltimos faqat JPG yoki PNG formatdagi rasm yuboring:")
         return
 
@@ -407,7 +438,7 @@ async def process_edit_phone_doc(message: Message, state: FSMContext, bot: Bot):
 
         await state.clear()
         await message.answer(
-            f"✅ <b>'{phone.name}' rasmi muvaffaqiyatli yangilandi!</b>",
+            f"✅ <b>'{html.escape(phone.name)}' rasmi muvaffaqiyatli yangilandi!</b>",
             reply_markup=get_section_crud_menu("Telefon"),
             parse_mode="HTML"
         )

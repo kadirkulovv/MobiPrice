@@ -1,51 +1,46 @@
 /* ==========================================================================
-   MobiPrice — Team Section Styles
+   MobiPrice — Precision Tech-Lab Team / Master Technicians Section
    ========================================================================== */
 
 .team-section {
-  padding: 60px 0 40px;
+  padding: 28px 0 36px;
 }
 
 .team-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 340px));
   justify-content: center;
-  gap: 28px;
-  margin-top: 36px;
+  gap: 20px;
 }
 
 .team-card {
-  background: var(--bg-card);
+  width: 100%;
+  background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: var(--transition);
   position: relative;
   display: flex;
   flex-direction: column;
-  width: 360px;
-  max-width: 360px;
-  flex: 0 0 360px;
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-card);
+  transition: var(--transition);
 }
 
 .team-card:hover {
   border-color: var(--neon-cyan);
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 242, 254, 0.2);
-  transform: translateY(-5px);
+  transform: translateY(-4px);
 }
 
 .team-photo-wrap {
   width: 100%;
-  height: 360px;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 4 / 3;
   position: relative;
-  background: radial-gradient(circle at center, rgba(0, 242, 254, 0.12), #080b11 75%);
+  background: radial-gradient(circle at center, rgba(0, 242, 254, 0.14), #060911 75%);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .team-photo {
@@ -53,11 +48,11 @@
   height: 100%;
   object-fit: cover;
   object-position: center 15%;
-  transition: transform 0.4s ease;
+  transition: transform 0.35s ease;
 }
 
 .team-card:hover .team-photo {
-  transform: scale(1.05);
+  transform: scale(1.04);
 }
 
 .team-avatar-placeholder {
@@ -71,46 +66,42 @@
 }
 
 .avatar-circle {
-  width: 110px;
-  height: 110px;
+  width: 88px;
+  height: 88px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.04);
-  border: 2px dashed rgba(0, 242, 254, 0.4);
+  border: 1.5px dashed rgba(0, 242, 254, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 50px;
-  box-shadow: 0 0 25px rgba(0, 242, 254, 0.15);
-  animation: floatAvatar 3s ease-in-out infinite alternate;
-}
-
-@keyframes floatAvatar {
-  0% { transform: translateY(0); }
-  100% { transform: translateY(-6px); }
+  font-size: 40px;
 }
 
 .avatar-brand-badge {
   position: absolute;
-  bottom: 24px;
+  bottom: 16px;
   background: linear-gradient(135deg, var(--neon-cyan), var(--neon-blue));
-  color: #080b11;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 1px;
-  padding: 3px 12px;
+  color: #060911;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  padding: 2px 10px;
   border-radius: var(--radius-full);
 }
 
 .team-exp-badge {
   position: absolute;
-  top: 14px;
-  right: 14px;
-  background: rgba(14, 19, 31, 0.85);
-  border: 1px solid rgba(0, 242, 254, 0.4);
+  top: 12px;
+  right: 12px;
+  background: rgba(9, 13, 22, 0.9);
+  border: 1px solid rgba(0, 242, 254, 0.35);
   backdrop-filter: blur(8px);
-  color: #fff;
+  -webkit-backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
   padding: 4px 10px;
   border-radius: var(--radius-full);
   display: flex;
@@ -119,51 +110,43 @@
 }
 
 .team-info {
-  padding: 20px 22px 24px;
+  padding: 16px 18px 20px;
   display: flex;
   flex-direction: column;
   flex: 1;
 }
 
 .team-name {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 800;
-  color: #fff;
-  margin: 0 0 8px;
+  color: #ffffff;
+  margin-bottom: 6px;
 }
 
 .team-role-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(0, 242, 254, 0.1);
+  background: rgba(0, 242, 254, 0.08);
   color: var(--neon-cyan);
   border: 1px solid rgba(0, 242, 254, 0.25);
-  padding: 4px 12px;
+  padding: 3px 10px;
   border-radius: var(--radius-full);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
   width: fit-content;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .team-quote {
   font-size: 13px;
-  color: var(--text-dim);
+  color: var(--text-sub);
   line-height: 1.5;
-  margin: 0;
   margin-top: auto;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 599px) {
   .team-grid {
-    gap: 20px;
-  }
-  .team-card {
-    max-width: 340px;
-  }
-  .team-photo-wrap {
-    aspect-ratio: 1 / 1;
-    min-height: 280px;
+    grid-template-columns: minmax(0, 1fr);
   }
 }

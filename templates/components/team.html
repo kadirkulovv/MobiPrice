@@ -1,73 +1,6 @@
-<style>
-.team-grid {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  justify-content: center !important;
-  align-items: stretch !important;
-  gap: 28px !important;
-  margin-top: 36px !important;
-}
-
-.team-card {
-  width: 360px !important;
-  max-width: 360px !important;
-  flex: 0 0 360px !important;
-  background: #0f172a !important;
-  border: 1px solid rgba(0, 242, 254, 0.25) !important;
-  border-radius: 24px !important;
-  overflow: hidden !important;
-  display: flex !important;
-  flex-direction: column !important;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 25px rgba(0, 242, 254, 0.1) !important;
-  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease !important;
-}
-
-.team-card:hover {
-  border-color: #00f2fe !important;
-  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.7), 0 0 35px rgba(0, 242, 254, 0.25) !important;
-  transform: translateY(-6px) !important;
-}
-
-.team-photo-wrap {
-  width: 100% !important;
-  height: 360px !important;
-  aspect-ratio: 1 / 1 !important;
-  position: relative !important;
-  background: radial-gradient(circle at center, rgba(0, 242, 254, 0.18), #080b11 75%) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  overflow: hidden !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-}
-
-.team-photo {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  object-position: center 15% !important;
-  display: block !important;
-  transition: transform 0.4s ease !important;
-}
-
-.team-card:hover .team-photo {
-  transform: scale(1.04) !important;
-}
-
-@media (max-width: 480px) {
-  .team-card {
-    width: 100% !important;
-    max-width: 330px !important;
-    flex: 0 0 100% !important;
-  }
-  .team-photo-wrap {
-    height: 330px !important;
-  }
-}
-</style>
-
+{% load static i18n %}
 <!-- Our Team / Bizning Jamoamiz Section -->
-<section class="team-section container">
+<section class="team-section container" id="team">
   <div class="section-header">
     <div class="section-badge">
       <span>👨‍🔧</span> {% if current_lang == 'ru' %}Профессиональные мастера{% elif current_lang == 'en' %}Expert Technicians{% else %}Tajribali ustalar jamoasi{% endif %}
@@ -76,12 +9,18 @@
     <p>{{ t.team_sub }}</p>
   </div>
 
-  <div class="team-grid" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 28px; margin-top: 36px;">
+  <div class="team-grid">
     {% for member in team_members %}
-    <div class="team-card" style="width: 360px; max-width: 360px; flex: 0 0 360px; margin: 0 auto;">
-      <div class="team-photo-wrap" style="width: 100%; height: 360px; aspect-ratio: 1 / 1; min-height: 360px; overflow: hidden; position: relative;">
+    <div class="team-card">
+      <div class="team-photo-wrap">
         {% if member.photo %}
-          <img src="{{ member.photo.url }}" alt="{{ member.full_name }}" class="team-photo" style="width: 100%; height: 100%; object-fit: cover; object-position: center 15%; display: block;" loading="lazy">
+          <img src="{{ member.photo.url }}" alt="{{ member.full_name }}" class="team-photo" loading="lazy" onerror="this.classList.add('hidden');this.nextElementSibling.classList.remove('hidden');">
+          <div class="team-avatar-placeholder hidden">
+            <div class="avatar-circle">
+              <span class="avatar-icon">👨‍🔧</span>
+            </div>
+            <div class="avatar-brand-badge">PRO</div>
+          </div>
         {% else %}
           <div class="team-avatar-placeholder">
             <div class="avatar-circle">

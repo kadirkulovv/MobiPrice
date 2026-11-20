@@ -1,14 +1,13 @@
 import os
 from datetime import datetime
-from pathlib import Path
 from aiogram import Router, F, Bot
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, FSInputFile
 from aiogram.fsm.context import FSMContext
-from bot.keyboards.main_menu import get_main_menu, get_cancel_menu
+from bot.keyboards.main_menu import get_cancel_menu
 from bot.states.admin_states import ExcelImportStates
 from bot.database import sync_to_async
 from bot.config import BASE_DIR
-from bot.handlers.start import is_admin, is_site_admin
+from bot.handlers.start import require_site_admin
 from core.excel_manager import export_prices_to_excel, import_prices_from_excel
 
 router = Router()
@@ -34,8 +33,7 @@ def get_excel_menu() -> ReplyKeyboardMarkup:
 @router.message(F.text == "📁 Excel Import / Export")
 async def excel_home(message: Message, state: FSMContext):
     """Excel bo'limi bosh menyusi"""
-    if not await is_site_admin(message.from_user.id, message.from_user.username):
-        await message.answer("⛔️ Bu bo‘lim faqat Sayt Administratorlari va Bosh Admin uchun!")
+    if not await require_site_admin(message):
         return
 
     await state.clear()
@@ -54,7 +52,7 @@ async def excel_home(message: Message, state: FSMContext):
 @router.message(F.text == "📥 Excel yuklab olish (Eksport)")
 async def export_excel_handler(message: Message):
     """Barcha narxlarni Excel fayl ko'rinishida generatsiya qilib yuborish"""
-    if not await is_admin(message.from_user.id, message.from_user.username):
+    if not await require_site_admin(message):
         return
 
     wait_msg = await message.answer("⏳ Excel jadvali tayyorlanmoqda, iltimos kuting...")
@@ -85,7 +83,7 @@ async def export_excel_handler(message: Message):
 @router.message(F.text == "📄 Excel shablonini olish")
 async def download_template_handler(message: Message):
     """Namuna shablon yuborish"""
-    if not await is_admin(message.from_user.id, message.from_user.username):
+    if not await require_site_admin(message):
         return
 
     filepath = EXCEL_TMP_DIR / "MobiPrice_Namuna_Shablon.xlsx"
@@ -115,7 +113,7 @@ async def download_template_handler(message: Message):
 @router.message(F.text == "📤 Excel faylni yuklash (Import)")
 async def import_excel_start(message: Message, state: FSMContext):
     """Excel fayl yuklashni so'rash"""
-    if not await is_admin(message.from_user.id, message.from_user.username):
+    if not await require_site_admin(message):
         return
 
     await state.set_state(ExcelImportStates.waiting_for_file)
@@ -130,6 +128,8 @@ async def import_excel_start(message: Message, state: FSMContext):
 @router.message(ExcelImportStates.waiting_for_file, F.document)
 async def process_excel_upload(message: Message, state: FSMContext, bot: Bot):
     """Yuklangan Excel faylini qabul qilib bazaga yozish"""
+    if not await require_site_admin(message):
+        return
     doc = message.document
     if not doc.file_name.lower().endswith(('.xlsx', '.xlsm')):
         await message.answer("⚠️ Iltimos, faqat <b>.xlsx</b> formatdagi Excel faylini yuboring!")

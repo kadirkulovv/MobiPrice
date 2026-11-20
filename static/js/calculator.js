@@ -2,10 +2,11 @@
 (function () {
   const currentLang = document.documentElement.lang || 'uz';
 
-  const t = {
+  const translations = {
     uz: {
       selectBtn: "Tanlash →",
       btnBook: "Buyurtma berish / Usta band qilish",
+      btnPreorder: "Buyurtma qilish (Kutilmoqda)",
       loadingSeries: "Model seriyalari yuklanmoqda...",
       noSeries: "Bu brend bo‘yicha hozircha modellar qo‘shilmagan.",
       loadingPhones: "Telefonlar yuklanmoqda...",
@@ -14,16 +15,19 @@
       noIssues: "Ushbu telefon uchun xizmatlar hali kiritilmagan. Ma'lumot uchun qo‘ng‘iroq qiling.",
       loadingOptions: "Narxlar taqqoslanmoqda...",
       noOptions: "Ushbu muammo bo‘yicha hozircha narxlar kiritilmagan. Ma'lumot uchun qo‘ng‘iroq qiling.",
-      serviceFee: "Usta haqqi:",
+      loadError: "Xatolik yuz berdi. Iltimos qaytadan urinib ko'ring.",
       warranty: "Kafolat:",
       repairTime: "Vaqt:",
-      inStock: "Mavjud (Omborda)",
-      included: "narx ichida",
+      inStock: "Omborda mavjud",
+      outOfStock: "Buyurtma asosida",
       comparePrompt: "Narxlarni solishtirish →",
+      yearSuffix: " yil",
+      currencySuffix: " so'm",
     },
     ru: {
       selectBtn: "Выбрать →",
       btnBook: "Записаться на ремонт / Заказать",
+      btnPreorder: "Под заказ (Ожидается)",
       loadingSeries: "Загрузка серий моделей...",
       noSeries: "Для этого бренда пока нет добавленных серий.",
       loadingPhones: "Загрузка телефонов...",
@@ -32,16 +36,19 @@
       noIssues: "Для этого телефона виды ремонта пока не указаны.",
       loadingOptions: "Сравнение цен и вариантов...",
       noOptions: "Для этой проблемы цены пока не указаны. Пожалуйста, позвоните нам.",
-      serviceFee: "Работа мастера:",
+      loadError: "Произошла ошибка при загрузке данных. Попробуйте еще раз.",
       warranty: "Гарантия:",
       repairTime: "Время:",
       inStock: "В наличии",
-      included: "включено",
+      outOfStock: "Под заказ",
       comparePrompt: "Сравнить цены →",
+      yearSuffix: " г.",
+      currencySuffix: " сум",
     },
     en: {
       selectBtn: "Select →",
       btnBook: "Book Repair / Order Part",
+      btnPreorder: "Pre-order (On Order)",
       loadingSeries: "Loading model series...",
       noSeries: "No model series available for this brand yet.",
       loadingPhones: "Loading phones...",
@@ -50,31 +57,26 @@
       noIssues: "No repair issues listed for this phone yet.",
       loadingOptions: "Comparing prices and options...",
       noOptions: "Prices for this issue are not available yet. Please call us.",
-      serviceFee: "Service fee:",
+      loadError: "An error occurred while loading data. Please try again.",
       warranty: "Warranty:",
       repairTime: "Time:",
       inStock: "In Stock",
-      included: "included",
+      outOfStock: "On Order",
       comparePrompt: "Compare Prices →",
+      yearSuffix: "",
+      currencySuffix: " UZS",
     }
-  }[currentLang] || {
-    selectBtn: "Tanlash →",
-    btnBook: "Buyurtma berish / Usta band qilish",
-    loadingSeries: "Model seriyalari yuklanmoqda...",
-    noSeries: "Bu brend bo‘yicha hozircha modellar qo‘shilmagan.",
-    loadingPhones: "Telefonlar yuklanmoqda...",
-    noPhones: "Ushbu seriyada hozircha telefonlar mavjud emas.",
-    loadingIssues: "Muammolar va xizmatlar yuklanmoqda...",
-    noIssues: "Ushbu telefon uchun xizmatlar hali kiritilmagan. Ma'lumot uchun qo‘ng‘iroq qiling.",
-    loadingOptions: "Narxlar taqqoslanmoqda...",
-    noOptions: "Ushbu muammo bo‘yicha hozircha narxlar kiritilmagan. Ma'lumot uchun qo‘ng‘iroq qiling.",
-    serviceFee: "Usta haqqi:",
-    warranty: "Kafolat:",
-    repairTime: "Vaqt:",
-    inStock: "Mavjud (Omborda)",
-    included: "narx ichida",
-    comparePrompt: "Narxlarni solishtirish →",
   };
+  const t = translations[currentLang] || translations.uz;
+
+  function escapeHtml(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
 
   window.mobiState = {
     currentLang: currentLang,
@@ -119,10 +121,11 @@
     function goToStep(stepNum) {
       stepItems.forEach((item) => {
         const itemStep = parseInt(item.getAttribute('data-step'), 10);
-        if (itemStep === stepNum) {
+        item.classList.remove('active', 'completed');
+        if (itemStep < stepNum) {
+          item.classList.add('completed');
+        } else if (itemStep === stepNum) {
           item.classList.add('active');
-        } else {
-          item.classList.remove('active');
         }
       });
 
@@ -136,20 +139,30 @@
         }
       });
 
-      // Smooth scroll to calculator container
       const calcElem = document.getElementById('calculator');
-      if (calcElem) {
+      if (calcElem && stepNum > 1) {
         const yOffset = -80;
         const y = calcElem.getBoundingClientRect().top + window.pageYOffset + yOffset;
         window.scrollTo({ top: y, behavior: 'smooth' });
       }
     }
 
+    // Allow clicking completed steps in progress bar to navigate back
+    stepItems.forEach((item) => {
+      item.addEventListener('click', () => {
+        if (!item.classList.contains('completed')) return;
+        const targetStep = parseInt(item.getAttribute('data-step'), 10);
+        if (targetStep >= 1 && targetStep <= 5) {
+          goToStep(targetStep);
+        }
+      });
+    });
+
     // Step 1: Click Brand -> Load Series
     const brandCards = document.querySelectorAll('.brand-card');
     brandCards.forEach((card) => {
       card.addEventListener('click', () => {
-        brandCards.forEach(c => c.classList.remove('selected'));
+        brandCards.forEach((c) => c.classList.remove('selected'));
         card.classList.add('selected');
 
         const brandId = card.getAttribute('data-brand-id');
@@ -167,9 +180,9 @@
       if (selectedBrandLabel) selectedBrandLabel.textContent = brandName;
 
       seriesList.innerHTML = `
-        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-sub);">
-          <div class="loader-spinner" style="margin: 0 auto 12px;"></div>
-          ${t.loadingSeries}
+        <div class="calc-state-box">
+          <div class="loader-spinner"></div>
+          <p class="calc-state-text">${escapeHtml(t.loadingSeries)}</p>
         </div>
       `;
       goToStep(2);
@@ -180,22 +193,25 @@
 
         if (!data.series || data.series.length === 0) {
           seriesList.innerHTML = `
-            <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-sub);">
-              <p style="font-size: 16px;">${t.noSeries}</p>
+            <div class="calc-state-box">
+              <p class="calc-state-text">${escapeHtml(t.noSeries)}</p>
             </div>
           `;
           return;
         }
 
         seriesList.innerHTML = data.series.map((s) => `
-          <div class="series-card" data-series-id="${s.id}" data-series-name="${s.name}">
-            <div class="series-card-name">${s.name}</div>
+          <div class="series-card" data-series-id="${escapeHtml(s.id)}" data-series-name="${escapeHtml(s.name)}">
+            <div class="series-card-name">${escapeHtml(s.name)}</div>
             <div class="series-arrow">→</div>
           </div>
         `).join('');
 
-        seriesList.querySelectorAll('.series-card').forEach((sCard) => {
+        const sCards = seriesList.querySelectorAll('.series-card');
+        sCards.forEach((sCard) => {
           sCard.addEventListener('click', () => {
+            sCards.forEach((c) => c.classList.remove('selected'));
+            sCard.classList.add('selected');
             const sId = sCard.getAttribute('data-series-id');
             const sName = sCard.getAttribute('data-series-name');
             loadPhonesBySeries(sId, sName);
@@ -204,8 +220,8 @@
       } catch (err) {
         console.error('Error fetching series:', err);
         seriesList.innerHTML = `
-          <div style="grid-column: 1 / -1; text-align: center; padding: 30px; color: #ef4444;">
-            Xatolik yuz berdi. Iltimos qaytadan urinib ko'ring.
+          <div class="calc-state-box calc-state-error">
+            <p class="calc-state-text">${escapeHtml(t.loadError)}</p>
           </div>
         `;
       }
@@ -218,13 +234,15 @@
       window.mobiState.seriesName = seriesName;
 
       if (selectedSeriesLabel) {
-        selectedSeriesLabel.textContent = `${window.mobiState.brandName} — ${seriesName}`;
+        selectedSeriesLabel.textContent = window.mobiState.brandName
+          ? `${window.mobiState.brandName} — ${seriesName}`
+          : seriesName;
       }
 
       phonesList.innerHTML = `
-        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-sub);">
-          <div class="loader-spinner" style="margin: 0 auto 12px;"></div>
-          ${t.loadingPhones}
+        <div class="calc-state-box">
+          <div class="loader-spinner"></div>
+          <p class="calc-state-text">${escapeHtml(t.loadingPhones)}</p>
         </div>
       `;
       goToStep(3);
@@ -235,33 +253,36 @@
 
         if (!data.phones || data.phones.length === 0) {
           phonesList.innerHTML = `
-            <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-sub);">
-              <p style="font-size: 16px;">${t.noPhones}</p>
+            <div class="calc-state-box">
+              <p class="calc-state-text">${escapeHtml(t.noPhones)}</p>
             </div>
           `;
           return;
         }
 
         phonesList.innerHTML = data.phones.map((p) => `
-          <div class="model-duo-card" data-phone-id="${p.id}" data-phone-name="${p.name}">
+          <div class="model-duo-card" data-phone-id="${escapeHtml(p.id)}" data-phone-name="${escapeHtml(p.name)}">
             <div class="model-duo-img-wrapper">
-              <img src="${p.image_url}" alt="${p.name}" class="model-duo-img" loading="lazy" onerror="this.src='/static/img/models/iphone_16_pro_max.jpg'">
+              <img src="${escapeHtml(p.image_url)}" alt="${escapeHtml(p.name)}" class="model-duo-img" loading="lazy" onerror="this.onerror=null;this.src='/static/img/models/iphone_16_pro_max.jpg'">
               <div class="model-name-overlay">
-                <span class="overlay-brand">${window.mobiState.brandName}</span>
-                <span class="overlay-title">${p.name}</span>
+                <span class="overlay-brand">${escapeHtml(window.mobiState.brandName || p.brand_name || '')}</span>
+                <span class="overlay-title">${escapeHtml(p.name)}</span>
               </div>
             </div>
             <div class="model-duo-content">
               <div class="model-meta">
-                <span class="model-year">${p.release_year ? p.release_year + ' yil' : ''}</span>
-                <button class="model-select-btn">${t.selectBtn}</button>
+                <span class="model-year">${p.release_year ? escapeHtml(p.release_year + t.yearSuffix) : ''}</span>
+                <button type="button" class="model-select-btn">${escapeHtml(t.selectBtn)}</button>
               </div>
             </div>
           </div>
         `).join('');
 
-        phonesList.querySelectorAll('.model-duo-card').forEach((pCard) => {
+        const pCards = phonesList.querySelectorAll('.model-duo-card');
+        pCards.forEach((pCard) => {
           pCard.addEventListener('click', () => {
+            pCards.forEach((c) => c.classList.remove('selected'));
+            pCard.classList.add('selected');
             const pId = pCard.getAttribute('data-phone-id');
             const pName = pCard.getAttribute('data-phone-name');
             selectPhone(pId, pName);
@@ -270,8 +291,8 @@
       } catch (err) {
         console.error('Error fetching phones:', err);
         phonesList.innerHTML = `
-          <div style="grid-column: 1 / -1; text-align: center; padding: 30px; color: #ef4444;">
-            Xatolik yuz berdi. Iltimos qaytadan urinib ko'ring.
+          <div class="calc-state-box calc-state-error">
+            <p class="calc-state-text">${escapeHtml(t.loadError)}</p>
           </div>
         `;
       }
@@ -289,12 +310,12 @@
       loadIssuesByPhone(pId, pName);
     }
 
-    async function loadIssuesByPhone(phoneId, phoneName) {
+    async function loadIssuesByPhone(phoneId) {
       if (!issuesList) return;
       issuesList.innerHTML = `
-        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-sub);">
-          <div class="loader-spinner" style="margin: 0 auto 12px;"></div>
-          ${t.loadingIssues}
+        <div class="calc-state-box">
+          <div class="loader-spinner"></div>
+          <p class="calc-state-text">${escapeHtml(t.loadingIssues)}</p>
         </div>
       `;
       goToStep(4);
@@ -305,28 +326,31 @@
 
         if (!data.issues || data.issues.length === 0) {
           issuesList.innerHTML = `
-            <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-sub);">
-              <p style="font-size: 16px;">${t.noIssues}</p>
-              <a href="tel:+998909197600" class="btn-primary" style="display: inline-block; margin-top: 14px;">+998 90 919 76 00</a>
+            <div class="calc-state-box">
+              <p class="calc-state-text">${escapeHtml(t.noIssues)}</p>
+              <a href="tel:+998909197600" class="btn-primary calc-state-cta">+998 90 919 76 00</a>
             </div>
           `;
           return;
         }
 
         issuesList.innerHTML = data.issues.map((iss) => `
-          <div class="issue-card" data-issue-id="${iss.id}" data-issue-title="${iss.title}">
+          <div class="issue-card" data-issue-id="${escapeHtml(iss.id)}" data-issue-title="${escapeHtml(iss.title)}">
             <div class="issue-card-icon">
-              <img src="${iss.icon_svg_url}" alt="${iss.title}" onerror="this.src='/static/img/icons/1.svg'">
+              <img src="${escapeHtml(iss.icon_svg_url)}" alt="${escapeHtml(iss.title)}" onerror="this.onerror=null;this.src='/static/img/icons/1.svg'">
             </div>
             <div>
-              <div class="part-card-title">${iss.title}</div>
-              <span style="font-size: 12px; color: var(--text-dim);">${t.comparePrompt}</span>
+              <div class="part-card-title">${escapeHtml(iss.title)}</div>
+              <span class="issue-card-sub">${escapeHtml(t.comparePrompt)}</span>
             </div>
           </div>
         `).join('');
 
-        issuesList.querySelectorAll('.issue-card').forEach((iCard) => {
+        const iCards = issuesList.querySelectorAll('.issue-card');
+        iCards.forEach((iCard) => {
           iCard.addEventListener('click', () => {
+            iCards.forEach((c) => c.classList.remove('selected'));
+            iCard.classList.add('selected');
             const issId = iCard.getAttribute('data-issue-id');
             const issTitle = iCard.getAttribute('data-issue-title');
             selectIssue(issId, issTitle);
@@ -335,8 +359,8 @@
       } catch (err) {
         console.error('Error fetching issues:', err);
         issuesList.innerHTML = `
-          <div style="grid-column: 1 / -1; text-align: center; padding: 30px; color: #ef4444;">
-            Xatolik yuz berdi.
+          <div class="calc-state-box calc-state-error">
+            <p class="calc-state-text">${escapeHtml(t.loadError)}</p>
           </div>
         `;
       }
@@ -354,12 +378,12 @@
       loadComparisonsByIssue(issId, issTitle);
     }
 
-    async function loadComparisonsByIssue(issueId, issueTitle) {
+    async function loadComparisonsByIssue(issueId) {
       if (!comparisonsGrid) return;
       comparisonsGrid.innerHTML = `
-        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-sub);">
-          <div class="loader-spinner" style="margin: 0 auto 12px;"></div>
-          ${t.loadingOptions}
+        <div class="calc-state-box">
+          <div class="loader-spinner"></div>
+          <p class="calc-state-text">${escapeHtml(t.loadingOptions)}</p>
         </div>
       `;
       goToStep(5);
@@ -370,9 +394,9 @@
 
         if (!data.options || data.options.length === 0) {
           comparisonsGrid.innerHTML = `
-            <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-sub);">
-              <p style="font-size: 16px; margin-bottom: 16px;">${t.noOptions}</p>
-              <a href="tel:+998909197600" class="btn-primary" style="display: inline-block;">+998 90 919 76 00</a>
+            <div class="calc-state-box">
+              <p class="calc-state-text">${escapeHtml(t.noOptions)}</p>
+              <a href="tel:+998909197600" class="btn-primary calc-state-cta">+998 90 919 76 00</a>
             </div>
           `;
           return;
@@ -384,23 +408,48 @@
           const badgeClass = isOriginal ? 'option-badge badge-orig' : 'option-badge';
           const isAvailable = opt.is_in_stock !== false && (opt.quantity === undefined || opt.quantity > 0);
           const stockClass = isAvailable ? 'option-stock in-stock' : 'option-stock out-of-stock';
-          const btnText = isAvailable ? t.btnBook : (currentLang === 'ru' ? 'Под заказ (Ожидается)' : (currentLang === 'en' ? 'Pre-order (Pending)' : 'Buyurtma qilish (Kutilmoqda)'));
+          const btnText = isAvailable ? t.btnBook : t.btnPreorder;
+          const totalPriceVal = opt.total_price_uzs || opt.part_price_uzs || 0;
+
+          let specsHtml = '';
+          if (opt.warranty || opt.repair_time) {
+            specsHtml = `
+              <div class="option-specs">
+                ${opt.warranty ? `<div class="spec-row"><span class="spec-label">${escapeHtml(t.warranty)}</span><span class="spec-val highlight-warranty">${escapeHtml(opt.warranty)}</span></div>` : ''}
+                ${opt.repair_time ? `<div class="spec-row"><span class="spec-label">${escapeHtml(t.repairTime)}</span><span class="spec-val">${escapeHtml(opt.repair_time)}</span></div>` : ''}
+              </div>
+            `;
+          }
+
+          const descHtml = opt.description
+            ? `<p class="option-desc">${escapeHtml(opt.description)}</p>`
+            : '';
+
+          const featuresHtml = Array.isArray(opt.features) && opt.features.length > 0
+            ? `<ul class="option-features-list">${opt.features.map((f) => `<li><span class="feat-check">✓</span><span>${escapeHtml(f)}</span></li>`).join('')}</ul>`
+            : '';
 
           return `
-            <div class="${cardClass}" data-option-id="${opt.id}" data-option-title="${opt.title}" data-option-price="${opt.total_price_uzs || opt.part_price_uzs}">
-              <div class="option-header">
-                <span class="${badgeClass}">${opt.badge || (isOriginal ? 'Original' : 'Kopiya')}</span>
-                <span class="${stockClass}">${opt.stock_display || (isAvailable ? 'Omborda mavjud' : 'Mavjud emas')}</span>
+            <div class="${cardClass}" data-option-id="${escapeHtml(opt.id)}" data-option-title="${escapeHtml(opt.title)}" data-option-price="${escapeHtml(totalPriceVal)}">
+              <div>
+                <div class="option-header">
+                  <span class="${badgeClass}">${escapeHtml(opt.badge || (isOriginal ? 'Original' : 'Kopiya'))}</span>
+                  <span class="${stockClass}">${escapeHtml(opt.stock_display || (isAvailable ? t.inStock : t.outOfStock))}</span>
+                </div>
+
+                <h3 class="option-title">${escapeHtml(opt.title)}</h3>
+
+                <div class="option-price-box">
+                  <div class="price-uzs">${Number(totalPriceVal).toLocaleString('uz-UZ')}${escapeHtml(t.currencySuffix)}</div>
+                  <div class="price-usd">~$${escapeHtml(opt.price_usd)} USD</div>
+                </div>
+
+                ${specsHtml}
+                ${descHtml}
+                ${featuresHtml}
               </div>
 
-              <h3 class="option-title">${opt.title}</h3>
-
-              <div class="option-price-box" style="margin-bottom: 24px; border-bottom: none;">
-                <div class="price-uzs">${Number(opt.part_price_uzs || opt.total_price_uzs).toLocaleString('uz-UZ')} so'm</div>
-                <div class="price-usd">~$${opt.price_usd} USD</div>
-              </div>
-
-              <button class="btn-book-option btn-primary ${isAvailable ? '' : 'btn-out-stock'}">${btnText}</button>
+              <button type="button" class="btn-book-option btn-primary ${isAvailable ? '' : 'btn-out-stock'}">${escapeHtml(btnText)}</button>
             </div>
           `;
         }).join('');
@@ -419,18 +468,22 @@
               window.mobiState.comparisonTitle = optTitle;
               window.mobiState.totalPrice = optPrice;
 
+              if (window.mobiAuth && !window.mobiAuth.isAuthenticated()) {
+                window.mobiAuth.openLoginModal('order');
+                return;
+              }
+
               if (window.mobiModal && typeof window.mobiModal.open === 'function') {
                 window.mobiModal.open();
               }
             });
           }
         });
-
       } catch (err) {
         console.error('Error fetching comparisons:', err);
         comparisonsGrid.innerHTML = `
-          <div style="grid-column: 1 / -1; text-align: center; padding: 30px; color: #ef4444;">
-            Ma'lumotlarni yuklashda xatolik yuz berdi.
+          <div class="calc-state-box calc-state-error">
+            <p class="calc-state-text">${escapeHtml(t.loadError)}</p>
           </div>
         `;
       }

@@ -11,6 +11,11 @@ urlpatterns = [
     path('orders/submit/', views.api_submit_order, name='api_submit_order'),
     path('orders/track/', views.api_track_order, name='api_track_order'),
     path('reviews/submit/', views.api_submit_review, name='api_submit_review'),
+    # Telegram Bot Authentication Endpoints (Verified +998 Phone Only)
+    path('auth/me/', views.api_auth_me, name='api_auth_me'),
+    path('auth/telegram/deeplink/start/', views.api_auth_deeplink_start, name='api_auth_deeplink_start'),
+    path('auth/telegram/deeplink/status/', views.api_auth_deeplink_status, name='api_auth_deeplink_status'),
+    path('auth/logout/', views.api_auth_logout, name='api_auth_logout'),
 ]
 
 

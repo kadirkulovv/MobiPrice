@@ -4,8 +4,17 @@ from .admin_states import (
     PhoneAddStates,
     IssueAddStates,
     ComparisonAddStates,
-    DeleteStates,
+    BrandEditStates,
+    SeriesEditStates,
+    PhoneEditStates,
+    IssueEditStates,
+    ComparisonEditStates,
+    MasterAddStates,
+    MasterEditStates,
+    AdminAddStates,
+    ExcelImportStates,
 )
+from .client_states import CourierLocationStates
 
 __all__ = [
     'BrandAddStates',
@@ -13,5 +22,14 @@ __all__ = [
     'PhoneAddStates',
     'IssueAddStates',
     'ComparisonAddStates',
-    'DeleteStates',
+    'BrandEditStates',
+    'SeriesEditStates',
+    'PhoneEditStates',
+    'IssueEditStates',
+    'ComparisonEditStates',
+    'MasterAddStates',
+    'MasterEditStates',
+    'AdminAddStates',
+    'ExcelImportStates',
+    'CourierLocationStates',
 ]

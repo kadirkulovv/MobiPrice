@@ -1,49 +1,256 @@
-/* MobiPrice — Ultra-Smooth Scroll Reveal & Interactive Animations */
+/* ==========================================================================
+   MobiPrice — GPU-Accelerated Animations: Quantum Background & Brand Scanlines
+   ========================================================================== */
 
-/* Base Reveal Styles */
+/* 1. Ambient Background Orbs (Soft Floating Light Clouds) */
+@keyframes ambientFloat1 {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.75;
+  }
+  50% {
+    transform: translate3d(80px, 50px, 0) scale(1.08);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate3d(-40px, 95px, 0) scale(0.96);
+    opacity: 0.7;
+  }
+}
+
+@keyframes ambientFloat2 {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate3d(-85px, -55px, 0) scale(1.06);
+    opacity: 0.92;
+  }
+  100% {
+    transform: translate3d(-45px, 75px, 0) scale(0.95);
+    opacity: 0.65;
+  }
+}
+
+@keyframes ambientFloat3 {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.65;
+  }
+  50% {
+    transform: translate3d(65px, -50px, 0) scale(1.05);
+    opacity: 0.88;
+  }
+  100% {
+    transform: translate3d(-55px, -30px, 0) scale(0.97);
+    opacity: 0.7;
+  }
+}
+
+/* ==========================================================================
+   2. Background Parallax Quantum Nano-Particles & Signal Nodes (Astra-style)
+   ========================================================================== */
+
+@keyframes techParticlesDrift1 {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, -100vh, 0);
+  }
+}
+
+@keyframes techParticlesDrift2 {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, -100vh, 0);
+  }
+}
+
+@keyframes techParticlesDrift3 {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, -100vh, 0);
+  }
+}
+
+@keyframes techParticlesPulse {
+  0% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes circuitNodesFloat {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.65;
+  }
+  50% {
+    transform: translate3d(-40px, -60px, 0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(0, -120px, 0);
+    opacity: 0.65;
+  }
+}
+
+/* ==========================================================================
+   3. Brand Cards Only: Top-to-Bottom Repeating Laser Scanline (.brand-card)
+   ========================================================================== */
+
+.brand-card {
+  overflow: hidden;
+  position: relative;
+}
+
+.brand-card::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -65px;
+  height: 56px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 242, 254, 0.08) 76%,
+    rgba(0, 242, 254, 0.72) 96%,
+    #ffffff 100%
+  );
+  box-shadow: 0 2px 16px rgba(0, 242, 254, 0.55);
+  pointer-events: none;
+  opacity: 0;
+  animation: brandLaserScanDown 6s cubic-bezier(0.35, 0, 0.25, 1) infinite;
+}
+
+/* Sequential stagger across the 4 brand cards (Apple -> Samsung -> Xiaomi -> Honor) */
+.brand-card:nth-child(1)::after {
+  animation-delay: 0s;
+}
+
+.brand-card:nth-child(2)::after {
+  animation-delay: 1.5s;
+}
+
+.brand-card:nth-child(3)::after {
+  animation-delay: 3s;
+}
+
+.brand-card:nth-child(4)::after {
+  animation-delay: 4.5s;
+}
+
+@keyframes brandLaserScanDown {
+  0% {
+    top: -65px;
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  42% {
+    opacity: 0.8;
+  }
+  54% {
+    top: 112%;
+    opacity: 0;
+  }
+  100% {
+    top: 112%;
+    opacity: 0;
+  }
+}
+
+/* Modal & Reveal Keyframes */
+@keyframes modalScaleUp {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 20px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Base Scroll Reveal Styles */
 [data-reveal],
 .reveal-on-scroll {
   opacity: 0;
-  transition: opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1), transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity, transform;
 }
 
 /* Transform Variants */
 [data-reveal="fade-up"],
 .reveal-fade-up {
-  transform: translateY(35px);
+  transform: translate3d(0, 32px, 0);
 }
 
 [data-reveal="fade-down"],
 .reveal-fade-down {
-  transform: translateY(-35px);
+  transform: translate3d(0, -32px, 0);
 }
 
 [data-reveal="fade-left"],
 .reveal-fade-left {
-  transform: translateX(-40px);
+  transform: translate3d(-36px, 0, 0);
 }
 
 [data-reveal="fade-right"],
 .reveal-fade-right {
-  transform: translateX(40px);
+  transform: translate3d(36px, 0, 0);
 }
 
 [data-reveal="zoom-in"],
 .reveal-zoom-in {
-  transform: scale(0.92);
+  transform: scale(0.93);
 }
 
 [data-reveal="flip-up"],
 .reveal-flip-up {
-  transform: perspective(1000px) rotateX(15deg) translateY(30px);
+  transform: perspective(1000px) rotateX(12deg) translate3d(0, 28px, 0);
 }
 
 /* Revealed State */
 [data-reveal].is-revealed,
 .reveal-on-scroll.is-revealed {
   opacity: 1 !important;
-  transform: translate(0, 0) scale(1) rotate(0) !important;
+  transform: translate3d(0, 0, 0) scale(1) rotate(0) !important;
 }
 
 /* Stagger Delays */
@@ -57,22 +264,24 @@
 [data-delay="400"] { transition-delay: 0.4s; }
 [data-delay="500"] { transition-delay: 0.5s; }
 
-/* Micro-Pulse & Floating Animations */
+/* Micro-Pulse & Floating Animations (GPU friendly) */
 @keyframes softPulseGlow {
   0%, 100% {
-    box-shadow: 0 0 20px rgba(0, 242, 254, 0.2);
+    opacity: 0.92;
+    transform: scale(1);
   }
   50% {
-    box-shadow: 0 0 35px rgba(0, 242, 254, 0.45);
+    opacity: 1;
+    transform: scale(1.02);
   }
 }
 
 @keyframes subtleFloat {
   0%, 100% {
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
   }
   50% {
-    transform: translateY(-6px);
+    transform: translate3d(0, -6px, 0);
   }
 }
 
@@ -86,6 +295,24 @@
 
 /* Respect user's motion preference */
 @media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .ambient-orb,
+  .ambient-particles,
+  .ambient-circuit-pulses,
+  .brand-card::after,
+  .floating-badge,
+  .pulsing-glow {
+    animation: none !important;
+  }
+
   [data-reveal],
   .reveal-on-scroll {
     opacity: 1 !important;

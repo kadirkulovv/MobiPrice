@@ -2,7 +2,6 @@ import io
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-from django.utils.text import slugify
 from core.models import Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison
 
 
@@ -112,6 +111,20 @@ def export_prices_to_excel(stream_or_path=None):
         return out
 
 
+def normalize_quality_type(raw_val: str) -> str:
+    """Excel dan kelgan sifat turini IssueComparison.QUALITY_CHOICES ga moslash"""
+    val = str(raw_val or '').strip().lower()
+    if val in ('original_service_pack', 'original_donor', 'oled_gx', 'tft_incell'):
+        return val
+    if 'donor' in val or 'donar' in val:
+        return 'original_donor'
+    if 'oled' in val or 'gx' in val:
+        return 'oled_gx'
+    if 'orig' in val or 'zavod' in val:
+        return 'original_service_pack'
+    return 'tft_incell'
+
+
 def import_prices_from_excel(file_or_path):
     """Excel faylini o'qib bazani yangilash va yangi yozuvlarni kiritish"""
     wb = openpyxl.load_workbook(file_or_path, data_only=True)
@@ -132,7 +145,7 @@ def import_prices_from_excel(file_or_path):
             series_name = str(row[2] or '').strip()
             phone_name = str(row[3] or '').strip()
             issue_title = str(row[4] or '').strip()
-            quality_type = str(row[5] or '').strip().lower()
+            raw_quality = str(row[5] or '').strip()
 
             if not brand_name or not phone_name or not issue_title:
                 continue
@@ -142,43 +155,42 @@ def import_prices_from_excel(file_or_path):
             total_price = int(float(row[8] or (part_price + service_fee)))
             price_usd = int(float(row[9] or (total_price // 12800 if total_price else 0)))
             quantity = int(float(row[10] or 0))
-            is_stock = bool(int(float(row[11] or (1 if quantity > 0 else 0))))
+            is_stock = bool(int(float(row[11] if (len(row) > 11 and row[11] is not None) else (1 if quantity > 0 else 0))))
             warranty = str(row[12] or '6 oy').strip() if len(row) > 12 else '6 oy'
 
-            if quality_type not in ('original', 'copy'):
-                quality_type = 'original' if 'orig' in quality_type else 'copy'
+            quality_type = normalize_quality_type(raw_quality)
+            is_original = quality_type in ('original_service_pack', 'original_donor')
 
             # 1. Brand
-            brand_slug = slugify(brand_name) or brand_name.lower().replace(' ', '-')
-            brand, _ = Brand.objects.get_or_create(
-                name__iexact=brand_name,
-                defaults={'name': brand_name, 'slug': brand_slug, 'is_active': True}
-            )
+            brand = Brand.objects.filter(name__iexact=brand_name).first()
+            if not brand:
+                brand = Brand.objects.create(name=brand_name, is_active=True)
 
             # 2. Series
             if not series_name:
                 series_name = "Umumiy"
-            series_slug = slugify(series_name) or series_name.lower().replace(' ', '-')
-            series, _ = DeviceSeries.objects.get_or_create(
-                brand=brand,
-                name__iexact=series_name,
-                defaults={'name': series_name, 'slug': series_slug}
-            )
+            series = DeviceSeries.objects.filter(brand=brand, name__iexact=series_name).first()
+            if not series:
+                series = DeviceSeries.objects.create(brand=brand, name=series_name)
 
             # 3. Phone
-            phone_slug = slugify(phone_name) or phone_name.lower().replace(' ', '-')
-            phone, _ = DevicePhone.objects.get_or_create(
-                series=series,
-                name__iexact=phone_name,
-                defaults={'name': phone_name, 'slug': phone_slug}
-            )
+            phone = DevicePhone.objects.filter(series=series, name__iexact=phone_name).first()
+            if not phone:
+                phone = DevicePhone.objects.create(series=series, name=phone_name)
 
             # 4. Issue
-            issue, _ = DeviceIssue.objects.get_or_create(
-                phone=phone,
-                title__iexact=issue_title,
-                defaults={'title': issue_title, 'icon_number': 1}
-            )
+            issue = DeviceIssue.objects.filter(phone=phone, title__iexact=issue_title).first()
+            if not issue:
+                from bot.utils.translator import REPAIR_GLOSSARY
+                norm_title = issue_title.lower().strip()
+                t_ru, t_en = REPAIR_GLOSSARY.get(norm_title, ("", ""))
+                issue = DeviceIssue.objects.create(
+                    phone=phone,
+                    title=issue_title,
+                    title_ru=t_ru,
+                    title_en=t_en,
+                    icon_number=1
+                )
 
             # 5. Comparison
             comparison = None
@@ -186,14 +198,31 @@ def import_prices_from_excel(file_or_path):
                 comparison = IssueComparison.objects.filter(id=int(cid)).first()
 
             if not comparison:
+                legacy_aliases = [quality_type]
+                if is_original:
+                    legacy_aliases.append('original')
+                else:
+                    legacy_aliases.append('copy')
                 comparison = IssueComparison.objects.filter(
                     issue=issue,
-                    quality_type=quality_type
+                    quality_type__in=legacy_aliases
                 ).first()
 
-            title_display = "Original Servis Paketi" if quality_type == 'original' else "Sifatli Dublikat (Kopiya)"
+            title_uz = "Original Zavod" if is_original else "Sifatli Kopiya"
+            title_ru = "Оригинал Завод" if is_original else "Качественная Копия"
+            title_en = "Original Factory" if is_original else "High-Quality Copy"
+            badge = "Original" if is_original else "Kopiya"
 
             if comparison:
+                comparison.quality_type = quality_type
+                if not comparison.title:
+                    comparison.title = title_uz
+                if not comparison.title_ru:
+                    comparison.title_ru = title_ru
+                if not comparison.title_en:
+                    comparison.title_en = title_en
+                if not comparison.badge:
+                    comparison.badge = badge
                 comparison.part_price_uzs = part_price
                 comparison.service_fee_uzs = service_fee
                 comparison.price_usd = price_usd
@@ -206,7 +235,10 @@ def import_prices_from_excel(file_or_path):
                 IssueComparison.objects.create(
                     issue=issue,
                     quality_type=quality_type,
-                    title=title_display,
+                    title=title_uz,
+                    title_ru=title_ru,
+                    title_en=title_en,
+                    badge=badge,
                     part_price_uzs=part_price,
                     service_fee_uzs=service_fee,
                     price_usd=price_usd,
@@ -215,7 +247,6 @@ def import_prices_from_excel(file_or_path):
                     warranty=warranty,
                 )
                 created_count += 1
-
 
         except Exception as e:
             errors.append(f"Qator {row_idx}: {str(e)}")

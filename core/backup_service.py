@@ -29,12 +29,14 @@ def create_db_backup() -> tuple[Path, float]:
     raw_backup_path = backup_dir / f"mobiprice_db_{timestamp}.sqlite3"
     gz_backup_path = backup_dir / f"mobiprice_db_{timestamp}.sqlite3.gz"
 
-    # 1. Native SQLite hot backup (WAL-safe)
-    src_conn = sqlite3.connect(str(db_file))
-    dst_conn = sqlite3.connect(str(raw_backup_path))
-    src_conn.backup(dst_conn)
-    dst_conn.close()
-    src_conn.close()
+    # 1. Native SQLite hot backup (WAL-safe with 30s busy timeout)
+    src_conn = sqlite3.connect(str(db_file), timeout=30)
+    dst_conn = sqlite3.connect(str(raw_backup_path), timeout=30)
+    try:
+        src_conn.backup(dst_conn)
+    finally:
+        dst_conn.close()
+        src_conn.close()
 
     # 2. Gzip compression
     with open(raw_backup_path, "rb") as f_in, gzip.open(gz_backup_path, "wb", compresslevel=9) as f_out:
@@ -46,10 +48,10 @@ def create_db_backup() -> tuple[Path, float]:
         raw_backup_path.unlink()
 
     # 3. 14 kundan eski arxivlarni avtomatik tozalash
-    retention_cutoff = datetime.now() - timedelta(days=14)
+    retention_cutoff = datetime.now(TZ_TASHKENT) - timedelta(days=14)
     for old_file in backup_dir.glob("*.gz"):
         try:
-            mtime = datetime.fromtimestamp(old_file.stat().st_mtime)
+            mtime = datetime.fromtimestamp(old_file.stat().st_mtime, tz=TZ_TASHKENT)
             if mtime < retention_cutoff:
                 old_file.unlink()
         except Exception:

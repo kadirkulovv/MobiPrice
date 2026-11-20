@@ -1,0 +1,78 @@
+/* ==========================================================================
+   MobiPrice — Precision Tech-Lab App-Shell Footer
+   ========================================================================== */
+
+footer {
+  border-top: 1px solid var(--border-color);
+  background: rgba(6, 9, 17, 0.82);
+  padding: 28px 0 24px;
+  margin-top: 20px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.footer-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.footer-brand-title {
+  font-weight: 800;
+  color: #ffffff;
+  font-size: 14.5px;
+  margin-bottom: 4px;
+}
+
+.footer-contacts {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 4px 0 8px;
+  flex-wrap: wrap;
+}
+
+.footer-link {
+  font-family: var(--font-mono);
+  color: var(--neon-cyan);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 13px;
+  transition: var(--transition);
+}
+
+.footer-link:hover {
+  color: #ffffff;
+}
+
+.footer-link-tg {
+  color: #38bdf8;
+}
+
+.footer-link-ig {
+  color: #f43f5e;
+}
+
+.footer-divider {
+  color: var(--text-dim);
+}
+
+.footer-copy {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
+
+@media (max-width: 540px) {
+  .footer-divider {
+    display: none;
+  }
+
+  .footer-contacts {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

@@ -29,8 +29,6 @@ DEBUG = os.getenv('DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*').split(',') if h.strip()]
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://*.ngrok-free.app',
-    'https://*.ngrok.io',
     'http://localhost:8000',
     'http://127.0.0.1:8000',
 ]
@@ -38,8 +36,9 @@ CSRF_TRUSTED_ORIGINS = [
 # Auto-add allowed hosts to CSRF trusted origins for production domains
 for host in ALLOWED_HOSTS:
     if host and host != '*':
+        origin_host = f"*{host}" if host.startswith('.') else host
         for proto in ('https://', 'http://'):
-            origin = f"{proto}{host}"
+            origin = f"{proto}{origin_host}"
             if origin not in CSRF_TRUSTED_ORIGINS:
                 CSRF_TRUSTED_ORIGINS.append(origin)
 
@@ -49,6 +48,33 @@ if env_trusted:
         origin = origin.strip()
         if origin and origin not in CSRF_TRUSTED_ORIGINS:
             CSRF_TRUSTED_ORIGINS.append(origin)
+
+# ==============================================================================
+# TEMPORARY NGROK / LOCAL DEV SETTINGS (DEBUG=True)
+# Remove or replace with your production domain once deployed behind HTTPS.
+# ==============================================================================
+if DEBUG:
+    for _ngrok_host in ('.ngrok-free.app', '.ngrok-free.dev', '.ngrok.io'):
+        if _ngrok_host not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(_ngrok_host)
+
+    for _dev_origin in (
+        'https://*.ngrok-free.app',
+        'https://*.ngrok-free.dev',
+        'https://*.ngrok.io',
+        'http://localhost:8080',
+        'http://127.0.0.1:8080',
+    ):
+        if _dev_origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(_dev_origin)
+
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Session Cookie Security & Telegram Login Widget Popup Support
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+# Allow cross-origin OAuth popups (oauth.telegram.org) to keep window.opener for postMessage
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
 
 
 # Application definition
@@ -89,6 +115,7 @@ TEMPLATES = [
                 'django.template.context_processors.i18n',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'core.context_processors.telegram_auth_context',
             ],
         },
     },
@@ -110,11 +137,11 @@ DATABASES = {
     }
 }
 
-# Cache Configuration (High-Performance In-Memory Caching for 10,000+ RPS)
+# Cache Configuration (Shared File-Based Cache for Multi-Process Web + Telegram Bot Sync)
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'mobiprice-cache',
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': '/tmp/mobiprice_cache',
         'TIMEOUT': 300,  # 5 minutes default
         'OPTIONS': {
             'MAX_ENTRIES': 10000,
@@ -175,6 +202,20 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Telegram settings
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
 TELEGRAM_ADMIN_CHAT_ID = os.getenv('TELEGRAM_ADMIN_CHAT_ID', '')
+TELEGRAM_BOT_USERNAME = os.getenv('TELEGRAM_BOT_USERNAME', '').lstrip('@').strip()
+
+# Service Center / Shop Location settings
+SHOP_LAT = float(os.getenv('SHOP_LAT', '41.338306'))
+SHOP_LON = float(os.getenv('SHOP_LON', '69.270389'))
+SHOP_ADDRESS = os.getenv('SHOP_ADDRESS', "Malika bozor, B32 do'kon")
+SHOP_GOOGLE_MAPS_URL = os.getenv(
+    'SHOP_GOOGLE_MAPS_URL',
+    f'https://www.google.com/maps/search/?api=1&query={SHOP_LAT},{SHOP_LON}',
+)
+SHOP_YANDEX_MAPS_URL = os.getenv(
+    'SHOP_YANDEX_MAPS_URL',
+    f'https://yandex.uz/maps/?pt={SHOP_LON},{SHOP_LAT}&z=17&l=map',
+)
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

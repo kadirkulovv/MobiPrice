@@ -1,10 +1,14 @@
 import json
+import logging
+import secrets
+import threading
 import requests
 from datetime import timedelta
+from django.db import transaction
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST, require_GET
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.conf import settings
 
 from django.utils import timezone
@@ -13,8 +17,34 @@ from django.core.cache import cache
 from django.utils.html import escape
 from .models import (
     Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison,
-    RepairFAQ, Review, ServiceOrder, TeamMember, BotAdmin
+    RepairFAQ, Review, ServiceOrder, TeamMember, BotAdmin, TelegramUser, AuthToken
 )
+from .telegram_auth import (
+    get_bot_username,
+    get_current_telegram_user,
+    get_shop_info,
+    is_uzbek_phone_number,
+    login_telegram_session,
+    logout_telegram_session,
+    normalize_uzbek_phone_number,
+    serialize_telegram_user,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def _send_telegram_notifications_async(bot_token: str, admin_ids: list, payload_base: dict):
+    """Telegram xabarlarini asosiy HTTP javobni bloklamasdan orqa fonda yuborish"""
+    def _worker():
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        for aid in admin_ids:
+            try:
+                body = dict(payload_base, chat_id=aid)
+                requests.post(url, json=body, timeout=4)
+            except Exception as exc:
+                logger.warning(f"Telegram notification failed for {aid}: {exc}")
+
+    threading.Thread(target=_worker, daemon=True).start()
 
 
 UI_TRANSLATIONS = {
@@ -56,12 +86,9 @@ UI_TRANSLATIONS = {
         'leave_review_btn': "✍️ Fikr qoldirish",
         'review_modal_title': "Fikr va mulohaza qoldirish",
         'modal_title': "Buyurtmani tasdiqlash",
-        'name_label': "Ismingiz *",
-        'phone_label': "Telefon raqamingiz *",
         'format_label': "Xizmat formati",
-        'format_opt_1': "Servis markaziga boraman (30 daqiqada)",
-        'format_opt_2': "Usta chaqirish (Manzilga usta boradi)",
-        'format_opt_3': "Kuryer orqali yuborish (Bepul olib ketish)",
+        'format_opt_1': "O'zim boraman (Servis markaziga)",
+        'format_opt_2': "Kuryer orqali olib ketish",
         'btn_submit': "Tasdiqlash va Yuborish",
         'consult_badge': "🛠 Ko'p Yillik Tajribali Telefon Ustalari",
         'consult_title': "Saytdan o'zingizga kerakli modelni topa olmadingizmi?",
@@ -114,12 +141,9 @@ UI_TRANSLATIONS = {
         'leave_review_btn': "✍️ Оставить отзыв",
         'review_modal_title': "Оставить отзыв о сервисе",
         'modal_title': "Подтверждение заявки",
-        'name_label': "Ваше имя *",
-        'phone_label': "Номер телефона *",
         'format_label': "Формат услуги",
-        'format_opt_1': "Приеду в сервис (ремонт за 30 минут)",
-        'format_opt_2': "Вызов мастера (мастер приедет по адресу)",
-        'format_opt_3': "Курьерская доставка (заберем бесплатно)",
+        'format_opt_1': "Приеду сам (в сервисный центр)",
+        'format_opt_2': "Забрать через курьера",
         'btn_submit': "Подтвердить и отправить",
         'consult_badge': "🛠 Опытные мастера с многолетним стажем",
         'consult_title': "Не нашли нужную модель на сайте?",
@@ -172,12 +196,9 @@ UI_TRANSLATIONS = {
         'leave_review_btn': "✍️ Leave a Review",
         'review_modal_title': "Leave Customer Feedback",
         'modal_title': "Confirm Request",
-        'name_label': "Your Name *",
-        'phone_label': "Phone Number *",
         'format_label': "Service Format",
-        'format_opt_1': "Visit service center (ready in 30 mins)",
-        'format_opt_2': "Call a technician (on-site repair)",
-        'format_opt_3': "Free courier pickup and return",
+        'format_opt_1': "Visit service center myself",
+        'format_opt_2': "Courier pickup",
         'btn_submit': "Confirm and Send",
         'consult_badge': "🛠 Expert Phone Technicians with Years of Experience",
         'consult_title': "Can't find your phone model on the site?",
@@ -195,6 +216,7 @@ UI_TRANSLATIONS = {
 }
 
 
+@ensure_csrf_cookie
 def index_view(request):
     current_lang = getattr(request, 'LANGUAGE_CODE', None) or get_language() or 'uz'
     if current_lang not in ('uz', 'ru', 'en'):
@@ -236,7 +258,10 @@ def api_series_by_brand(request, brand_id):
     cache_key = f"api_series_brand_{brand_id}"
     data = cache.get(cache_key)
     if data is None:
-        series_qs = DeviceSeries.objects.filter(brand_id=brand_id).order_by('order', 'name')
+        series_qs = DeviceSeries.objects.filter(
+            brand_id=brand_id,
+            brand__is_active=True
+        ).select_related('brand').order_by('order', 'name')
         data = []
         for s in series_qs:
             data.append({
@@ -257,7 +282,10 @@ def api_phones_by_series(request, series_id):
     cache_key = f"api_phones_series_{series_id}"
     data = cache.get(cache_key)
     if data is None:
-        phones_qs = DevicePhone.objects.filter(series_id=series_id).select_related('series', 'series__brand').order_by('order', 'name')
+        phones_qs = DevicePhone.objects.filter(
+            series_id=series_id,
+            series__brand__is_active=True
+        ).select_related('series', 'series__brand').order_by('order', 'name')
         data = []
         for p in phones_qs:
             image_url = p.image.url if p.image else f"/static/img/models/{p.slug.replace('-', '_')}.jpg"
@@ -282,7 +310,10 @@ def api_issues_by_phone(request, phone_id):
     cache_key = f"api_issues_phone_{phone_id}_{lang}"
     data = cache.get(cache_key)
     if data is None:
-        issues_qs = DeviceIssue.objects.filter(phone_id=phone_id).order_by('order', 'title')
+        issues_qs = DeviceIssue.objects.filter(
+            phone_id=phone_id,
+            phone__series__brand__is_active=True
+        ).order_by('order', 'title')
         data = []
         for issue in issues_qs:
             title = issue.title
@@ -291,12 +322,13 @@ def api_issues_by_phone(request, phone_id):
             elif lang == 'en' and issue.title_en:
                 title = issue.title_en
 
-            icon_svg_url = f"/static/img/icons/{issue.icon_number}.svg" if issue.icon_number else "/static/img/brands/apple.svg"
+            icon_num = issue.icon_number if (issue.icon_number and 1 <= issue.icon_number <= 30) else 1
+            icon_svg_url = f"/static/img/icons/{icon_num}.svg"
 
             data.append({
                 'id': issue.id,
                 'title': title,
-                'icon_number': issue.icon_number,
+                'icon_number': icon_num,
                 'icon_svg_url': icon_svg_url,
             })
         cache.set(cache_key, data, 300)
@@ -310,12 +342,16 @@ def api_comparisons_by_issue(request, issue_id):
     cache_key = f"api_comparisons_issue_{issue_id}_{lang}"
     data = cache.get(cache_key)
     if data is None:
-        comp_qs = IssueComparison.objects.filter(issue_id=issue_id).order_by('-quality_type')
+        comp_qs = IssueComparison.objects.filter(
+            issue_id=issue_id,
+            issue__phone__series__brand__is_active=True
+        ).order_by('-quality_type')
 
         data = []
         for c in comp_qs:
             title = c.title
-            is_original = (c.quality_type == 'original_service_pack')
+            is_original = c.quality_type in ('original_service_pack', 'original_donor', 'original')
+            normalized_qtype = 'original_service_pack' if is_original else c.quality_type
 
             if lang == 'ru':
                 title = c.title_ru or ("Оригинал Завод" if is_original else "Качественная Копия")
@@ -329,7 +365,7 @@ def api_comparisons_by_issue(request, issue_id):
                 desc = c.description_en or c.description or ""
             else:
                 title = c.title or ("Original Zavod" if is_original else "Sifatli Kopiya")
-                badge = "Original" if is_original else "Kopiya"
+                badge = c.badge or ("Original" if is_original else "Kopiya")
                 warranty = c.warranty or ""
                 desc = c.description or ""
 
@@ -341,9 +377,15 @@ def api_comparisons_by_issue(request, issue_id):
             else:
                 stock_display = f"Omborda: {c.quantity} ta" if is_available else "Mavjud emas (Kutilmoqda)"
 
+            repair_time_str = c.repair_time or ""
+            if lang == 'ru' and repair_time_str:
+                repair_time_str = repair_time_str.replace("daqiqa", "минут").replace("soat", "ч.")
+            elif lang == 'en' and repair_time_str:
+                repair_time_str = repair_time_str.replace("daqiqa", "mins").replace("soat", "hr")
+
             data.append({
                 'id': c.id,
-                'quality_type': c.quality_type,
+                'quality_type': normalized_qtype,
                 'quality_display': c.get_quality_type_display(),
                 'title': title,
                 'part_price_uzs': int(c.part_price_uzs),
@@ -354,7 +396,7 @@ def api_comparisons_by_issue(request, issue_id):
                 'is_in_stock': is_available,
                 'stock_display': stock_display,
                 'warranty': warranty,
-                'repair_time': c.repair_time,
+                'repair_time': repair_time_str,
                 'badge': badge,
                 'description': desc,
                 'features': c.features if isinstance(c.features, list) else [],
@@ -370,7 +412,10 @@ def api_search_phones(request):
     if not query:
         return JsonResponse({'phones': []})
 
-    phones_qs = DevicePhone.objects.filter(name__icontains=query).select_related('series', 'series__brand').order_by('order')[:10]
+    phones_qs = DevicePhone.objects.filter(
+        name__icontains=query,
+        series__brand__is_active=True
+    ).select_related('series', 'series__brand').order_by('order')[:10]
     data = []
     for p in phones_qs:
         image_url = p.image.url if p.image else f"/static/img/models/{p.slug.replace('-', '_')}.jpg"
@@ -386,38 +431,147 @@ def api_search_phones(request):
     return JsonResponse({'phones': data})
 
 
-@csrf_exempt
 @require_POST
 def api_submit_order(request):
-    """Ariza qabul qilish va Telegram admin(lar)ga xabar yuborish (Rate Limiter: max 2/min per IP)"""
+    """Ariza qabul qilish va Telegram menejer(lar)ga xabar yuborish (Faqat Telegram Auth + Rate Limit: max 2/min)"""
     try:
+        raw_data = {}
+        try:
+            if request.body:
+                parsed = json.loads(request.body.decode('utf-8'))
+                if isinstance(parsed, dict):
+                    raw_data = parsed
+                else:
+                    raw_data = None
+        except (ValueError, UnicodeDecodeError):
+            raw_data = None
+
+        lang = str((raw_data.get('lang') if isinstance(raw_data, dict) else '') or get_language() or 'uz').strip()[:2]
+
+        # Majburiy Telegram sessiya tekshiruvi
+        tg_user = get_current_telegram_user(request)
+        if not tg_user:
+            auth_err = {
+                'ru': "Для оформления заказа необходимо войти через Telegram.",
+                'en': "Please sign in with Telegram to place an order.",
+                'uz': "Buyurtma berish uchun avval Telegram orqali kiring.",
+            }.get(lang, "Buyurtma berish uchun avval Telegram orqali kiring.")
+            return JsonResponse({
+                'success': False,
+                'auth_required': True,
+                'error': auth_err,
+            }, status=401)
+
+        if raw_data is None:
+            return JsonResponse({'success': False, 'error': "Noto'g'ri so'rov formati."}, status=400)
+
+        data = raw_data
+
         # Rate Limiting (Anti-Spam: max 2 per minute from same IP)
         client_ip = get_client_ip(request)
         rate_key = f"order_ratelimit_{client_ip}"
         submits = cache.get(rate_key, 0)
         if submits >= 2:
+            rate_err = {
+                'ru': "Защита от спама: не более 2 заявок в минуту. Пожалуйста, немного подождите.",
+                'en': "Spam protection: maximum 2 requests per minute. Please wait a moment.",
+                'uz': "Spam himoyasi: 1 daqiqada maksimum 2 ta ariza yuborish mumkin. Iltimos, ozroq kuting.",
+            }.get(lang, "Spam himoyasi: 1 daqiqada maksimum 2 ta ariza yuborish mumkin. Iltimos, ozroq kuting.")
             return JsonResponse({
                 'success': False,
-                'error': "Spam himoyasi: 1 daqiqada maksimum 2 ta ariza yuborish mumkin. Iltimos, ozroq kuting."
+                'error': rate_err
             }, status=429)
+
+        raw_phone_id = data.get('phone_id')
+        raw_comparison_id = data.get('comparison_id') or data.get('option_id')
+        raw_service_type = str(data.get('service_type', 'in_service')).strip()
+
+        if raw_service_type not in ('in_service', 'courier'):
+            svc_err = {
+                'ru': "Выбран недоступный формат услуги. Выберите визит в сервис или курьера.",
+                'en': "Invalid service format. Please choose service center visit or courier pickup.",
+                'uz': "Noto'g'ri xizmat turi tanlandi. Faqat servisga borish yoki kuryer xizmatini tanlang.",
+            }.get(lang, "Noto'g'ri xizmat turi tanlandi.")
+            return JsonResponse({'success': False, 'error': svc_err}, status=400)
+
+        service_type = raw_service_type
+        client_name = tg_user.full_name[:100]
+
+        # Telefon raqami faqat Telegram bot tugmasi orqali tasdiqlangan O'zbekiston (+998) profilidan olinadi
+        verified_phone = normalize_uzbek_phone_number(tg_user.phone_number)
+        if not verified_phone:
+            auth_err = {
+                'ru': "Для оформления заказа подтвердите ваш узбекский номер (+998) через Telegram-бот.",
+                'en': "Please sign in via our Telegram bot and verify your Uzbekistan (+998) phone number.",
+                'uz': "Buyurtma berish uchun Telegram bot orqali O'zbekiston (+998) raqamingizni tasdiqlab kiring.",
+            }.get(lang, "Buyurtma berish uchun Telegram bot orqali +998 raqamingizni tasdiqlab kiring.")
+            return JsonResponse({'success': False, 'auth_required': True, 'error': auth_err}, status=401)
+
+        bot_username = ''
+        if service_type == 'courier':
+            bot_username = get_bot_username()
+            if not bot_username:
+                bot_err = {
+                    'ru': "Telegram бот временно недоступен для курьерской доставки. Пожалуйста, попробуйте позже.",
+                    'en': "Telegram bot is temporarily unavailable for courier pickup. Please try again later.",
+                    'uz': "Kuryer lokatsiyasini qabul qilish uchun Telegram bot vaqtincha mavjud emas. Birozdan so'ng urinib ko'ring.",
+                }.get(lang, "Telegram bot vaqtincha mavjud emas.")
+                return JsonResponse({'success': False, 'error': bot_err}, status=503)
+
         cache.set(rate_key, submits + 1, 60)
 
-        data = json.loads(request.body)
-        client_name = escape(data.get('client_name', '').strip())
-        phone_number = escape(data.get('phone_number', '').strip())
-        phone_id = data.get('phone_id')
-        comparison_id = data.get('comparison_id') or data.get('option_id')
-        service_type = escape(data.get('service_type', 'in_service'))
+        phone_obj = None
+        if raw_phone_id and str(raw_phone_id).isdigit():
+            phone_obj = DevicePhone.objects.filter(id=int(raw_phone_id)).first()
 
-        if not client_name or not phone_number:
-            return JsonResponse({'success': False, 'error': "Ism va telefon raqami kiritilishi shart!"}, status=400)
+        comp_obj = None
+        if raw_comparison_id and str(raw_comparison_id).isdigit():
+            comp_obj = IssueComparison.objects.select_related('issue', 'issue__phone').filter(id=int(raw_comparison_id)).first()
+            if comp_obj and not phone_obj:
+                phone_obj = comp_obj.issue.phone
 
+        if service_type == 'courier':
+            courier_token = secrets.token_urlsafe(24)
+            expires_at = timezone.now() + timedelta(minutes=60)
+            order = ServiceOrder.objects.create(
+                telegram_user=tg_user,
+                client_name=client_name,
+                phone_number=verified_phone,
+                phone=phone_obj,
+                comparison=comp_obj,
+                service_type='courier',
+                status='pending_location',
+                courier_token=courier_token,
+                courier_token_expires_at=expires_at,
+            )
+
+            bot_url = f"https://t.me/{bot_username}?start=courier_{courier_token}"
+            courier_msg = {
+                'ru': "Заказ создан! Перейдите в Telegram-бот и отправьте геолокацию для расчета стоимости курьера.",
+                'en': "Order created! Open our Telegram bot and share your location to calculate the courier fee.",
+                'uz': "Buyurtma yaratildi! Kuryer narxini hisoblash uchun Telegram botga o'tib lokatsiyangizni yuboring.",
+            }.get(lang, "Buyurtma yaratildi! Telegram botga o'tib lokatsiyangizni yuboring.")
+
+            return JsonResponse({
+                'success': True,
+                'order_id': order.order_id,
+                'service_type': 'courier',
+                'status': order.status,
+                'phone_number': verified_phone,
+                'bot_url': bot_url,
+                'message': courier_msg,
+            })
+
+        part_total = comp_obj.total_price_uzs if comp_obj else None
         order = ServiceOrder.objects.create(
+            telegram_user=tg_user,
             client_name=client_name,
-            phone_number=phone_number,
-            phone_id=phone_id if phone_id else None,
-            comparison_id=comparison_id if comparison_id else None,
-            service_type=service_type,
+            phone_number=verified_phone,
+            phone=phone_obj,
+            comparison=comp_obj,
+            service_type='in_service',
+            status='new',
+            final_total_uzs=part_total,
         )
 
         # Telegram notification to all configured admins and dynamic BotAdmins
@@ -442,18 +596,30 @@ def api_submit_order(request):
         if bot_token and admin_ids:
             try:
                 phone_str = order.phone.name if order.phone else "Ko'rsatilmagan"
-                part_str = order.comparison.title if order.comparison else "Umumiy konsultatsiya"
-                price_str = f"{order.comparison.total_price_uzs:,} so'm" if order.comparison else "-"
+                if order.comparison:
+                    issue_part = order.comparison.issue.title if getattr(order.comparison, 'issue', None) else ""
+                    part_str = f"{issue_part} ({order.comparison.title})" if issue_part else order.comparison.title
+                    price_str = f"{order.comparison.total_price_uzs:,} so'm"
+                else:
+                    part_str = "Umumiy konsultatsiya"
+                    price_str = "-"
 
+                tg_link_label = f"@{escape(tg_user.username)}" if tg_user.username else f"ID: {tg_user.telegram_id}"
+                phone_line = (
+                    f"📞 <b>Telefon:</b> <code>{escape(order.phone_number)}</code>\n"
+                    if order.phone_number
+                    else ""
+                )
                 text = (
-                    f"🚨 <b>YANGI TA'MIRLASH BUYURTMASI! #{order.order_id}</b>\n\n"
-                    f"👤 <b>Mijoz:</b> {client_name}\n"
-                    f"📞 <b>Telefon:</b> <code>{phone_number}</code>\n"
-                    f"📱 <b>Model:</b> {phone_str}\n"
-                    f"🔧 <b>Muammo / Qism:</b> {part_str}\n"
-                    f"💵 <b>Narxi:</b> {price_str}\n"
+                    f"🚨 <b>YANGI TA'MIRLASH BUYURTMASI! #{escape(order.order_id)}</b>\n\n"
+                    f"👤 <b>Mijoz:</b> {escape(client_name)}\n"
+                    f"🔗 <b>Telegram:</b> <a href=\"{escape(tg_user.tg_profile_url)}\">{tg_link_label}</a>\n"
+                    f"{phone_line}"
+                    f"📱 <b>Model:</b> {escape(phone_str)}\n"
+                    f"🔧 <b>Muammo / Qism:</b> {escape(part_str)}\n"
+                    f"💵 <b>Zapchast narxi:</b> {escape(price_str)}\n"
                     f"📦 <b>Holati:</b> 🔴 Yangi ariza\n"
-                    f"📍 <b>Format:</b> {order.get_service_type_display()}"
+                    f"📍 <b>Format:</b> O'zim boraman (Servis markaziga)"
                 )
 
                 inline_kb = {
@@ -463,7 +629,7 @@ def api_submit_order(request):
                             {'text': "👨‍🔧 Ustaga biriktirish", 'callback_data': f"crm_assign:{order.id}"},
                         ],
                         [
-                            {'text': "📞 Bog‘lanildi", 'callback_data': f"crm_st:{order.id}:contacted"},
+                            {'text': "🔧 Ta'mirlanmoqda", 'callback_data': f"crm_st:{order.id}:in_progress"},
                             {'text': "🎉 Tayyor", 'callback_data': f"crm_st:{order.id}:ready"},
                         ],
                         [
@@ -472,28 +638,38 @@ def api_submit_order(request):
                     ]
                 }
 
-                url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                _send_telegram_notifications_async(
+                    bot_token=bot_token,
+                    admin_ids=admin_ids,
+                    payload_base={
+                        'text': text,
+                        'parse_mode': 'HTML',
+                        'disable_web_page_preview': True,
+                        'reply_markup': inline_kb,
+                    }
+                )
+            except Exception as exc:
+                logger.warning(f"Order Telegram notification prep failed: {exc}")
 
-                for aid in admin_ids:
-                    try:
-                        requests.post(url, json={
-                            'chat_id': aid,
-                            'text': text,
-                            'parse_mode': 'HTML',
-                            'reply_markup': inline_kb
-                        }, timeout=4)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+        success_msg = {
+            'ru': "Ваша заявка успешно принята! Ждем вас в нашем сервисном центре.",
+            'en': "Your request has been received! We look forward to seeing you at our service center.",
+            'uz': "Buyurtmangiz muvaffaqiyatli qabul qilindi! Sizni servis markazimizda kutamiz.",
+        }.get(lang, "Buyurtmangiz muvaffaqiyatli qabul qilindi! Sizni servis markazimizda kutamiz.")
 
+        shop_location = get_shop_info()
         return JsonResponse({
             'success': True,
             'order_id': order.order_id,
-            'message': "Arizangiz muvaffaqiyatli qabul qilindi! Tez orada mutaxassisimiz siz bilan bog‘lanadi."
+            'service_type': 'in_service',
+            'status': order.status,
+            'phone_number': verified_phone,
+            'message': success_msg,
+            'shop_location': shop_location,
         })
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        logger.error(f"Error in api_submit_order: {e}", exc_info=True)
+        return JsonResponse({'success': False, 'error': "Buyurtmani saqlashda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring."}, status=500)
 
 
 
@@ -513,7 +689,7 @@ def api_track_order(request):
         return JsonResponse({'found': False, 'error': err_msg}, status=400)
 
     try:
-        order = ServiceOrder.objects.filter(order_id__iexact=clean_code).select_related('phone', 'comparison').first()
+        order = ServiceOrder.objects.filter(order_id__iexact=clean_code).select_related('phone', 'comparison', 'comparison__issue').first()
         if not order:
             not_found_msg = {
                 'ru': f"Заказ с кодом #{clean_code} не найден. Проверьте правильность кода.",
@@ -523,11 +699,13 @@ def api_track_order(request):
             return JsonResponse({'found': False, 'error': not_found_msg}, status=404)
 
         # Mapping status to 4-step progress:
+        # 0: Lokatsiya kutilmoqda / Bekor qilingan
         # 1: Qabul qilindi
         # 2: Diagnostika / Bog'lanildi
         # 3: Ta'mirlanmoqda
         # 4: Tayyor / Topshirildi
         step_map = {
+            'pending_location': 0,
             'new': 1,
             'contacted': 2,
             'in_progress': 3,
@@ -540,6 +718,7 @@ def api_track_order(request):
         # Status labels per language
         status_labels = {
             'uz': {
+                'pending_location': 'Lokatsiya kutilmoqda (Botda)',
                 'new': 'Qabul qilindi',
                 'contacted': 'Diagnostika jarayonida',
                 'in_progress': "Ta'mirlanmoqda",
@@ -548,6 +727,7 @@ def api_track_order(request):
                 'cancelled': "Bekor qilingan"
             },
             'ru': {
+                'pending_location': 'Ожидается геолокация (в боте)',
                 'new': 'Принято',
                 'contacted': 'На диагностике',
                 'in_progress': 'В процессе ремонта',
@@ -556,6 +736,7 @@ def api_track_order(request):
                 'cancelled': 'Отменен'
             },
             'en': {
+                'pending_location': 'Waiting for location (in bot)',
                 'new': 'Received',
                 'contacted': 'Diagnostic in progress',
                 'in_progress': 'In repair',
@@ -572,7 +753,14 @@ def api_track_order(request):
 
         phone_name = order.phone.name if order.phone else "Smartfon"
         part_name = order.comparison.title if order.comparison else "-"
-        price_val = int(order.comparison.total_price_uzs) if (order.comparison and order.comparison.total_price_uzs) else None
+        part_price_val = int(order.comparison.total_price_uzs) if (order.comparison and order.comparison.total_price_uzs) else None
+        delivery_fee_val = int(order.delivery_fee_uzs) if order.delivery_fee_uzs is not None else None
+        if order.final_total_uzs is not None:
+            final_total_val = int(order.final_total_uzs)
+        elif part_price_val is not None:
+            final_total_val = part_price_val + (delivery_fee_val or 0)
+        else:
+            final_total_val = delivery_fee_val
 
         return JsonResponse({
             'found': True,
@@ -580,36 +768,74 @@ def api_track_order(request):
             'client_masked': masked_name,
             'device_model': phone_name,
             'issue_title': part_name,
-            'price_uzs': price_val,
+            'service_type': order.service_type,
+            'part_price_uzs': part_price_val,
+            'distance_km': float(order.distance_km) if order.distance_km is not None else None,
+            'delivery_fee_uzs': delivery_fee_val,
+            'final_total_uzs': final_total_val,
+            'price_uzs': final_total_val,
             'status': order.status,
             'status_display': status_text,
             'current_step': current_step,
             'created_at': order.created_at.strftime('%d.%m.%Y %H:%M'),
         })
     except Exception as e:
-        return JsonResponse({'found': False, 'error': str(e)}, status=500)
+        logger.error(f"Error in api_track_order: {e}", exc_info=True)
+        return JsonResponse({'found': False, 'error': "Buyurtma holatini tekshirishda xatolik yuz berdi."}, status=500)
 
 
-@csrf_exempt
 @require_POST
 def api_submit_review(request):
-    """Mijoz fikri qabul qilish (Anti-Spam: 1 ta qurilma + 1 ta IP dan 24 soatda faqat 1 marta)"""
+    """Mijoz fikri qabul qilish (Faqat Telegram Auth + Anti-Spam: 24 soatda faqat 1 marta)"""
     try:
-        data = json.loads(request.body)
-        client_name = escape(data.get('client_name', '').strip())
-        device_model = escape(data.get('device_model', '').strip())
-        service_type = escape(data.get('service_type', '').strip())
-        rating = int(data.get('rating', 5))
-        comment = escape(data.get('comment', '').strip())
-        device_fp = escape(data.get('device_fingerprint', '').strip())
-        lang = data.get('lang', 'uz')
+        raw_data = {}
+        try:
+            if request.body:
+                parsed = json.loads(request.body.decode('utf-8'))
+                if isinstance(parsed, dict):
+                    raw_data = parsed
+                else:
+                    raw_data = None
+        except (ValueError, UnicodeDecodeError):
+            raw_data = None
 
-        if not client_name or not comment:
+        lang = str((raw_data.get('lang') if isinstance(raw_data, dict) else '') or get_language() or 'uz').strip()[:2]
+
+        # Majburiy Telegram sessiya tekshiruvi
+        tg_user = get_current_telegram_user(request)
+        if not tg_user:
+            auth_err = {
+                'ru': "Чтобы оставить отзыв, необходимо войти через Telegram.",
+                'en': "Please sign in with Telegram to leave a review.",
+                'uz': "Fikr qoldirish uchun avval Telegram orqali kiring.",
+            }.get(lang, "Fikr qoldirish uchun avval Telegram orqali kiring.")
+            return JsonResponse({
+                'success': False,
+                'auth_required': True,
+                'error': auth_err,
+            }, status=401)
+
+        if raw_data is None:
+            return JsonResponse({'success': False, 'error': "Noto'g'ri so'rov formati."}, status=400)
+
+        data = raw_data
+        # Ism faqat sessiyadagi tasdiqlangan Telegram profilidan olinadi
+        client_name = tg_user.full_name[:100]
+        device_model = str(data.get('device_model', '')).strip()[:100]
+        service_type = str(data.get('service_type', '')).strip()[:100]
+        try:
+            rating = int(data.get('rating', 5))
+        except (TypeError, ValueError):
+            rating = 5
+        comment = str(data.get('comment', '')).strip()[:1000]
+        device_fp = str(data.get('device_fingerprint', '')).strip()[:100]
+
+        if not comment:
             err_msg = {
-                'ru': "Пожалуйста, укажите имя и напишите отзыв.",
-                'en': "Please enter your name and review text.",
-                'uz': "Iltimos, ismingizni va fikringizni yozing."
-            }.get(lang, "Ism va fikr matni kiritilishi shart.")
+                'ru': "Пожалуйста, напишите текст отзыва.",
+                'en': "Please enter your review text.",
+                'uz': "Iltimos, fikringizni yozing.",
+            }.get(lang, "Fikr matni kiritilishi shart.")
             return JsonResponse({'success': False, 'error': err_msg}, status=400)
 
         if rating < 1 or rating > 5:
@@ -618,30 +844,37 @@ def api_submit_review(request):
         client_ip = get_client_ip(request)
         one_day_ago = timezone.now() - timedelta(hours=24)
 
-        # 1. IP tekshiruvi (Oxirgi 24 soat ichida)
-        ip_has_reviewed = Review.objects.filter(
-            ip_address=client_ip,
-            created_at__gte=one_day_ago
+        # 1. Telegram foydalanuvchi tekshiruvi (Oxirgi 24 soat ichida)
+        tg_has_reviewed = Review.objects.filter(
+            telegram_user=tg_user,
+            created_at__gte=one_day_ago,
         ).exists()
 
-        # 2. Qurilma identifikatori (Fingerprint) tekshiruvi (Oxirgi 24 soat ichida)
+        # 2. IP tekshiruvi (Oxirgi 24 soat ichida)
+        ip_has_reviewed = Review.objects.filter(
+            ip_address=client_ip,
+            created_at__gte=one_day_ago,
+        ).exists()
+
+        # 3. Qurilma identifikatori (Fingerprint) tekshiruvi (Oxirgi 24 soat ichida)
         device_has_reviewed = False
         if device_fp:
             device_has_reviewed = Review.objects.filter(
                 device_fingerprint=device_fp,
-                created_at__gte=one_day_ago
+                created_at__gte=one_day_ago,
             ).exists()
 
-        if ip_has_reviewed or device_has_reviewed:
+        if tg_has_reviewed or ip_has_reviewed or device_has_reviewed:
             limit_msg = {
-                'ru': "Вы уже оставляли отзыв за последние 24 часа. С одного устройства и IP разрешен только 1 отзыв в день!",
-                'en': "You have already submitted a review in the last 24 hours. Only 1 review per day is allowed from the same device and IP!",
-                'uz': "Siz oxirgi 24 soat ichida fikr qoldirgansiz. 1 ta qurilma va IP dan kunda faqat 1 marta sharh yozish mumkin!"
+                'ru': "Вы уже оставляли отзыв за последние 24 часа. С одного аккаунта, устройства или IP разрешен только 1 отзыв в день!",
+                'en': "You have already submitted a review in the last 24 hours. Only 1 review per day is allowed per account, device, or IP!",
+                'uz': "Siz oxirgi 24 soat ichida fikr qoldirgansiz. 1 ta Telegram akkount, qurilma va IP dan kunda faqat 1 marta sharh yozish mumkin!",
             }.get(lang, "Kunda faqat 1 marta fikr qoldirish mumkin!")
             return JsonResponse({'success': False, 'error': limit_msg}, status=429)
 
         # Sharhni bazaga saqlash
         review = Review.objects.create(
+            telegram_user=tg_user,
             client_name=client_name,
             device_model=device_model or "Smartfon",
             service_type=service_type or "Servis xizmati",
@@ -652,14 +885,18 @@ def api_submit_review(request):
             is_verified=True,
         )
 
-        # Telegram bot orqali barcha adminlarga bildirishnoma yuborish
+        # Telegram bot orqali barcha faol adminlarga bildirishnoma yuborish
         bot_token = settings.TELEGRAM_BOT_TOKEN
         admin_chat_ids_raw = getattr(settings, 'TELEGRAM_ADMIN_CHAT_ID', '') or ''
         admin_ids = [i.strip() for i in str(admin_chat_ids_raw).split(',') if i.strip()]
 
-        # Dinamik BotAdmin larni ham qo'shamiz
+        # Dinamik faol BotAdmin larni ham qo'shamiz
         try:
-            db_admin_ids = list(BotAdmin.objects.exclude(telegram_id__isnull=True).values_list('telegram_id', flat=True))
+            db_admin_ids = list(
+                BotAdmin.objects.filter(is_active=True)
+                .exclude(telegram_id__isnull=True)
+                .values_list('telegram_id', flat=True)
+            )
             for aid in db_admin_ids:
                 if str(aid) not in admin_ids:
                     admin_ids.append(str(aid))
@@ -669,25 +906,26 @@ def api_submit_review(request):
         if bot_token and admin_ids:
             try:
                 stars_str = '⭐️' * review.rating
+                tg_link_label = f"@{escape(tg_user.username)}" if tg_user.username else f"ID: {tg_user.telegram_id}"
                 text = (
                     f"💬 <b>YANGI MIJOZ SHARHI!</b>\n\n"
-                    f"👤 <b>Mijoz:</b> {review.client_name}\n"
-                    f"📱 <b>Model:</b> {review.device_model}\n"
-                    f"🔧 <b>Xizmat:</b> {review.service_type}\n"
+                    f"👤 <b>Mijoz:</b> {escape(review.client_name)}\n"
+                    f"🔗 <b>Telegram:</b> <a href=\"{escape(tg_user.tg_profile_url)}\">{tg_link_label}</a>\n"
+                    f"📱 <b>Model:</b> {escape(review.device_model)}\n"
+                    f"🔧 <b>Xizmat:</b> {escape(review.service_type)}\n"
                     f"⭐️ <b>Baho:</b> {stars_str} ({review.rating}/5)\n"
-                    f"📝 <b>Fikr:</b> \"<i>{review.comment}</i>\"\n"
-                    f"🌐 <b>IP:</b> <code>{client_ip}</code>"
+                    f"📝 <b>Fikr:</b> \"<i>{escape(review.comment)}</i>\"\n"
+                    f"🌐 <b>IP:</b> <code>{escape(client_ip)}</code>"
                 )
-                url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-                for aid in admin_ids:
-                    try:
-                        requests.post(url, json={
-                            'chat_id': aid,
-                            'text': text,
-                            'parse_mode': 'HTML'
-                        }, timeout=3)
-                    except Exception:
-                        pass
+                _send_telegram_notifications_async(
+                    bot_token=bot_token,
+                    admin_ids=admin_ids,
+                    payload_base={
+                        'text': text,
+                        'parse_mode': 'HTML',
+                        'disable_web_page_preview': True,
+                    }
+                )
             except Exception:
                 pass
 
@@ -711,7 +949,8 @@ def api_submit_review(request):
             }
         })
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        logger.error(f"Error in api_submit_review: {e}", exc_info=True)
+        return JsonResponse({'success': False, 'error': "Fikrni saqlashda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring."}, status=500)
 
 
 @require_GET
@@ -761,6 +1000,147 @@ def sitemap_xml_view(request):
 
     xml_lines.append('</urlset>')
     return HttpResponse("\n".join(xml_lines), content_type="application/xml; charset=utf-8")
+
+
+# --- Telegram Bot Authentication APIs (Verified +998 Phone Only) ---
+
+@ensure_csrf_cookie
+@require_GET
+def api_auth_me(request):
+    """Joriy Telegram sessiya holatini qaytarish"""
+    tg_user = get_current_telegram_user(request)
+    return JsonResponse({
+        'authenticated': tg_user is not None,
+        'user': serialize_telegram_user(tg_user),
+        'bot_username': get_bot_username(),
+    })
+
+
+@require_POST
+def api_auth_deeplink_start(request):
+    """Telegram Bot Deep-Link zaxira login uchun bir martalik AuthToken yaratish"""
+    lang = str(get_language() or 'uz').strip()[:2]
+    try:
+        if request.body:
+            body_data = json.loads(request.body.decode('utf-8'))
+            if isinstance(body_data, dict) and body_data.get('lang'):
+                lang = str(body_data.get('lang')).strip()[:2]
+    except (ValueError, UnicodeDecodeError):
+        pass
+
+    bot_username = get_bot_username()
+    if not bot_username:
+        err = {
+            'ru': "Имя Telegram бота не настроено. Пожалуйста, попробуйте позже.",
+            'en': "Telegram bot username is not configured. Please try again later.",
+            'uz': "Telegram bot nomi aniqlanmadi. Iltimos, birozdan so'ng qayta urinib ko'ring.",
+        }.get(lang, "Telegram bot nomi aniqlanmadi.")
+        return JsonResponse({'success': False, 'error': err}, status=503)
+
+    if not request.session.session_key:
+        request.session.create()
+    session_key = request.session.session_key
+
+    token_str = secrets.token_urlsafe(24)
+    expires_at = timezone.now() + timedelta(minutes=5)
+    auth_token = AuthToken.objects.create(
+        token=token_str,
+        session_key=session_key,
+        expires_at=expires_at,
+    )
+
+    bot_url = f"https://t.me/{bot_username}?start=login_{auth_token.token}"
+    return JsonResponse({
+        'success': True,
+        'token': auth_token.token,
+        'bot_url': bot_url,
+        'expires_in': 300,
+    })
+
+
+@require_GET
+def api_auth_deeplink_status(request):
+    """Deep-Link login token holatini polling qilish va tasdiqlanganda atomar sessiya ochish"""
+    token_str = request.GET.get('token', '').strip()
+    lang = str(request.GET.get('lang') or get_language() or 'uz').strip()[:2]
+    if not token_str:
+        return JsonResponse({'status': 'invalid', 'authenticated': False}, status=400)
+
+    session_key = request.session.session_key
+    if not session_key:
+        return JsonResponse({'status': 'invalid', 'authenticated': False}, status=403)
+
+    auth_token = (
+        AuthToken.objects.select_related('telegram_user')
+        .filter(token=token_str, session_key=session_key)
+        .first()
+    )
+    if not auth_token:
+        return JsonResponse({'status': 'invalid', 'authenticated': False}, status=404)
+
+    if auth_token.rejected_reason == 'non_uz_phone':
+        uz_err = {
+            'ru': "Доступ разрешен только для номеров Узбекистана (+998).",
+            'en': "Only Uzbekistan (+998) phone numbers are allowed to sign in.",
+            'uz': "Faqat O'zbekiston (+998) telefon raqamlari orqali kirish mumkin!",
+        }.get(lang, "Faqat O'zbekiston (+998) telefon raqamlari orqali kirish mumkin!")
+        return JsonResponse({
+            'status': 'rejected',
+            'reason': 'non_uz_phone',
+            'authenticated': False,
+            'error': uz_err,
+        }, status=403)
+
+    if auth_token.is_used:
+        return JsonResponse({'status': 'used', 'authenticated': False}, status=410)
+
+    now = timezone.now()
+    if now >= auth_token.expires_at:
+        return JsonResponse({'status': 'expired', 'authenticated': False})
+
+    if not auth_token.is_confirmed or not auth_token.telegram_user:
+        return JsonResponse({'status': 'pending', 'authenticated': False})
+
+    if not is_uzbek_phone_number(auth_token.telegram_user.phone_number):
+        return JsonResponse({
+            'status': 'rejected',
+            'reason': 'non_uz_phone',
+            'authenticated': False,
+            'error': "Faqat O'zbekiston (+998) telefon raqamlari orqali kirish mumkin!",
+        }, status=403)
+
+    with transaction.atomic():
+        updated = AuthToken.objects.filter(
+            pk=auth_token.pk,
+            session_key=session_key,
+            is_confirmed=True,
+            is_used=False,
+            rejected_reason='',
+            expires_at__gt=now,
+        ).update(is_used=True)
+
+    if not updated:
+        return JsonResponse({'status': 'used', 'authenticated': False}, status=410)
+
+    tg_user = auth_token.telegram_user
+    login_telegram_session(request, tg_user)
+
+    return JsonResponse({
+        'status': 'confirmed',
+        'authenticated': True,
+        'user': serialize_telegram_user(tg_user),
+    })
+
+
+@require_POST
+def api_auth_logout(request):
+    """Telegram sessiyasidan chiqish"""
+    logout_telegram_session(request)
+    return JsonResponse({
+        'success': True,
+        'authenticated': False,
+    })
+
 
 
 

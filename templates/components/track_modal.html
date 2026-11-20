@@ -1,7 +1,8 @@
+{% load static i18n %}
 <!-- Order Tracking Modal -->
-<div id="track-modal" class="modal-backdrop" aria-hidden="true" style="display: none;">
+<div id="track-modal" class="modal-backdrop" aria-hidden="true">
   <div class="modal-card track-modal-card">
-    <button type="button" class="modal-close-btn" id="btn-close-track-modal" aria-label="Yopish">&times;</button>
+    <button type="button" class="modal-close-btn" id="btn-close-track-modal" aria-label="{% trans 'Close' %}">&times;</button>
     
     <div class="track-modal-header">
       <div class="track-modal-icon">🔍</div>
@@ -18,7 +19,7 @@
     </div>
 
     <!-- Search Form -->
-    <form id="track-order-form" class="track-form" onsubmit="return false;">
+    <form id="track-order-form" class="track-form">
       <div class="track-input-group">
         <span class="track-input-prefix">#</span>
         <input 
@@ -33,20 +34,20 @@
         >
         <button type="submit" id="btn-submit-track" class="btn-track-submit">
           <span class="btn-text">{{ t.track_btn }}</span>
-          <span class="btn-spinner" style="display: none;">⏳</span>
+          <span class="btn-spinner hidden">⏳</span>
         </button>
       </div>
-      <div id="track-error-msg" class="track-error" style="display: none;"></div>
+      <div id="track-error-msg" class="track-error hidden"></div>
     </form>
 
     <!-- Tracking Result Box -->
-    <div id="track-result-box" class="track-result-box" style="display: none;">
+    <div id="track-result-box" class="track-result-box hidden">
       <div class="track-result-header">
         <div>
           <span class="track-badge-id" id="track-res-id">#MP-000000</span>
-          <h4 class="track-res-device" id="track-res-device">Samsung Galaxy S24 Ultra</h4>
+          <h4 class="track-res-device" id="track-res-device">-</h4>
         </div>
-        <div class="track-status-pill" id="track-res-pill">Ta'mirlanmoqda</div>
+        <div class="track-status-pill" id="track-res-pill">-</div>
       </div>
 
       <!-- 4-Step Stepper -->
@@ -84,19 +85,19 @@
       <div class="track-meta-grid">
         <div class="track-meta-item">
           <div class="meta-label">{% if current_lang == 'ru' %}Клиент{% elif current_lang == 'en' %}Client{% else %}Mijoz{% endif %}</div>
-          <div class="meta-val" id="track-res-client">Mu***ov</div>
+          <div class="meta-val" id="track-res-client">-</div>
         </div>
         <div class="track-meta-item">
           <div class="meta-label">{% if current_lang == 'ru' %}Услуга / Деталь{% elif current_lang == 'en' %}Service / Part{% else %}Xizmat / Detal{% endif %}</div>
-          <div class="meta-val" id="track-res-service">Original ekran</div>
+          <div class="meta-val" id="track-res-service">-</div>
         </div>
         <div class="track-meta-item">
           <div class="meta-label">{% if current_lang == 'ru' %}Сумма{% elif current_lang == 'en' %}Price{% else %}Narxi{% endif %}</div>
-          <div class="meta-val highlight" id="track-res-price">1,850,000 so'm</div>
+          <div class="meta-val highlight" id="track-res-price">-</div>
         </div>
         <div class="track-meta-item">
           <div class="meta-label">{% if current_lang == 'ru' %}Дата приема{% elif current_lang == 'en' %}Date{% else %}Qabul vaqti{% endif %}</div>
-          <div class="meta-val" id="track-res-date">24.10.2026 12:00</div>
+          <div class="meta-val" id="track-res-date">-</div>
         </div>
       </div>
 

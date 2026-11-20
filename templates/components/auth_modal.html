@@ -1,0 +1,97 @@
+{% load static i18n %}
+<!-- Telegram Bot Authentication Modal (Verified +998 Phone Only) -->
+<div
+  id="auth-modal"
+  class="modal-backdrop"
+  aria-hidden="true"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="auth-modal-title"
+  data-authenticated="{% if tg_user %}1{% else %}0{% endif %}"
+  data-bot-username="{{ telegram_bot_username|default:'' }}"
+  data-user-id="{{ tg_user.id|default:'' }}"
+  data-telegram-id="{{ tg_user.telegram_id|default:'' }}"
+  data-full-name="{{ tg_user.full_name|default:'' }}"
+  data-username="{{ tg_user.username|default:'' }}"
+  data-phone-number="{{ tg_user.phone_number|default:'' }}"
+  data-display-handle="{{ tg_user.display_handle|default:'' }}"
+  data-photo-url="{{ tg_user.photo_url|default:'' }}"
+  data-initials="{{ tg_user.initials|default:'TG' }}"
+>
+  <div class="modal-card auth-modal-card">
+    <button type="button" class="modal-close-btn" id="btn-close-auth-modal" aria-label="{% trans 'Close' %}">&times;</button>
+
+    <div class="auth-csrf-holder" aria-hidden="true">{% csrf_token %}</div>
+
+    <div class="auth-modal-header">
+      <div class="auth-modal-badge" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+        </svg>
+      </div>
+      <h3 class="auth-modal-title" id="auth-modal-title">{% trans "Telegram orqali kirish" %}</h3>
+      <p class="auth-modal-subtitle">
+        {% trans "Buyurtma berish va fikr qoldirish uchun Telegram bot orqali O'zbekiston (+998) raqamingizni tasdiqlang." %}
+      </p>
+    </div>
+
+    <!-- Read-Only Security Notice -->
+    <div class="auth-security-box">
+      <div class="auth-security-icon" aria-hidden="true">🛡️</div>
+      <div class="auth-security-copy">
+        <div class="auth-security-title">{% trans "100% Xavfsiz (Faqat +998 raqamlar)" %}</div>
+        <p class="auth-security-text">
+          {% trans "Biz Telegram akkountingizga kira olmaymiz va sizning nomingizdan hech kimga xabar yubora olmaymiz. Faqat ochiq profil ma'lumotlaringiz va buyurtma uchun tasdiqlangan telefon raqamingiz olinadi." %}
+        </p>
+      </div>
+    </div>
+
+    <div id="auth-modal-alert" class="auth-alert hidden" role="alert"></div>
+
+    <!-- Telegram Bot Deep-Link Login (Only Auth Method) -->
+    <div class="auth-method-block">
+      <div class="auth-bot-steps">
+        <div class="auth-bot-step">
+          <span class="auth-step-num">1</span>
+          <span>{% trans "Pastdagi tugmani bosib Telegram botni oching" %}</span>
+        </div>
+        <div class="auth-bot-step">
+          <span class="auth-step-num">2</span>
+          <span>{% trans "Botda Start bosing va «📱 Telefon raqamni yuborish» tugmasini bosing" %}</span>
+        </div>
+        <div class="auth-bot-step">
+          <span class="auth-step-num">3</span>
+          <span>{% trans "O'zbekiston (+998) raqamingiz tasdiqlangach, sahifa avtomatik ochiladi" %}</span>
+        </div>
+      </div>
+
+      <button type="button" id="btn-auth-deeplink" class="btn-auth-deeplink">
+        <svg class="auth-tg-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+        </svg>
+        <span class="btn-deeplink-text">{% trans "Telegram Bot orqali kirish" %}</span>
+      </button>
+
+      <div id="auth-deeplink-panel" class="auth-deeplink-panel hidden">
+        <div class="auth-polling-row">
+          <span class="auth-polling-dot" aria-hidden="true"></span>
+          <span id="auth-deeplink-status-text" class="auth-polling-text">
+            {% trans "Telegram botda Start bosing va «📱 Telefon raqamni yuborish» tugmasi orqali +998 raqamingizni tasdiqlang..." %}
+          </span>
+        </div>
+        <a
+          id="auth-deeplink-open-link"
+          href="#"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn-auth-deeplink-open"
+        >
+          {% trans "Telegram botni ochish →" %}
+        </a>
+        <button type="button" id="btn-auth-deeplink-retry" class="btn-auth-deeplink-retry hidden">
+          {% trans "Yangi havola olish" %}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

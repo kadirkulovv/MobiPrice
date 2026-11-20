@@ -1,5 +1,9 @@
-<section class="container faq-section">
+{% load static i18n %}
+<section class="container faq-section" id="faq">
   <div class="section-header">
+    <div class="section-badge">
+      <span>💡</span> {% if current_lang == 'ru' %}БАЗА ЗНАНИЙ TECH-LAB{% elif current_lang == 'en' %}TECH-LAB KNOWLEDGE BASE{% else %}TECH-LAB BILIMLAR BAZASI{% endif %}
+    </div>
     <h2>{{ t.faq_title|safe }}</h2>
     <p>{{ t.faq_sub }}</p>
   </div>
@@ -13,7 +17,7 @@
           {% elif current_lang == 'en' %}{{ faq.question_en|default:faq.question }}
           {% else %}{{ faq.question }}{% endif %}
         </span>
-        <span style="font-size: 20px;">▾</span>
+        <span class="faq-arrow">▾</span>
       </div>
       <div class="faq-answer">
         {% if current_lang == 'ru' %}{{ faq.answer_ru|default:faq.answer }}

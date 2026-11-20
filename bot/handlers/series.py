@@ -1,3 +1,4 @@
+import html
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
@@ -5,12 +6,15 @@ from bot.keyboards.main_menu import get_section_crud_menu, get_cancel_menu
 from bot.keyboards.common import build_3_row_reply_kb, build_3_row_inline_kb
 from bot.states.admin_states import SeriesAddStates, SeriesEditStates
 from bot.database import Brand, DeviceSeries, sync_to_async
+from bot.handlers.start import require_site_admin
 
 router = Router()
 
 
 @router.message(F.text == "📂 Modellar")
 async def series_menu(message: Message, state: FSMContext):
+    if not await require_site_admin(message):
+        return
     await state.clear()
     await message.answer(
         "📂 <b>Model seriyalari bo‘limi</b>\n\n"
@@ -23,6 +27,8 @@ async def series_menu(message: Message, state: FSMContext):
 
 @router.message(F.text == "📋 Model ro‘yxati")
 async def list_series(message: Message):
+    if not await require_site_admin(message):
+        return
     series_list = await sync_to_async(list)(
         DeviceSeries.objects.select_related('brand').all().order_by('brand__name', 'name')
     )
@@ -36,14 +42,16 @@ async def list_series(message: Message):
     for s in series_list:
         if s.brand.name != current_brand:
             current_brand = s.brand.name
-            text += f"\n🏷 <b>{current_brand}:</b>\n"
-        text += f"  • {s.name} (id: <code>{s.id}</code>)\n"
+            text += f"\n🏷 <b>{html.escape(current_brand)}:</b>\n"
+        text += f"  • {html.escape(s.name)} (id: <code>{s.id}</code>)\n"
 
     await message.answer(text, parse_mode="HTML")
 
 
 @router.message(F.text == "➕ Yangi Model qo‘shish")
 async def add_series_start(message: Message, state: FSMContext):
+    if not await require_site_admin(message):
+        return
     brands = await sync_to_async(list)(Brand.objects.filter(is_active=True).order_by('name'))
     if not brands:
         await message.answer("Avval brend qo‘shishingiz kerak! Hozircha bazada brendlar yo‘q.")
@@ -63,6 +71,8 @@ async def add_series_start(message: Message, state: FSMContext):
 
 @router.message(SeriesAddStates.waiting_for_brand, F.text)
 async def process_series_brand(message: Message, state: FSMContext):
+    if not await require_site_admin(message):
+        return
     brand_name = message.text.strip()
     try:
         brand = await sync_to_async(Brand.objects.get)(name__iexact=brand_name)
@@ -74,7 +84,7 @@ async def process_series_brand(message: Message, state: FSMContext):
     await state.set_state(SeriesAddStates.waiting_for_name)
 
     await message.answer(
-        f"✅ Tanlangan brend: <b>{brand.name}</b>\n\n"
+        f"✅ Tanlangan brend: <b>{html.escape(brand.name)}</b>\n\n"
         f"Endi ushbu brend uchun <b>model seriyasi nomini</b> kiriting:\n"
         f"<i>(Masalan: Pro seriya, Pro Max seriya, S seriya, A seriya, Redmi Note seriya...)</i>",
         reply_markup=get_cancel_menu(),
@@ -84,6 +94,8 @@ async def process_series_brand(message: Message, state: FSMContext):
 
 @router.message(SeriesAddStates.waiting_for_name, F.text)
 async def process_series_name(message: Message, state: FSMContext):
+    if not await require_site_admin(message):
+        return
     series_name = message.text.strip()
     if len(series_name) < 2:
         await message.answer("Nom juda qisqa. Qaytadan kiriting:")
@@ -91,7 +103,7 @@ async def process_series_name(message: Message, state: FSMContext):
 
     data = await state.get_data()
     brand_id = data.get('brand_id')
-    brand_name = data.get('brand_name')
+    brand_name = data.get('brand_name', '')
 
     exists = await sync_to_async(DeviceSeries.objects.filter(brand_id=brand_id, name__iexact=series_name).exists)()
     if exists:
@@ -106,8 +118,8 @@ async def process_series_name(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(
         f"🎉 <b>Yangi model seriyasi muvaffaqiyatli saqlandi!</b>\n\n"
-        f"🏷 Brend: <b>{brand_name}</b>\n"
-        f"📂 Model seriyasi: <b>{series.name}</b>",
+        f"🏷 Brend: <b>{html.escape(brand_name)}</b>\n"
+        f"📂 Model seriyasi: <b>{html.escape(series.name)}</b>",
         reply_markup=get_section_crud_menu("Model"),
         parse_mode="HTML"
     )
@@ -115,6 +127,8 @@ async def process_series_name(message: Message, state: FSMContext):
 
 @router.message(F.text == "🗑 Model o‘chirish")
 async def delete_series_start(message: Message):
+    if not await require_site_admin(message):
+        return
     series_list = await sync_to_async(list)(DeviceSeries.objects.select_related('brand').all().order_by('brand__name', 'name'))
     if not series_list:
         await message.answer("O‘chirish uchun modellar mavjud emas.")
@@ -133,12 +147,14 @@ async def delete_series_start(message: Message):
 
 @router.callback_query(F.data.startswith("del_series_"))
 async def process_delete_series(call: CallbackQuery):
+    if not await require_site_admin(call):
+        return
     series_id = int(call.data.replace("del_series_", ""))
     try:
         series = await sync_to_async(DeviceSeries.objects.select_related('brand').get)(id=series_id)
         name = f"{series.brand.name} {series.name}"
         await sync_to_async(series.delete)()
-        await call.message.edit_text(f"✅ <b>{name}</b> seriyasi muvaffaqiyatli o‘chirildi!", parse_mode="HTML")
+        await call.message.edit_text(f"✅ <b>{html.escape(name)}</b> seriyasi muvaffaqiyatli o‘chirildi!", parse_mode="HTML")
     except Exception as e:
         await call.message.edit_text(f"Xatolik: {e}")
     await call.answer()
@@ -146,6 +162,8 @@ async def process_delete_series(call: CallbackQuery):
 
 @router.message(F.text == "✏️ Model tahrirlash")
 async def edit_series_start(message: Message):
+    if not await require_site_admin(message):
+        return
     series_list = await sync_to_async(list)(DeviceSeries.objects.select_related('brand').all().order_by('brand__name', 'name'))
     if not series_list:
         await message.answer("Tahrirlash uchun modellar mavjud emas.")
@@ -163,6 +181,8 @@ async def edit_series_start(message: Message):
 
 @router.callback_query(F.data.startswith("edit_series_"))
 async def process_select_series_for_edit(call: CallbackQuery, state: FSMContext):
+    if not await require_site_admin(call):
+        return
     series_id = int(call.data.replace("edit_series_", ""))
     try:
         series = await sync_to_async(DeviceSeries.objects.select_related('brand').get)(id=series_id)
@@ -170,7 +190,7 @@ async def process_select_series_for_edit(call: CallbackQuery, state: FSMContext)
         await state.set_state(SeriesEditStates.waiting_for_new_name)
 
         await call.message.edit_text(
-            f"✏️ <b>'{series.brand.name} - {series.name}' seriyasini tahrirlash</b>\n\n"
+            f"✏️ <b>'{html.escape(series.brand.name)} - {html.escape(series.name)}' seriyasini tahrirlash</b>\n\n"
             f"Yangi nomini yuboring:",
             parse_mode="HTML"
         )
@@ -181,6 +201,8 @@ async def process_select_series_for_edit(call: CallbackQuery, state: FSMContext)
 
 @router.message(SeriesEditStates.waiting_for_new_name, F.text)
 async def process_edit_series_name(message: Message, state: FSMContext):
+    if not await require_site_admin(message):
+        return
     new_name = message.text.strip()
     if len(new_name) < 2:
         await message.answer("Nom juda qisqa. Qaytadan kiriting:")
@@ -190,18 +212,24 @@ async def process_edit_series_name(message: Message, state: FSMContext):
     series_id = data.get('edit_series_id')
 
     try:
-        series = await sync_to_async(DeviceSeries.objects.get)(id=series_id)
+        series = await sync_to_async(DeviceSeries.objects.select_related('brand').get)(id=series_id)
+        dup = await sync_to_async(
+            DeviceSeries.objects.filter(brand_id=series.brand_id, name__iexact=new_name).exclude(id=series_id).exists
+        )()
+        if dup:
+            await message.answer(f"⚠️ '{new_name}' ushbu brend ostida allaqachon mavjud! Boshqa nom kiriting:")
+            return
+
         old_name = series.name
         series.name = new_name
-        from django.utils.text import slugify
-        series.slug = slugify(new_name)
+        series.slug = ""
         await sync_to_async(series.save)()
 
         await state.clear()
         await message.answer(
             f"✅ <b>Model seriyasi muvaffaqiyatli yangilandi!</b>\n\n"
-            f"Eski: <i>{old_name}</i>\n"
-            f"Yangi: <b>{new_name}</b>",
+            f"Eski: <i>{html.escape(old_name)}</i>\n"
+            f"Yangi: <b>{html.escape(new_name)}</b>",
             reply_markup=get_section_crud_menu("Model"),
             parse_mode="HTML"
         )

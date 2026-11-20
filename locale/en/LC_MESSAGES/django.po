@@ -1,0 +1,139 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: MobiPrice 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-21 01:45+0500\n"
+"PO-Revision-Date: 2026-11-21 01:45+0500\n"
+"Last-Translator: MobiPrice Team\n"
+"Language-Team: English\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Close"
+msgstr "Close"
+
+msgid "Language"
+msgstr "Language"
+
+msgid "Telegram orqali kirish"
+msgstr "Sign in with Telegram"
+
+msgid "Kirish"
+msgstr "Sign in"
+
+msgid "Chiqish"
+msgstr "Log out"
+
+msgid "Buyurtma berish va fikr qoldirish uchun Telegram bot orqali O'zbekiston (+998) raqamingizni tasdiqlang."
+msgstr "Verify your Uzbekistan (+998) phone number via our Telegram bot to place an order or leave a review."
+
+msgid "100% Xavfsiz (Faqat +998 raqamlar)"
+msgstr "100% Secure (+998 numbers only)"
+
+msgid "Biz Telegram akkountingizga kira olmaymiz va sizning nomingizdan hech kimga xabar yubora olmaymiz. Faqat ochiq profil ma'lumotlaringiz va buyurtma uchun tasdiqlangan telefon raqamingiz olinadi."
+msgstr "We cannot access your Telegram account or send messages on your behalf. Only your public profile details and verified phone number for order contact are collected."
+
+msgid "Botda Start bosing va «📱 Telefon raqamni yuborish» tugmasini bosing"
+msgstr "Press Start in the bot and tap the '📱 Telefon raqamni yuborish' button"
+
+msgid "O'zbekiston (+998) raqamingiz tasdiqlangach, sahifa avtomatik ochiladi"
+msgstr "Once your Uzbekistan (+998) number is verified, sign-in completes automatically"
+
+msgid "Telegram Bot orqali kirish"
+msgstr "Sign in via Telegram Bot"
+
+msgid "Telegram botda Start bosing va «📱 Telefon raqamni yuborish» tugmasi orqali +998 raqamingizni tasdiqlang..."
+msgstr "Press Start in the Telegram bot and share your Uzbekistan (+998) phone number using the button..."
+
+msgid "Telegram botni ochish →"
+msgstr "Open Telegram Bot →"
+
+msgid "Yangi havola olish"
+msgstr "Generate new link"
+
+msgid "Telegram profili"
+msgstr "Telegram Profile"
+
+msgid "Buyurtmangiz qabul qilindi!"
+msgstr "Order confirmed!"
+
+msgid "Holatni kuzatish →"
+msgstr "Track status →"
+
+msgid "Arizangiz ustalarimizga yuborildi. Quyidagi manzil orqali servis markazimizga kelishingiz mumkin:"
+msgstr "Your request has been sent to our technicians. Visit our service center at the address below:"
+
+msgid "Servis markazi manzili"
+msgstr "Service Center Address"
+
+msgid "Ish vaqti: 09:00 – 21:00 (har kuni)"
+msgstr "Working hours: 09:00 – 21:00 (daily)"
+
+msgid "Yopish"
+msgstr "Close"
+
+msgid "Lokatsiyani botga yuboring"
+msgstr "Share location in Telegram bot"
+
+msgid "Kuryer narxini masofa asosida aniq hisoblash va buyurtmani tasdiqlash uchun Telegram botga o'tib lokatsiyangizni yuboring."
+msgstr "Open our Telegram bot and share your location to calculate the exact courier fee and confirm your pickup."
+
+msgid "Pastdagi tugmani bosib Telegram botni oching"
+msgstr "Tap the button below to open our Telegram bot"
+
+msgid "Botda Start bosing va lokatsiyangizni yuboring"
+msgstr "Press Start in the bot and share your location"
+
+msgid "Kuryer narxi va jami chek darhol hisoblanadi"
+msgstr "Courier fee and final receipt are calculated instantly"
+
+msgid "Botga o'tib lokatsiya yuborish"
+msgstr "Open bot & send location"
+
+msgid "Lokatsiya kutilmoqda"
+msgstr "Waiting for location"
+
+msgid "Yangi ariza"
+msgstr "New request"
+
+msgid "Bog‘lanildi"
+msgstr "Contacted"
+
+msgid "Ta’mirlanmoqda"
+msgstr "In repair"
+
+msgid "Tayyor"
+msgstr "Ready"
+
+msgid "Topshirildi"
+msgstr "Completed"
+
+msgid "Bekor qilindi"
+msgstr "Cancelled"
+
+msgid "O'zim boraman (Servis markaziga)"
+msgstr "Visit service center myself"
+
+msgid "Kuryer orqali olib ketish"
+msgstr "Courier pickup"
+
+msgid "Original Zavod (Service Pack)"
+msgstr "Original Factory (Service Pack)"
+
+msgid "Original Donar (Yechib olingan)"
+msgstr "Original Donor (Pulled)"
+
+msgid "OLED GX / ZY (Originalga eng yaqin)"
+msgstr "OLED GX / ZY (Closest to Original)"
+
+msgid "Incell / TFT (Hamyonbop Kopiya)"
+msgstr "Incell / TFT (Budget Copy)"
+
+msgid "Telegram foydalanuvchi"
+msgstr "Telegram user"
+
+msgid "Telefon raqami"
+msgstr "Phone number"
+

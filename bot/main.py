@@ -2,18 +2,18 @@ import asyncio
 import logging
 import sys
 
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, BaseMiddleware
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import BotCommand
+from aiogram.types import BotCommand, TelegramObject
 
 # Bootstrap Django ORM before importing any handlers
 import bot.database
+from bot.database import close_old_connections, sync_to_async
 
 from bot.config import BOT_TOKEN, ADMIN_IDS
-from bot.handlers import start, brands, series, phones, issues, comparisons, masters, admins, crm, excel
-
+from bot.handlers import client, start, brands, series, phones, issues, comparisons, masters, admins, crm, excel
 
 
 # Configure logging
@@ -23,6 +23,17 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger("mobiprice_bot")
+_backup_scheduler_task = None
+
+
+class DjangoDBCleanupMiddleware(BaseMiddleware):
+    """Uzoq ishlovchi bot protsessida SQLite WAL ulanishlarini yangilab turish"""
+    async def __call__(self, handler, event: TelegramObject, data: dict):
+        await sync_to_async(close_old_connections)()
+        try:
+            return await handler(event, data)
+        finally:
+            await sync_to_async(close_old_connections)()
 
 
 async def set_bot_commands(bot: Bot):
@@ -36,13 +47,14 @@ async def set_bot_commands(bot: Bot):
 
 
 async def on_startup(bot: Bot):
+    global _backup_scheduler_task
     logger.info("MobiPrice Admin Bot ishga tushdi!")
     logger.info(f"Ruxsat berilgan Admin IDlar: {ADMIN_IDS}")
     await set_bot_commands(bot)
 
     # Start daily 00:00 (Asia/Tashkent) database backup scheduler
     from core.backup_service import daily_backup_scheduler_task
-    asyncio.create_task(daily_backup_scheduler_task(bot))
+    _backup_scheduler_task = asyncio.create_task(daily_backup_scheduler_task(bot))
 
     for admin_id in ADMIN_IDS:
         try:
@@ -55,7 +67,15 @@ async def on_startup(bot: Bot):
 
 
 async def on_shutdown(bot: Bot):
+    global _backup_scheduler_task
     logger.info("MobiPrice Admin Bot to'xtatilmoqda...")
+    if _backup_scheduler_task and not _backup_scheduler_task.done():
+        _backup_scheduler_task.cancel()
+        try:
+            await _backup_scheduler_task
+        except asyncio.CancelledError:
+            pass
+
     for admin_id in ADMIN_IDS:
         try:
             await bot.send_message(
@@ -76,8 +96,10 @@ async def main():
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     dp = Dispatcher(storage=MemoryStorage())
+    dp.update.outer_middleware(DjangoDBCleanupMiddleware())
 
-    # Register routers in logical sequence
+    # Register routers in logical sequence (client deep-link router MUST come before start.router)
+    dp.include_router(client.router)
     dp.include_router(start.router)
     dp.include_router(brands.router)
     dp.include_router(series.router)

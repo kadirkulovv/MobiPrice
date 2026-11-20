@@ -1,6 +1,7 @@
+import html
 from aiogram import Router, F, Bot
-from aiogram.filters import CommandStart, Command
-from aiogram.types import Message
+from aiogram.filters import CommandStart, Command, StateFilter
+from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from bot.config import ADMIN_IDS
 from bot.keyboards.main_menu import get_main_menu, get_section_crud_menu
@@ -25,8 +26,28 @@ async def is_site_admin(user_id: int, username: str = None) -> bool:
     return perms.can_manage_site
 
 
-@router.message(CommandStart())
-@router.message(F.text == "🔄 Yangilash")
+async def require_site_admin(event: Message | CallbackQuery) -> bool:
+    """Sayt resurslarini boshqarish huquqini tekshirish va ruxsat bo'lmasa xabar qaytarish"""
+    user = event.from_user
+    if not user:
+        return False
+    perms = await get_user_permissions(user.id, user.username)
+    if not perms.can_manage_site:
+        if isinstance(event, CallbackQuery):
+            await event.answer("⛔️ Ruxsat yo'q! Bu bo'lim faqat Sayt Adminlari uchun.", show_alert=True)
+        elif isinstance(event, Message):
+            await event.answer(
+                "⛔️ <b>Ruxsat yo‘q!</b>\n\n"
+                "Ushbu bo‘lim faqat <b>Sayt Administratorlari</b> va <b>Bosh Admin</b> uchun mo‘ljallangan.",
+                parse_mode="HTML"
+            )
+        return False
+    return True
+
+
+@router.message(StateFilter("*"), CommandStart())
+@router.message(StateFilter("*"), Command("menu"))
+@router.message(StateFilter("*"), F.text == "🔄 Yangilash")
 async def cmd_start(message: Message, state: FSMContext):
     """Start komandasi va rolga mos panelni ochish"""
     await state.clear()
@@ -37,10 +58,10 @@ async def cmd_start(message: Message, state: FSMContext):
     if not perms.has_any_access:
         await message.answer(
             f"⛔️ <b>Ruxsat yo‘q!</b>\n\n"
-            f"Assalomu alaykum, {message.from_user.full_name}!\n"
+            f"Assalomu alaykum, {html.escape(message.from_user.full_name or '')}!\n"
             f"Ushbu bot faqat <b>MobiPrice</b> admin va menejerlari uchun mo‘ljallangan.\n\n"
             f"Sizning Telegram ID: <code>{user_id}</code>\n"
-            f"Username: @{username or 'mavjud emas'}\n\n"
+            f"Username: @{html.escape(username or 'mavjud emas')}\n\n"
             f"Botdan foydalanish uchun Telegram ID yoki username'ingizni Bosh Adminga yuboring.",
             parse_mode="HTML"
         )
@@ -84,18 +105,21 @@ async def cmd_start(message: Message, state: FSMContext):
 
     await message.answer(
         f"{desc}\n\n"
-        f"Xush kelibsiz, <b>{message.from_user.first_name}</b>! Kerakli bo‘limni tanlang 👇",
+        f"Xush kelibsiz, <b>{html.escape(message.from_user.first_name or 'Admin')}</b>! Kerakli bo‘limni tanlang 👇",
         reply_markup=get_main_menu(perms),
         parse_mode="HTML"
     )
 
 
-@router.message(F.text == "🔙 Asosiy menyu")
-@router.message(F.text == "❌ Bekor qilish")
+@router.message(StateFilter("*"), Command("cancel"))
+@router.message(StateFilter("*"), F.text == "🔙 Asosiy menyu")
+@router.message(StateFilter("*"), F.text == "❌ Bekor qilish")
 async def back_to_main(message: Message, state: FSMContext):
     """Har qanday holatdan asosiy menyuga qaytish"""
     await state.clear()
     perms = await get_user_permissions(message.from_user.id, message.from_user.username)
+    if not perms.has_any_access:
+        return
     await message.answer(
         "🏠 Asosiy menyuga qaytdingiz. Kerakli bo‘limni tanlang:",
         reply_markup=get_main_menu(perms)
@@ -135,7 +159,7 @@ async def show_stats(message: Message):
 @router.message(F.text == "💾 Zaxira (Backup)")
 async def trigger_manual_backup(message: Message, bot: Bot):
     """Admin buyrug'i orqali tezkor zaxira nusxasini yuborish"""
-    if not await is_admin(message.from_user.id, message.from_user.username):
+    if not await require_site_admin(message):
         return
 
     from core.backup_service import send_backup_to_admins

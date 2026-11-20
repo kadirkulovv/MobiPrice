@@ -1,16 +1,16 @@
+{% load static i18n %}
 <footer>
   <div class="container footer-content">
-    <p style="font-weight: 800; color: #fff; font-size: 16px; margin-bottom: 6px;">MobiPrice — {% if current_lang == 'ru' %}Цены на запчасти и профессиональный ремонт{% elif current_lang == 'en' %}Smart Phone Spare Parts & Repair Pricing{% else %}Smartfonlar Ehtiyot Qismlari va Servis Narxlari{% endif %}</p>
+    <p class="footer-brand-title">MobiPrice — {% if current_lang == 'ru' %}Цены на запчасти и профессиональный ремонт{% elif current_lang == 'en' %}Smart Phone Spare Parts & Repair Pricing{% else %}Smartfonlar Ehtiyot Qismlari va Servis Narxlari{% endif %}</p>
     <div class="footer-contacts">
       <a href="tel:+998909197600" class="footer-link">📞 +998 (90) 919-76-00</a>
       <span class="footer-divider">•</span>
       <a href="tel:+998909187600" class="footer-link">📞 +998 (90) 918-76-00</a>
       <span class="footer-divider">•</span>
-      <a href="https://t.me/Murodjonmilyazov" target="_blank" rel="noopener" class="footer-link" style="color: #24a1de;">✈️ @Murodjonmilyazov</a>
+      <a href="https://t.me/Murodjonmilyazov" target="_blank" rel="noopener" class="footer-link footer-link-tg">✈️ @Murodjonmilyazov</a>
       <span class="footer-divider">•</span>
-      <a href="https://www.instagram.com/murodjonmilyazov_" target="_blank" rel="noopener" class="footer-link" style="color: #e1306c;">📸 @murodjonmilyazov_</a>
+      <a href="https://www.instagram.com/murodjonmilyazov_" target="_blank" rel="noopener" class="footer-link footer-link-ig">📸 @murodjonmilyazov_</a>
     </div>
-    <p style="font-size: 13px; color: var(--text-dim); margin-top: 10px;">© 2026 MobiPrice. {% if current_lang == 'ru' %}Все права защищены.{% elif current_lang == 'en' %}All rights reserved.{% else %}Barcha huquqlar himoyalangan.{% endif %}</p>
+    <p class="footer-copy">© 2026 MobiPrice. {% if current_lang == 'ru' %}Все права защищены.{% elif current_lang == 'en' %}All rights reserved.{% else %}Barcha huquqlar himoyalangan.{% endif %}</p>
   </div>
 </footer>
-

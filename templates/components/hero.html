@@ -1,28 +1,37 @@
+{% load static i18n %}
 <section class="hero">
   <div class="container">
-    <div class="hero-badge">
-      <span>⚡️</span> {{ t.hero_badge }}
-    </div>
-    <h1>
-      {{ t.hero_title|safe }}
-    </h1>
-    <p>
-      {{ t.hero_desc }}
-    </p>
-
-    <!-- Live Search Bar -->
-    <div class="search-box-wrapper">
-      <div class="search-input-group">
-        <span class="search-icon">🔍</span>
-        <input 
-          type="text" 
-          id="search-model-input" 
-          class="search-input" 
-          placeholder="{{ t.search_placeholder }}"
-          autocomplete="off"
-        >
+    <div class="hero-command-panel">
+      <div class="hero-top-meta">
+        <div class="hero-badge">
+          <span>⚡️</span> {{ t.hero_badge }}
+        </div>
+        <div class="hero-telemetry-tags">
+          <span class="telemetry-pill">OEM &amp; COPY LAB</span>
+          <span class="telemetry-pill telemetry-pill-live">● 30 MIN EXPRESS</span>
+        </div>
       </div>
-      <div id="search-dropdown" class="search-dropdown"></div>
+
+      <div class="hero-heading-group">
+        <h1>{{ t.hero_title|safe }}</h1>
+        <p>{{ t.hero_desc }}</p>
+      </div>
+
+      <!-- Spotlight Live Search Bar -->
+      <div class="search-box-wrapper">
+        <div class="search-input-group">
+          <span class="search-icon" aria-hidden="true">🔍</span>
+          <input
+            type="text"
+            id="search-model-input"
+            class="search-input"
+            placeholder="{{ t.search_placeholder }}"
+            autocomplete="off"
+          >
+          <span class="search-kbd-badge">LIVE DB</span>
+        </div>
+        <div id="search-dropdown" class="search-dropdown"></div>
+      </div>
     </div>
   </div>
 </section>

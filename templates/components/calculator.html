@@ -1,4 +1,4 @@
-{% load static %}
+{% load static i18n %}
 <section class="container" id="calculator">
   <div class="calc-card">
     <!-- Steps Progress Bar (5 Steps) -->
@@ -27,7 +27,7 @@
 
     <!-- Step 1: Brands -->
     <div id="step-1-brands" class="step-content">
-      <h2 style="font-size: 20px; font-weight: 800; margin-bottom: 24px; text-align: center;">
+      <h2 class="calc-step-heading">
         {{ t.step_1_head }}
       </h2>
       <div class="brands-grid">
@@ -35,9 +35,9 @@
         <div class="brand-card" data-brand-id="{{ b.id }}" data-brand-name="{{ b.name }}" data-brand-slug="{{ b.slug }}">
           <div class="brand-logo-icon">
             {% if b.logo %}
-              <img src="{{ b.logo.url }}" alt="{{ b.name }} logo" class="brand-real-logo brand-logo-{{ b.slug }}" loading="lazy">
+              <img src="{{ b.logo.url }}" alt="{{ b.name }} logo" class="brand-real-logo brand-logo-{{ b.slug }}" loading="lazy" onerror="this.onerror=function(){this.onerror=null;this.src='{% static 'img/icons/3.svg' %}';};this.src='{% static 'img/brands/' %}{{ b.slug }}.svg';">
             {% else %}
-              <img src="{% static 'img/brands/' %}{{ b.slug }}.svg" alt="{{ b.name }} logo" class="brand-real-logo brand-logo-{{ b.slug }}" loading="lazy">
+              <img src="{% static 'img/brands/' %}{{ b.slug }}.svg" alt="{{ b.name }} logo" class="brand-real-logo brand-logo-{{ b.slug }}" loading="lazy" onerror="this.onerror=null;this.src='{% static 'img/icons/3.svg' %}';">
             {% endif %}
           </div>
           <div class="brand-card-name">{{ b.name }}</div>
@@ -48,66 +48,66 @@
 
     <!-- Step 2: Series (Model) -->
     <div id="step-2-series" class="step-content hidden">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-        <div>
-          <span style="font-size: 13px; color: var(--neon-cyan); font-weight: 700;">
+      <div class="step-header-bar">
+        <div class="step-header-info">
+          <span class="step-selected-tag">
             {% if current_lang == 'ru' %}Выбранный бренд:{% elif current_lang == 'en' %}Selected brand:{% else %}Tanlangan brend:{% endif %}
           </span>
-          <h2 id="selected-brand-label" style="font-size: 20px; font-weight: 800;">-</h2>
-          <p style="font-size: 13px; color: var(--text-sub);">{{ t.step_2_sub }}</p>
+          <h2 id="selected-brand-label" class="step-selected-title">-</h2>
+          <p class="step-selected-sub">{{ t.step_2_sub }}</p>
         </div>
-        <button id="back-to-step-1" class="back-btn">{{ t.back_step_1 }}</button>
+        <button type="button" id="back-to-step-1" class="back-btn">{{ t.back_step_1 }}</button>
       </div>
-      <div id="series-list" class="series-grid models-grid"></div>
+      <div id="series-list" class="series-grid"></div>
     </div>
 
     <!-- Step 3: Phone -->
     <div id="step-3-phones" class="step-content hidden">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-        <div>
-          <span style="font-size: 13px; color: var(--neon-cyan); font-weight: 700;">
+      <div class="step-header-bar">
+        <div class="step-header-info">
+          <span class="step-selected-tag">
             {% if current_lang == 'ru' %}Выбранная серия:{% elif current_lang == 'en' %}Selected series:{% else %}Tanlangan seriya:{% endif %}
           </span>
-          <h2 id="selected-series-label" style="font-size: 20px; font-weight: 800;">-</h2>
-          <p style="font-size: 13px; color: var(--text-sub);">{{ t.step_3_sub }}</p>
+          <h2 id="selected-series-label" class="step-selected-title">-</h2>
+          <p class="step-selected-sub">{{ t.step_3_sub }}</p>
         </div>
-        <button id="back-to-step-2" class="back-btn">{{ t.back_step_2 }}</button>
+        <button type="button" id="back-to-step-2" class="back-btn">{{ t.back_step_2 }}</button>
       </div>
-      <div id="phones-list" class="phones-grid models-grid"></div>
+      <div id="phones-list" class="models-grid"></div>
     </div>
 
     <!-- Step 4: Issues (Muammo) -->
     <div id="step-4-issues" class="step-content hidden">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-        <div>
-          <span style="font-size: 13px; color: var(--neon-cyan); font-weight: 700;">
+      <div class="step-header-bar">
+        <div class="step-header-info">
+          <span class="step-selected-tag">
             {% if current_lang == 'ru' %}Выбранный телефон:{% elif current_lang == 'en' %}Selected phone:{% else %}Tanlangan telefon:{% endif %}
           </span>
-          <h2 id="selected-phone-label" style="font-size: 20px; font-weight: 800;">-</h2>
+          <h2 id="selected-phone-label" class="step-selected-title">-</h2>
         </div>
-        <button id="back-to-step-3" class="back-btn">{{ t.back_step_3 }}</button>
+        <button type="button" id="back-to-step-3" class="back-btn">{{ t.back_step_3 }}</button>
       </div>
 
-      <p style="color: var(--text-sub); margin-bottom: 20px;">{{ t.step_4_prompt }}</p>
+      <p class="step-prompt-text">{{ t.step_4_prompt }}</p>
 
-      <div id="issues-list" class="issues-grid parts-grid"></div>
+      <div id="issues-list" class="parts-grid"></div>
     </div>
 
     <!-- Step 5: Comparison Results (Solishtirish) -->
     <div id="step-5-results" class="step-content hidden">
       <div class="results-header">
-        <div>
-          <span style="font-size: 13px; color: var(--neon-cyan); font-weight: 700;">
+        <div class="step-header-info">
+          <span class="step-selected-tag">
             {% if current_lang == 'ru' %}Деталь / Проблема:{% elif current_lang == 'en' %}Part / Issue:{% else %}Detal / Muammo:{% endif %}
           </span>
-          <h2 id="selected-issue-label" style="font-size: 22px; font-weight: 800;">-</h2>
-          <p style="color: var(--text-sub); font-size: 14px;">
+          <h2 id="selected-issue-label" class="step-selected-title step-selected-title-lg">-</h2>
+          <p class="results-sub-text">
             {% if current_lang == 'ru' %}Ниже приведено сравнение оригинальных запчастей и качественных копий:
             {% elif current_lang == 'en' %}Below is the side-by-side comparison of original and quality copy parts:
             {% else %}Quyida ushbu detalning original va sifatli nusxa variantlari taqqoslangan:{% endif %}
           </p>
         </div>
-        <button id="back-to-step-4" class="back-btn">{{ t.back_step_4 }}</button>
+        <button type="button" id="back-to-step-4" class="back-btn">{{ t.back_step_4 }}</button>
       </div>
 
       <div id="comparisons-grid" class="options-comparison-grid"></div>

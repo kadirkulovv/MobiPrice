@@ -1,7 +1,7 @@
-{% load static %}
+{% load static i18n %}
 <section class="consultation-section" id="consultation">
   <div class="consultation-bg-wrap">
-    <img src="{% static 'img/team_workshop_bg.jpg' %}" alt="MobiPrice Repair Workshop" class="consultation-bg-img">
+    <img src="{% static 'img/team_workshop_bg.jpg' %}" alt="MobiPrice Repair Workshop" class="consultation-bg-img" loading="lazy" onerror="this.classList.add('hidden');">
     <div class="consultation-bg-overlay"></div>
   </div>
 
@@ -79,9 +79,8 @@
       <!-- Right: Interactive Instagram QR Card -->
       <div class="consult-qr-col" data-reveal="fade-left" data-delay="300">
         <a href="https://www.instagram.com/murodjonmilyazov_" target="_blank" rel="noopener" class="qr-interactive-card">
-          <div class="qr-glow-effect"></div>
           <div class="qr-frame">
-            <img src="{% static 'img/instagram_qr.png' %}" alt="Instagram QR @murodjonmilyazov_" class="qr-img">
+            <img src="{% static 'img/instagram_qr.png' %}" alt="Instagram QR @murodjonmilyazov_" class="qr-img" loading="lazy" onerror="this.onerror=null;this.src='{% static 'img/logo.jpg' %}';">
           </div>
           <div class="qr-card-footer">
             <div class="qr-ig-user">@MURODJONMILYAZOV_</div>
