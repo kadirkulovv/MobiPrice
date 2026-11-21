@@ -1,111 +1,77 @@
 {% load static i18n %}
-<!-- Order Tracking Modal -->
-<div id="track-modal" class="modal-backdrop" aria-hidden="true">
+<!-- Authenticated Client Orders Status Modal (Auto-loaded + 10-per-page Pagination) -->
+<div id="track-modal" class="modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="track-modal-title">
   <div class="modal-card track-modal-card">
     <button type="button" class="modal-close-btn" id="btn-close-track-modal" aria-label="{% trans 'Close' %}">&times;</button>
-    
+
     <div class="track-modal-header">
-      <div class="track-modal-icon">🔍</div>
-      <h3 class="track-modal-title">{{ t.track_modal_title }}</h3>
+      <div class="track-modal-icon" aria-hidden="true">📦</div>
+      <h3 class="track-modal-title" id="track-modal-title">{{ t.track_modal_title }}</h3>
       <p class="track-modal-subtitle">
-        {% if current_lang == 'ru' %}
-          Введите персональный ID заказа, чтобы узнать текущий статус ремонта вашего устройства
-        {% elif current_lang == 'en' %}
-          Enter your unique order ID to check the real-time repair progress of your smartphone
-        {% else %}
-          Qurilmangiz ta'mirlanish jarayonini real vaqtda kuzatish uchun buyurtma kodini kiriting
-        {% endif %}
+        {% trans "Telegram akkountingiz orqali berilgan barcha buyurtmalaringiz va ularning joriy holati" %}
       </p>
     </div>
 
-    <!-- Search Form -->
-    <form id="track-order-form" class="track-form">
-      <div class="track-input-group">
-        <span class="track-input-prefix">#</span>
-        <input 
-          type="text" 
-          id="track-order-input" 
-          class="track-input" 
-          placeholder="{{ t.track_placeholder }}" 
-          maxlength="20"
-          autocomplete="off"
-          spellcheck="false"
-          required
-        >
-        <button type="submit" id="btn-submit-track" class="btn-track-submit">
-          <span class="btn-text">{{ t.track_btn }}</span>
-          <span class="btn-spinner hidden">⏳</span>
+    <!-- Account Toolbar & Order Count -->
+    <div class="my-orders-toolbar">
+      <div class="my-orders-user-chip">
+        <span class="my-orders-user-dot" aria-hidden="true"></span>
+        <span class="my-orders-user-name" data-auth-name>{{ tg_user.full_name|default:'' }}</span>
+        <span class="my-orders-user-phone{% if not tg_user or not tg_user.phone_number %} hidden{% endif %}" data-auth-phone>{{ tg_user.phone_number|default:'' }}</span>
+      </div>
+      <div class="my-orders-toolbar-right">
+        <span id="my-orders-count-badge" class="my-orders-count-badge hidden">0</span>
+        <button type="button" id="btn-refresh-my-orders" class="btn-orders-refresh" title="{% trans 'Yangilash' %}" aria-label="{% trans 'Yangilash' %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" aria-hidden="true">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
         </button>
       </div>
-      <div id="track-error-msg" class="track-error hidden"></div>
-    </form>
+    </div>
 
-    <!-- Tracking Result Box -->
-    <div id="track-result-box" class="track-result-box hidden">
-      <div class="track-result-header">
-        <div>
-          <span class="track-badge-id" id="track-res-id">#MP-000000</span>
-          <h4 class="track-res-device" id="track-res-device">-</h4>
-        </div>
-        <div class="track-status-pill" id="track-res-pill">-</div>
-      </div>
+    <!-- Loading State -->
+    <div id="my-orders-loading" class="my-orders-state hidden">
+      <div class="loader-spinner"></div>
+      <p class="my-orders-state-text">{% trans "Buyurtmalaringiz yuklanmoqda..." %}</p>
+    </div>
 
-      <!-- 4-Step Stepper -->
-      <div class="track-stepper" id="track-stepper">
-        <div class="stepper-step" data-step="1">
-          <div class="step-circle"><span class="step-ico">📥</span></div>
-          <div class="step-label">
-            {% if current_lang == 'ru' %}Принято{% elif current_lang == 'en' %}Received{% else %}Qabul qilindi{% endif %}
-          </div>
-        </div>
-        <div class="stepper-line" data-line="1"></div>
-        <div class="stepper-step" data-step="2">
-          <div class="step-circle"><span class="step-ico">🔍</span></div>
-          <div class="step-label">
-            {% if current_lang == 'ru' %}Диагностика{% elif current_lang == 'en' %}Diagnostic{% else %}Diagnostika{% endif %}
-          </div>
-        </div>
-        <div class="stepper-line" data-line="2"></div>
-        <div class="stepper-step" data-step="3">
-          <div class="step-circle"><span class="step-ico">🔧</span></div>
-          <div class="step-label">
-            {% if current_lang == 'ru' %}В ремонте{% elif current_lang == 'en' %}In repair{% else %}Ta'mirlanmoqda{% endif %}
-          </div>
-        </div>
-        <div class="stepper-line" data-line="3"></div>
-        <div class="stepper-step" data-step="4">
-          <div class="step-circle"><span class="step-ico">✅</span></div>
-          <div class="step-label">
-            {% if current_lang == 'ru' %}Готов{% elif current_lang == 'en' %}Ready{% else %}Tayyor{% endif %}
-          </div>
-        </div>
-      </div>
+    <!-- Error State -->
+    <div id="track-error-msg" class="track-error hidden" role="alert"></div>
 
-      <!-- Meta Grid -->
-      <div class="track-meta-grid">
-        <div class="track-meta-item">
-          <div class="meta-label">{% if current_lang == 'ru' %}Клиент{% elif current_lang == 'en' %}Client{% else %}Mijoz{% endif %}</div>
-          <div class="meta-val" id="track-res-client">-</div>
-        </div>
-        <div class="track-meta-item">
-          <div class="meta-label">{% if current_lang == 'ru' %}Услуга / Деталь{% elif current_lang == 'en' %}Service / Part{% else %}Xizmat / Detal{% endif %}</div>
-          <div class="meta-val" id="track-res-service">-</div>
-        </div>
-        <div class="track-meta-item">
-          <div class="meta-label">{% if current_lang == 'ru' %}Сумма{% elif current_lang == 'en' %}Price{% else %}Narxi{% endif %}</div>
-          <div class="meta-val highlight" id="track-res-price">-</div>
-        </div>
-        <div class="track-meta-item">
-          <div class="meta-label">{% if current_lang == 'ru' %}Дата приема{% elif current_lang == 'en' %}Date{% else %}Qabul vaqti{% endif %}</div>
-          <div class="meta-val" id="track-res-date">-</div>
-        </div>
-      </div>
+    <!-- Empty State -->
+    <div id="my-orders-empty" class="my-orders-state my-orders-empty hidden">
+      <div class="my-orders-empty-icon" aria-hidden="true">📭</div>
+      <h4 class="my-orders-empty-title">{% trans "Sizda hali buyurtmalar yo'q" %}</h4>
+      <p class="my-orders-state-text">
+        {% trans "Kalkulyator orqali telefoningiz narxini bilib oling va qulay buyurtma qoldiring." %}
+      </p>
+      <button type="button" id="btn-empty-go-calc" class="btn-primary my-orders-empty-cta">
+        {% trans "Narx hisoblash →" %}
+      </button>
+    </div>
 
-      <div class="track-direct-help">
-        <span>{% if current_lang == 'ru' %}Вопросы по заказу?{% elif current_lang == 'en' %}Questions?{% else %}Savollaringiz bormi?{% endif %}</span>
-        <a href="tel:+998909197600" class="track-help-link">📞 +998 90 919-76-00</a>
-        <a href="https://t.me/Murodjonmilyazov" target="_blank" rel="noopener" class="track-help-link">✈️ @Murodjonmilyazov</a>
+    <!-- Orders List (10 per page) -->
+    <div id="my-orders-list" class="my-orders-list hidden" aria-live="polite"></div>
+
+    <!-- Pagination Bar (10 items per page) -->
+    <div id="my-orders-pagination" class="my-orders-pagination hidden" aria-label="{% trans 'Sahifalash' %}">
+      <div id="my-orders-range" class="my-orders-range"></div>
+      <div class="my-orders-pager-controls">
+        <button type="button" id="btn-orders-prev" class="btn-pager-nav">
+          <span>← {% trans "Oldingi" %}</span>
+        </button>
+        <div id="my-orders-page-numbers" class="my-orders-page-numbers"></div>
+        <button type="button" id="btn-orders-next" class="btn-pager-nav">
+          <span>{% trans "Keyingi" %} →</span>
+        </button>
       </div>
+    </div>
+
+    <div class="track-direct-help">
+      <span>{% if current_lang == 'ru' %}Вопросы по заказу?{% elif current_lang == 'en' %}Questions?{% else %}Savollaringiz bormi?{% endif %}</span>
+      <a href="tel:+998909197600" class="track-help-link">📞 +998 90 919-76-00</a>
+      <a href="https://t.me/Murodjonmilyazov" target="_blank" rel="noopener" class="track-help-link">✈️ @Murodjonmilyazov</a>
     </div>
   </div>
 </div>

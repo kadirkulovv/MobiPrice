@@ -4,10 +4,12 @@ import secrets
 import threading
 import requests
 from datetime import timedelta
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST, require_GET
+from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.conf import settings
 
@@ -98,8 +100,8 @@ UI_TRANSLATIONS = {
         'consult_tg': "Telegram orqali bog‘lanish",
         'consult_ig': "Instagram sahifamiz",
         'consult_qr_hint': "Kamerangizni qarating yoki bosing",
-        'track_order_btn': "Buyurtma holatini tekshirish",
-        'track_modal_title': "Buyurtma holatini tekshirish",
+        'track_order_btn': "Mening buyurtmalarim",
+        'track_modal_title': "Mening buyurtmalarim",
         'track_placeholder': "Buyurtma ID sini kiriting (masalan: MP-XXXXXX)",
         'track_btn': "Tekshirish",
     },
@@ -153,8 +155,8 @@ UI_TRANSLATIONS = {
         'consult_tg': "Написать в Telegram",
         'consult_ig': "Наш Instagram",
         'consult_qr_hint': "Наведите камеру или нажмите",
-        'track_order_btn': "Проверить статус заказа",
-        'track_modal_title': "Проверка статуса ремонта",
+        'track_order_btn': "Мои заказы",
+        'track_modal_title': "Мои заказы",
         'track_placeholder': "Введите ID заказа (например: MP-XXXXXX)",
         'track_btn': "Проверить",
     },
@@ -208,14 +210,15 @@ UI_TRANSLATIONS = {
         'consult_tg': "Message on Telegram",
         'consult_ig': "Our Instagram",
         'consult_qr_hint': "Scan with camera or tap",
-        'track_order_btn': "Check Repair Status",
-        'track_modal_title': "Track Your Repair Order",
+        'track_order_btn': "My Orders",
+        'track_modal_title': "My Orders",
         'track_placeholder': "Enter Order ID (e.g. MP-XXXXXX)",
         'track_btn': "Check Status",
     }
 }
 
 
+@never_cache
 @ensure_csrf_cookie
 def index_view(request):
     current_lang = getattr(request, 'LANGUAGE_CODE', None) or get_language() or 'uz'
@@ -673,112 +676,249 @@ def api_submit_order(request):
 
 
 
-@require_GET
-def api_track_order(request):
-    """Mijoz uchun ta'mirlash holatini (Order tracking) tekshirish API"""
-    raw_code = request.GET.get('order_id', '').strip()
-    clean_code = raw_code.replace('#', '').strip().upper()
-    lang = request.GET.get('lang', 'uz')
+ORDER_STEP_MAP = {
+    'pending_location': 0,
+    'new': 1,
+    'contacted': 2,
+    'in_progress': 3,
+    'ready': 4,
+    'completed': 4,
+    'cancelled': 0,
+}
 
-    if not clean_code:
-        err_msg = {
-            'ru': "Пожалуйста, введите код заказа (например: MP-A1B2C3)",
-            'en': "Please enter your order ID (e.g. MP-A1B2C3)",
-            'uz': "Iltimos, buyurtma kodini kiriting (masalan: MP-A1B2C3)"
-        }.get(lang, "Iltimos, buyurtma kodini kiriting")
-        return JsonResponse({'found': False, 'error': err_msg}, status=400)
+ORDER_STATUS_LABELS = {
+    'uz': {
+        'pending_location': 'Lokatsiya kutilmoqda (Botda)',
+        'new': 'Qabul qilindi',
+        'contacted': 'Diagnostika jarayonida',
+        'in_progress': "Ta'mirlanmoqda",
+        'ready': "Tayyor (Olib ketishingiz mumkin)",
+        'completed': "Topshirildi",
+        'cancelled': "Bekor qilingan",
+    },
+    'ru': {
+        'pending_location': 'Ожидается геолокация (в боте)',
+        'new': 'Принято',
+        'contacted': 'На диагностике',
+        'in_progress': 'В процессе ремонта',
+        'ready': 'Готов к выдаче',
+        'completed': 'Выдан клиенту',
+        'cancelled': 'Отменен',
+    },
+    'en': {
+        'pending_location': 'Waiting for location (in bot)',
+        'new': 'Received',
+        'contacted': 'Diagnostic in progress',
+        'in_progress': 'In repair',
+        'ready': 'Ready for pickup',
+        'completed': 'Completed',
+        'cancelled': 'Cancelled',
+    },
+}
+
+ORDER_SERVICE_LABELS = {
+    'uz': {
+        'in_service': "O'zim boraman (Servis markaziga)",
+        'courier': "Kuryer orqali olib ketish",
+    },
+    'ru': {
+        'in_service': "Приеду сам (в сервисный центр)",
+        'courier': "Забрать через курьера",
+    },
+    'en': {
+        'in_service': "Visit service center myself",
+        'courier': "Courier pickup",
+    },
+}
+
+
+def _serialize_order_status(order: ServiceOrder, lang: str = 'uz', bot_username: str = '') -> dict:
+    """Foydalanuvchining o'z buyurtmasini holat oynasi uchun xavfsiz formatlash"""
+    lang_code = lang if lang in ('uz', 'ru', 'en') else 'uz'
+    status_text = ORDER_STATUS_LABELS[lang_code].get(order.status, order.get_status_display())
+    service_label = ORDER_SERVICE_LABELS[lang_code].get(order.service_type, str(order.get_service_type_display()))
+    current_step = ORDER_STEP_MAP.get(order.status, 1)
+
+    phone_name = order.phone.name if order.phone else "Smartfon"
+    if order.comparison:
+        issue_obj = getattr(order.comparison, 'issue', None)
+        if issue_obj:
+            if lang_code == 'ru' and issue_obj.title_ru:
+                issue_part = issue_obj.title_ru
+            elif lang_code == 'en' and issue_obj.title_en:
+                issue_part = issue_obj.title_en
+            else:
+                issue_part = issue_obj.title
+        else:
+            issue_part = ""
+        if lang_code == 'ru' and order.comparison.title_ru:
+            comp_title = order.comparison.title_ru
+        elif lang_code == 'en' and order.comparison.title_en:
+            comp_title = order.comparison.title_en
+        else:
+            comp_title = order.comparison.title
+        part_name = f"{issue_part} ({comp_title})" if issue_part else comp_title
+    else:
+        part_name = {
+            'ru': "Консультация",
+            'en': "Consultation",
+            'uz': "Umumiy konsultatsiya",
+        }[lang_code]
+
+    part_price_val = int(order.comparison.total_price_uzs) if (order.comparison and order.comparison.total_price_uzs) else None
+    delivery_fee_val = int(order.delivery_fee_uzs) if order.delivery_fee_uzs is not None else None
+    if order.final_total_uzs is not None:
+        final_total_val = int(order.final_total_uzs)
+    elif part_price_val is not None:
+        final_total_val = part_price_val + (delivery_fee_val or 0)
+    else:
+        final_total_val = delivery_fee_val
+
+    bot_url = ""
+    if (
+        order.status == 'pending_location'
+        and order.courier_token
+        and bot_username
+        and (not order.courier_token_expires_at or order.courier_token_expires_at > timezone.now())
+    ):
+        bot_url = f"https://t.me/{bot_username}?start=courier_{order.courier_token}"
+
+    local_created = timezone.localtime(order.created_at)
+    return {
+        'order_id': order.order_id,
+        'device_model': phone_name,
+        'issue_title': part_name,
+        'service_type': order.service_type,
+        'service_type_display': service_label,
+        'part_price_uzs': part_price_val,
+        'distance_km': float(order.distance_km) if order.distance_km is not None else None,
+        'delivery_fee_uzs': delivery_fee_val,
+        'final_total_uzs': final_total_val,
+        'price_uzs': final_total_val,
+        'status': order.status,
+        'status_display': status_text,
+        'current_step': current_step,
+        'master_name': order.master.full_name if order.master_id and order.master else '',
+        'bot_url': bot_url,
+        'created_at': local_created.strftime('%d.%m.%Y %H:%M'),
+    }
+
+
+@require_GET
+def api_my_orders(request):
+    """Faqat login qilgan mijozning o'z buyurtmalarini sahifalab (10 tadan pagination) qaytarish"""
+    lang = str(request.GET.get('lang') or get_language() or 'uz').strip()[:2]
+    if lang not in ('uz', 'ru', 'en'):
+        lang = 'uz'
+
+    tg_user = get_current_telegram_user(request)
+    if not tg_user:
+        auth_err = {
+            'ru': "Чтобы посмотреть статус заказов, войдите через Telegram.",
+            'en': "Please sign in via Telegram to view your orders.",
+            'uz': "Buyurtmalaringiz holatini ko'rish uchun avval Telegram orqali kiring.",
+        }[lang]
+        return JsonResponse({
+            'success': False,
+            'auth_required': True,
+            'error': auth_err,
+        }, status=401)
 
     try:
-        order = ServiceOrder.objects.filter(order_id__iexact=clean_code).select_related('phone', 'comparison', 'comparison__issue').first()
-        if not order:
-            not_found_msg = {
-                'ru': f"Заказ с кодом #{clean_code} не найден. Проверьте правильность кода.",
-                'en': f"Order #{clean_code} was not found. Please double-check your code.",
-                'uz': f"#{clean_code} raqamli buyurtma topilmadi. Kodni to'g'ri kiritganingizni tekshiring."
-            }.get(lang, "Buyurtma topilmadi.")
-            return JsonResponse({'found': False, 'error': not_found_msg}, status=404)
+        raw_page = request.GET.get('page', '1')
+        try:
+            page_num = int(raw_page)
+        except (TypeError, ValueError):
+            page_num = 1
+        if page_num < 1:
+            page_num = 1
 
-        # Mapping status to 4-step progress:
-        # 0: Lokatsiya kutilmoqda / Bekor qilingan
-        # 1: Qabul qilindi
-        # 2: Diagnostika / Bog'lanildi
-        # 3: Ta'mirlanmoqda
-        # 4: Tayyor / Topshirildi
-        step_map = {
-            'pending_location': 0,
-            'new': 1,
-            'contacted': 2,
-            'in_progress': 3,
-            'ready': 4,
-            'completed': 4,
-            'cancelled': 0,
-        }
-        current_step = step_map.get(order.status, 1)
+        orders_qs = (
+            ServiceOrder.objects
+            .filter(telegram_user=tg_user)
+            .select_related('phone', 'comparison', 'comparison__issue', 'master')
+            .order_by('-created_at', '-id')
+        )
 
-        # Status labels per language
-        status_labels = {
-            'uz': {
-                'pending_location': 'Lokatsiya kutilmoqda (Botda)',
-                'new': 'Qabul qilindi',
-                'contacted': 'Diagnostika jarayonida',
-                'in_progress': "Ta'mirlanmoqda",
-                'ready': "Tayyor (Olib ketishingiz mumkin)",
-                'completed': "Topshirildi",
-                'cancelled': "Bekor qilingan"
-            },
-            'ru': {
-                'pending_location': 'Ожидается геолокация (в боте)',
-                'new': 'Принято',
-                'contacted': 'На диагностике',
-                'in_progress': 'В процессе ремонта',
-                'ready': 'Готов к выдаче',
-                'completed': 'Выдан клиенту',
-                'cancelled': 'Отменен'
-            },
-            'en': {
-                'pending_location': 'Waiting for location (in bot)',
-                'new': 'Received',
-                'contacted': 'Diagnostic in progress',
-                'in_progress': 'In repair',
-                'ready': 'Ready for pickup',
-                'completed': 'Completed',
-                'cancelled': 'Cancelled'
-            }
-        }
-        status_text = status_labels.get(lang, status_labels['uz']).get(order.status, order.get_status_display())
+        per_page = 10
+        paginator = Paginator(orders_qs, per_page)
+        total_count = paginator.count
+        total_pages = paginator.num_pages if total_count > 0 else 1
+        page_obj = paginator.get_page(page_num)
 
-        # Mask client name for privacy (e.g., "Murodjon" -> "Mu***on")
-        name = order.client_name
-        masked_name = f"{name[:2]}***{name[-2:]}" if len(name) > 4 else f"{name[:1]}***"
+        has_pending_loc = any(o.status == 'pending_location' for o in page_obj.object_list)
+        bot_username = get_bot_username() if has_pending_loc else ''
 
-        phone_name = order.phone.name if order.phone else "Smartfon"
-        part_name = order.comparison.title if order.comparison else "-"
-        part_price_val = int(order.comparison.total_price_uzs) if (order.comparison and order.comparison.total_price_uzs) else None
-        delivery_fee_val = int(order.delivery_fee_uzs) if order.delivery_fee_uzs is not None else None
-        if order.final_total_uzs is not None:
-            final_total_val = int(order.final_total_uzs)
-        elif part_price_val is not None:
-            final_total_val = part_price_val + (delivery_fee_val or 0)
-        else:
-            final_total_val = delivery_fee_val
+        orders_data = [
+            _serialize_order_status(order, lang=lang, bot_username=bot_username)
+            for order in page_obj.object_list
+        ]
 
         return JsonResponse({
-            'found': True,
-            'order_id': order.order_id,
-            'client_masked': masked_name,
-            'device_model': phone_name,
-            'issue_title': part_name,
-            'service_type': order.service_type,
-            'part_price_uzs': part_price_val,
-            'distance_km': float(order.distance_km) if order.distance_km is not None else None,
-            'delivery_fee_uzs': delivery_fee_val,
-            'final_total_uzs': final_total_val,
-            'price_uzs': final_total_val,
-            'status': order.status,
-            'status_display': status_text,
-            'current_step': current_step,
-            'created_at': order.created_at.strftime('%d.%m.%Y %H:%M'),
+            'success': True,
+            'total_count': total_count,
+            'page': page_obj.number,
+            'per_page': per_page,
+            'total_pages': total_pages,
+            'has_previous': page_obj.has_previous(),
+            'has_next': page_obj.has_next(),
+            'previous_page': page_obj.previous_page_number() if page_obj.has_previous() else None,
+            'next_page': page_obj.next_page_number() if page_obj.has_next() else None,
+            'orders': orders_data,
         })
+    except Exception as e:
+        logger.error(f"Error in api_my_orders: {e}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': "Buyurtmalar ro'yxatini yuklashda xatolik yuz berdi.",
+        }, status=500)
+
+
+@require_GET
+def api_track_order(request):
+    """Faqat login qilgan mijozning o'z buyurtmasi holatini (yoki barcha buyurtmalarini 10 tadan) tekshirish API"""
+    lang = str(request.GET.get('lang') or get_language() or 'uz').strip()[:2]
+    if lang not in ('uz', 'ru', 'en'):
+        lang = 'uz'
+
+    tg_user = get_current_telegram_user(request)
+    if not tg_user:
+        auth_err = {
+            'ru': "Чтобы посмотреть статус заказов, войдите через Telegram.",
+            'en': "Please sign in via Telegram to view your orders.",
+            'uz': "Buyurtmalaringiz holatini ko'rish uchun avval Telegram orqali kiring.",
+        }[lang]
+        return JsonResponse({
+            'found': False,
+            'success': False,
+            'auth_required': True,
+            'error': auth_err,
+        }, status=401)
+
+    raw_code = request.GET.get('order_id', '').strip()
+    clean_code = raw_code.replace('#', '').strip().upper()
+    if not clean_code:
+        return api_my_orders(request)
+
+    try:
+        order = (
+            ServiceOrder.objects
+            .filter(order_id__iexact=clean_code, telegram_user=tg_user)
+            .select_related('phone', 'comparison', 'comparison__issue', 'master')
+            .first()
+        )
+        if not order:
+            not_found_msg = {
+                'ru': f"Заказ с кодом #{clean_code} в вашем аккаунте не найден.",
+                'en': f"Order #{clean_code} was not found in your account.",
+                'uz': f"#{clean_code} raqamli buyurtma sizning akkountingizda topilmadi.",
+            }[lang]
+            return JsonResponse({'found': False, 'error': not_found_msg}, status=404)
+
+        bot_username = get_bot_username() if order.status == 'pending_location' else ''
+        serialized = _serialize_order_status(order, lang=lang, bot_username=bot_username)
+        serialized['found'] = True
+        return JsonResponse(serialized)
     except Exception as e:
         logger.error(f"Error in api_track_order: {e}", exc_info=True)
         return JsonResponse({'found': False, 'error': "Buyurtma holatini tekshirishda xatolik yuz berdi."}, status=500)

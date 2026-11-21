@@ -661,6 +661,102 @@ class OrdersReviewsAndCourierTests(TestCase):
             sent_text = mock_notify.call_args.kwargs['payload_base']['text']
             self.assertIn('+998902520703', sent_text)
 
+    def test_my_orders_requires_login_isolates_accounts_and_paginates_by_10(self):
+        # 1. Unauthenticated requests MUST return 401
+        res_unauth_my = self.client.get('/api/orders/my/')
+        self.assertEqual(res_unauth_my.status_code, 401)
+        self.assertTrue(res_unauth_my.json().get('auth_required'))
+
+        res_unauth_track = self.client.get('/api/orders/track/?order_id=MP-ABCDEF')
+        self.assertEqual(res_unauth_track.status_code, 401)
+        self.assertTrue(res_unauth_track.json().get('auth_required'))
+
+        # 2. Create 23 orders for User A and 3 orders for User B
+        user_a = self._login_user(telegram_id=101010101, phone_number='+998902520703')
+        user_b = TelegramUser.objects.create(
+            telegram_id=202020202,
+            first_name="Boshqa",
+            username="boshqa_user",
+            phone_number="+998901112233",
+        )
+
+        user_a_order_ids = []
+        for idx in range(23):
+            o = ServiceOrder.objects.create(
+                telegram_user=user_a,
+                client_name=user_a.full_name,
+                phone_number=user_a.phone_number,
+                phone=self.phone,
+                comparison=self.comp,
+                service_type='in_service',
+                status='new',
+                final_total_uzs=self.comp.total_price_uzs,
+            )
+            user_a_order_ids.append(o.order_id)
+
+        user_b_orders = []
+        for idx in range(3):
+            ob = ServiceOrder.objects.create(
+                telegram_user=user_b,
+                client_name=user_b.full_name,
+                phone_number=user_b.phone_number,
+                phone=self.phone,
+                comparison=self.comp,
+                service_type='in_service',
+                status='new',
+                final_total_uzs=self.comp.total_price_uzs,
+            )
+            user_b_orders.append(ob.order_id)
+
+        # 3. IDOR check: User A cannot inspect User B's order via /api/orders/track/
+        idor_res = self.client.get(f'/api/orders/track/?order_id={user_b_orders[0]}&lang=uz')
+        self.assertEqual(idor_res.status_code, 404)
+
+        # 4. Page 1: 10 items, newest first, total_count=23, total_pages=3
+        p1 = self.client.get('/api/orders/my/?page=1&lang=uz').json()
+        self.assertTrue(p1['success'])
+        self.assertEqual(p1['total_count'], 23)
+        self.assertEqual(p1['per_page'], 10)
+        self.assertEqual(p1['total_pages'], 3)
+        self.assertEqual(p1['page'], 1)
+        self.assertFalse(p1['has_previous'])
+        self.assertTrue(p1['has_next'])
+        self.assertEqual(p1['next_page'], 2)
+        self.assertEqual(len(p1['orders']), 10)
+        p1_ids = [item['order_id'] for item in p1['orders']]
+        self.assertEqual(p1_ids[0], user_a_order_ids[-1])  # newest first
+
+        # 5. Page 2: next 10 items, disjoint from Page 1
+        p2 = self.client.get('/api/orders/my/?page=2&lang=uz').json()
+        self.assertEqual(p2['page'], 2)
+        self.assertTrue(p2['has_previous'])
+        self.assertEqual(p2['previous_page'], 1)
+        self.assertTrue(p2['has_next'])
+        self.assertEqual(p2['next_page'], 3)
+        self.assertEqual(len(p2['orders']), 10)
+        p2_ids = [item['order_id'] for item in p2['orders']]
+        self.assertEqual(len(set(p1_ids) & set(p2_ids)), 0)
+
+        # 6. Page 3: remaining 3 items, none from User B
+        p3 = self.client.get('/api/orders/my/?page=3&lang=uz').json()
+        self.assertEqual(p3['page'], 3)
+        self.assertTrue(p3['has_previous'])
+        self.assertEqual(p3['previous_page'], 2)
+        self.assertFalse(p3['has_next'])
+        self.assertIsNone(p3['next_page'])
+        self.assertEqual(len(p3['orders']), 3)
+        p3_ids = [item['order_id'] for item in p3['orders']]
+
+        all_returned = set(p1_ids + p2_ids + p3_ids)
+        self.assertEqual(all_returned, set(user_a_order_ids))
+        self.assertEqual(len(all_returned & set(user_b_orders)), 0)
+
+        # 7. Out-of-range / invalid page param clamps safely
+        p_invalid = self.client.get('/api/orders/my/?page=abc&lang=uz').json()
+        self.assertEqual(p_invalid['page'], 1)
+        p_overflow = self.client.get('/api/orders/my/?page=999&lang=uz').json()
+        self.assertEqual(p_overflow['page'], 3)
+
     def test_courier_order_distance_formula_osrm_and_haversine_fallback(self):
         # Fee formula check: 2.5 km -> 5000 + 25000 = 30 000 so'm
         self.assertEqual(calculate_courier_fee_uzs(2.5), 30000)
@@ -762,9 +858,13 @@ class I18nAndTemplatesTests(TestCase):
             self.assertEqual(resp.status_code, 200)
             html_content = resp.content.decode('utf-8')
             self.assertIn('auth_modal.css?v=7', html_content)
-            self.assertIn('auth.js?v=7', html_content)
+            self.assertIn('auth.js?v=10', html_content)
+            self.assertIn('track.js?v=10', html_content)
+            self.assertIn('track_modal.css?v=10', html_content)
             self.assertIn('modal.js?v=7', html_content)
             self.assertIn('id="btn-auth-deeplink"', html_content)
+            self.assertIn('id="my-orders-pagination"', html_content)
+            self.assertNotIn('id="track-order-input"', html_content)
             self.assertNotIn('telegram-widget.js', html_content)
             self.assertNotIn('onTelegramAuth', html_content)
             self.assertNotIn('order-phone-input', html_content)

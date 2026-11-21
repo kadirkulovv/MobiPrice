@@ -232,6 +232,12 @@
         const reviewBtn = document.getElementById('btn-open-review-modal');
         if (reviewBtn) reviewBtn.click();
       }
+      return;
+    }
+    if (action === 'orders') {
+      if (typeof window.openOrderTracking === 'function') {
+        window.openOrderTracking();
+      }
     }
   }
 

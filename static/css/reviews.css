@@ -3,7 +3,8 @@
    ========================================================================== */
 
 .reviews-section {
-  padding: 28px 0 44px;
+  padding-top: 28px;
+  padding-bottom: 44px;
 }
 
 .reviews-section-header {

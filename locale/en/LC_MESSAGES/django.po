@@ -137,3 +137,30 @@ msgstr "Telegram user"
 msgid "Telefon raqami"
 msgstr "Phone number"
 
+msgid "Telegram akkountingiz orqali berilgan barcha buyurtmalaringiz va ularning joriy holati"
+msgstr "All orders placed with your Telegram account and their live status"
+
+msgid "Yangilash"
+msgstr "Refresh"
+
+msgid "Buyurtmalaringiz yuklanmoqda..."
+msgstr "Loading your orders..."
+
+msgid "Sizda hali buyurtmalar yo'q"
+msgstr "You don't have any orders yet"
+
+msgid "Kalkulyator orqali telefoningiz narxini bilib oling va qulay buyurtma qoldiring."
+msgstr "Check your smartphone repair price in the calculator and book in seconds."
+
+msgid "Narx hisoblash →"
+msgstr "Calculate Price →"
+
+msgid "Sahifalash"
+msgstr "Pagination"
+
+msgid "Oldingi"
+msgstr "Previous"
+
+msgid "Keyingi"
+msgstr "Next"
+

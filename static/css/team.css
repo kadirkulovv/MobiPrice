@@ -3,7 +3,8 @@
    ========================================================================== */
 
 .team-section {
-  padding: 28px 0 36px;
+  padding-top: 28px;
+  padding-bottom: 36px;
 }
 
 .team-grid {
@@ -23,7 +24,7 @@
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-card);
-  transition: var(--transition);
+  transition: border-color 0.22s ease, box-shadow 0.22s ease, opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .team-card:hover {

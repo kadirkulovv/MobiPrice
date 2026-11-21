@@ -137,3 +137,30 @@ msgstr "Telegram foydalanuvchi"
 msgid "Telefon raqami"
 msgstr "Telefon raqami"
 
+msgid "Telegram akkountingiz orqali berilgan barcha buyurtmalaringiz va ularning joriy holati"
+msgstr "Telegram akkountingiz orqali berilgan barcha buyurtmalaringiz va ularning joriy holati"
+
+msgid "Yangilash"
+msgstr "Yangilash"
+
+msgid "Buyurtmalaringiz yuklanmoqda..."
+msgstr "Buyurtmalaringiz yuklanmoqda..."
+
+msgid "Sizda hali buyurtmalar yo'q"
+msgstr "Sizda hali buyurtmalar yo'q"
+
+msgid "Kalkulyator orqali telefoningiz narxini bilib oling va qulay buyurtma qoldiring."
+msgstr "Kalkulyator orqali telefoningiz narxini bilib oling va qulay buyurtma qoldiring."
+
+msgid "Narx hisoblash →"
+msgstr "Narx hisoblash →"
+
+msgid "Sahifalash"
+msgstr "Sahifalash"
+
+msgid "Oldingi"
+msgstr "Oldingi"
+
+msgid "Keyingi"
+msgstr "Keyingi"
+

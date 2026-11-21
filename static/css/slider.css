@@ -3,7 +3,8 @@
    ========================================================================== */
 
 .comparison-section {
-  padding: 28px 0 36px;
+  padding-top: 28px;
+  padding-bottom: 36px;
 }
 
 .ba-top-badge {
@@ -22,7 +23,7 @@
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75), 0 0 28px rgba(0, 242, 254, 0.14);
   user-select: none;
   touch-action: pan-y;
-  cursor: ew-resize;
+  cursor: default;
 }
 
 .ba-image {
@@ -121,8 +122,17 @@
   font-size: 18px;
   box-shadow: 0 0 20px rgba(0, 242, 254, 0.65);
   z-index: 5;
-  pointer-events: none;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: ew-resize;
   user-select: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ba-handle:hover,
+.ba-handle.is-dragging {
+  transform: translate(-50%, -50%) scale(1.08);
+  box-shadow: 0 0 26px rgba(0, 242, 254, 0.9);
 }
 
 @media (max-width: 640px) {

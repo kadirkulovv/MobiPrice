@@ -55,11 +55,23 @@ document.addEventListener('DOMContentLoaded', () => {
   // Prevent native browser image drag
   baContainer.addEventListener('dragstart', (e) => e.preventDefault());
 
-  // Mouse Events
-  baContainer.addEventListener('mousedown', (e) => {
-    e.preventDefault();
+  function startDrag(clientX) {
     isDragging = true;
-    updateSlider(e.clientX);
+    baHandle.classList.add('is-dragging');
+    updateSlider(clientX);
+  }
+
+  function stopDrag() {
+    if (!isDragging) return;
+    isDragging = false;
+    baHandle.classList.remove('is-dragging');
+  }
+
+  // Mouse Events (only when pressing the middle handle)
+  baHandle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    startDrag(e.clientX);
   });
 
   window.addEventListener('mousemove', (e) => {
@@ -68,27 +80,23 @@ document.addEventListener('DOMContentLoaded', () => {
     updateSlider(e.clientX);
   });
 
-  window.addEventListener('mouseup', () => {
-    isDragging = false;
-  });
+  window.addEventListener('mouseup', stopDrag);
 
-  // Touch Events (Mobile)
-  baContainer.addEventListener('touchstart', (e) => {
+  // Touch Events (Mobile — only when pressing the middle handle; scrolling elsewhere works normally)
+  baHandle.addEventListener('touchstart', (e) => {
     if (e.touches && e.touches.length > 0) {
-      isDragging = true;
-      updateSlider(e.touches[0].clientX);
+      e.preventDefault();
+      e.stopPropagation();
+      startDrag(e.touches[0].clientX);
     }
-  }, { passive: true });
+  }, { passive: false });
 
   window.addEventListener('touchmove', (e) => {
     if (!isDragging || !e.touches || e.touches.length === 0) return;
+    e.preventDefault();
     updateSlider(e.touches[0].clientX);
-  }, { passive: true });
+  }, { passive: false });
 
-  window.addEventListener('touchend', () => {
-    isDragging = false;
-  });
-  window.addEventListener('touchcancel', () => {
-    isDragging = false;
-  });
+  window.addEventListener('touchend', stopDrag);
+  window.addEventListener('touchcancel', stopDrag);
 });

@@ -27,26 +27,28 @@
       { selector: 'footer', reveal: 'fade-up', delay: '50' }
     ];
 
+    const isMobile = window.innerWidth <= 767;
+
     autoTargets.forEach((target) => {
       const elements = document.querySelectorAll(target.selector);
       elements.forEach((el, index) => {
         if (!el.hasAttribute('data-reveal')) {
           el.setAttribute('data-reveal', target.reveal);
-          if (target.stagger) {
+          if (target.stagger && !isMobile) {
             const delay = Math.min((index % 6) * target.stagger, 350);
             el.setAttribute('data-delay', (Math.round(delay / 50) * 50).toString());
-          } else if (target.delay) {
+          } else if (target.delay && !isMobile) {
             el.setAttribute('data-delay', target.delay);
           }
         }
       });
     });
 
-    // Setup IntersectionObserver
+    // Setup IntersectionObserver (trigger as each card enters viewport so 0.7s reveal is clearly visible)
     const observerOptions = {
       root: null,
-      rootMargin: '0px 0px -30px 0px',
-      threshold: 0.1
+      rootMargin: isMobile ? '0px 0px -24px 0px' : '0px 0px -20px 0px',
+      threshold: isMobile ? 0.06 : 0.05
     };
 
     const observer = new IntersectionObserver((entries, obs) => {

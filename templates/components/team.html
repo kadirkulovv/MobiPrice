@@ -11,10 +11,10 @@
 
   <div class="team-grid">
     {% for member in team_members %}
-    <div class="team-card">
+    <div class="team-card" data-reveal="fade-up">
       <div class="team-photo-wrap">
         {% if member.photo %}
-          <img src="{{ member.photo.url }}" alt="{{ member.full_name }}" class="team-photo" loading="lazy" onerror="this.classList.add('hidden');this.nextElementSibling.classList.remove('hidden');">
+          <img src="{{ member.photo.url }}" alt="{{ member.full_name }}" class="team-photo" decoding="async" onerror="this.classList.add('hidden');this.nextElementSibling.classList.remove('hidden');">
           <div class="team-avatar-placeholder hidden">
             <div class="avatar-circle">
               <span class="avatar-icon">👨‍🔧</span>

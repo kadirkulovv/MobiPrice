@@ -9,6 +9,7 @@ urlpatterns = [
     path('comparisons/by-issue/<int:issue_id>/', views.api_comparisons_by_issue, name='api_comparisons_by_issue'),
     path('phones/search/', views.api_search_phones, name='api_search_phones'),
     path('orders/submit/', views.api_submit_order, name='api_submit_order'),
+    path('orders/my/', views.api_my_orders, name='api_my_orders'),
     path('orders/track/', views.api_track_order, name='api_track_order'),
     path('reviews/submit/', views.api_submit_review, name='api_submit_review'),
     # Telegram Bot Authentication Endpoints (Verified +998 Phone Only)
