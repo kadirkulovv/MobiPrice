@@ -20,17 +20,31 @@ from django.utils.translation import activate, gettext
 from bot.handlers.client import (
     _confirm_login_token,
     _finalize_courier_order,
+    cancel_courier_location,
+    cmd_start_courier_deeplink,
     cmd_start_login_deeplink,
+    process_courier_location,
+    process_courier_location_without_state,
     process_login_phone_contact,
+    prompt_location_again,
     reject_manual_login_phone,
     validate_verified_own_contact,
 )
-from bot.states.client_states import LoginAuthStates
+from bot.main import prune_empty_fsm_memory
+from bot.states.client_states import CourierLocationStates, LoginAuthStates
+from core.backup_service import create_db_backup, prune_old_backups
 from core.distance import (
     HAVERSINE_ROAD_FACTOR,
     calculate_courier_fee_uzs,
     calculate_road_distance_km,
     haversine_distance_km,
+)
+from core.maintenance import (
+    cleanup_excel_tmp,
+    cleanup_expired_auth_tokens,
+    cleanup_expired_sessions,
+    cleanup_orphan_media,
+    expire_stale_pending_courier_orders,
 )
 from core.models import (
     AuthToken,
@@ -41,6 +55,7 @@ from core.models import (
     IssueComparison,
     Review,
     ServiceOrder,
+    TeamMember,
     TelegramUser,
 )
 from core.telegram_auth import (
@@ -89,6 +104,7 @@ def make_fake_bot_message(
     chat_type: str = "private",
     text: str = None,
     contact=None,
+    location=None,
     forward_origin=None,
     forward_date=None,
     forward_from=None,
@@ -107,6 +123,7 @@ def make_fake_bot_message(
         ),
         text=text,
         contact=contact,
+        location=location,
         forward_origin=forward_origin,
         forward_date=forward_date,
         forward_from=forward_from,
@@ -859,9 +876,9 @@ class I18nAndTemplatesTests(TestCase):
             html_content = resp.content.decode('utf-8')
             self.assertIn('auth_modal.css?v=7', html_content)
             self.assertIn('auth.js?v=10', html_content)
-            self.assertIn('track.js?v=10', html_content)
-            self.assertIn('track_modal.css?v=10', html_content)
-            self.assertIn('modal.js?v=7', html_content)
+            self.assertIn('track.js?v=11', html_content)
+            self.assertIn('track_modal.css?v=11', html_content)
+            self.assertIn('modal.js?v=8', html_content)
             self.assertIn('id="btn-auth-deeplink"', html_content)
             self.assertIn('id="my-orders-pagination"', html_content)
             self.assertNotIn('id="track-order-input"', html_content)
@@ -871,3 +888,310 @@ class I18nAndTemplatesTests(TestCase):
             self.assertNotIn('style="', html_content)
             self.assertNotIn('<style', html_content)
             self.assertNotIn('lang-pills', html_content)
+
+
+@override_settings(
+    TELEGRAM_BOT_TOKEN=TEST_BOT_TOKEN,
+    TELEGRAM_BOT_USERNAME=TEST_BOT_USERNAME,
+    TELEGRAM_ADMIN_CHAT_ID="999000111",
+    CACHES={'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}},
+)
+class CourierLifecycleAndTimeoutTests(TransactionTestCase):
+    def setUp(self):
+        cache.clear()
+        self.client = Client()
+        self.brand = Brand.objects.create(name="Apple", order=1)
+        self.series = DeviceSeries.objects.create(brand=self.brand, name="iPhone 16", order=1)
+        self.phone = DevicePhone.objects.create(series=self.series, name="iPhone 16 Pro Max", order=1)
+        self.issue = DeviceIssue.objects.create(phone=self.phone, title="Batareya almashtirish", icon_number=2)
+        self.comp = IssueComparison.objects.create(
+            issue=self.issue,
+            quality_type='original_service_pack',
+            title="Original Service Pack",
+            part_price_uzs=Decimal("800000"),
+            service_fee_uzs=Decimal("0"),
+            price_usd=Decimal("62"),
+        )
+        self.tg_user = TelegramUser.objects.create(
+            telegram_id=555888111,
+            first_name="Javohir",
+            username="javohir_client",
+            phone_number="+998949980703",
+        )
+        session = self.client.session
+        session['telegram_user_id'] = self.tg_user.id
+        session.save()
+
+    def _create_courier_order(self):
+        res = self.client.post(
+            '/api/orders/submit/',
+            data=json.dumps({
+                'phone_id': self.phone.id,
+                'comparison_id': self.comp.id,
+                'service_type': 'courier',
+                'lang': 'uz',
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        order = ServiceOrder.objects.get(order_id=body['order_id'])
+        return order, body
+
+    def test_cancel_in_bot_auto_cancels_order_in_db_and_website(self):
+        order, _ = self._create_courier_order()
+        state = make_fsm_context(user_id=self.tg_user.telegram_id)
+
+        # User opens deep link in bot
+        start_msg = make_fake_bot_message(user_id=self.tg_user.telegram_id, text=f"/start courier_{order.courier_token}")
+        asyncio.run(cmd_start_courier_deeplink(start_msg, SimpleNamespace(args=f"courier_{order.courier_token}"), state))
+        self.assertEqual(asyncio.run(state.get_state()), CourierLocationStates.waiting_for_location.state)
+
+        # User clicks Cancel without sending location -> DB order MUST become cancelled immediately
+        cancel_msg = make_fake_bot_message(user_id=self.tg_user.telegram_id, text="❌ Bekor qilish")
+        asyncio.run(cancel_courier_location(cancel_msg, state))
+
+        self.assertIsNone(asyncio.run(state.get_state()))
+        order.refresh_from_db()
+        self.assertEqual(order.status, 'cancelled')
+        self.assertIsNone(order.courier_token)
+
+        # Website API immediately reflects cancelled status with no bot_url
+        my_orders = self.client.get('/api/orders/my/?page=1&lang=uz').json()
+        self.assertEqual(my_orders['orders'][0]['order_id'], order.order_id)
+        self.assertEqual(my_orders['orders'][0]['status'], 'cancelled')
+        self.assertEqual(my_orders['orders'][0]['bot_url'], '')
+
+    def test_repeatable_website_button_recovers_after_accidental_message_or_state_switch(self):
+        order, body = self._create_courier_order()
+        token = order.courier_token
+        state = make_fsm_context(user_id=self.tg_user.telegram_id)
+
+        # 1st click on website button -> enters waiting_for_location
+        msg1 = make_fake_bot_message(user_id=self.tg_user.telegram_id, text=f"/start courier_{token}")
+        asyncio.run(cmd_start_courier_deeplink(msg1, SimpleNamespace(args=f"courier_{token}"), state))
+        self.assertEqual(asyncio.run(state.get_state()), CourierLocationStates.waiting_for_location.state)
+
+        # User accidentally sends random text -> stays in waiting_for_location and reminds order ID
+        junk_msg = make_fake_bot_message(user_id=self.tg_user.telegram_id, text="salom nima gap")
+        asyncio.run(prompt_location_again(junk_msg, state))
+        self.assertEqual(asyncio.run(state.get_state()), CourierLocationStates.waiting_for_location.state)
+        self.assertIn(order.order_id, junk_msg.answer.call_args.args[0])
+
+        # User accidentally switches FSM state to another unrelated state
+        asyncio.run(state.set_state(LoginAuthStates.waiting_for_phone))
+        self.assertEqual(asyncio.run(state.get_state()), LoginAuthStates.waiting_for_phone.state)
+
+        # Website STILL shows the persistent bot_url button (does NOT disappear after 1st click!)
+        my_orders = self.client.get('/api/orders/my/?page=1&lang=uz').json()
+        card = my_orders['orders'][0]
+        self.assertEqual(card['status'], 'pending_location')
+        self.assertEqual(card['bot_url'], body['bot_url'])
+        self.assertGreater(card['location_remaining_seconds'], 0)
+
+        # 2nd click on the SAME website button -> recovers exact same order and resets state back!
+        msg2 = make_fake_bot_message(user_id=self.tg_user.telegram_id, text=f"/start courier_{token}")
+        asyncio.run(cmd_start_courier_deeplink(msg2, SimpleNamespace(args=f"courier_{token}"), state))
+        self.assertEqual(asyncio.run(state.get_state()), CourierLocationStates.waiting_for_location.state)
+        state_data = asyncio.run(state.get_data())
+        self.assertEqual(state_data['courier_order_pk'], order.id)
+        self.assertEqual(state_data['courier_order_id'], order.order_id)
+
+        # Now user sends location -> order finalizes to 'new' and button disappears only AFTER completion
+        fake_bot = SimpleNamespace(send_message=AsyncMock(), send_location=AsyncMock())
+        loc_msg = make_fake_bot_message(
+            user_id=self.tg_user.telegram_id,
+            location=SimpleNamespace(latitude=41.3500, longitude=69.2800),
+        )
+        with patch('bot.handlers.client.calculate_road_distance_km', return_value=(2.5, 'osrm')):
+            asyncio.run(process_courier_location(loc_msg, state, fake_bot))
+
+        order.refresh_from_db()
+        self.assertEqual(order.status, 'new')
+        self.assertIsNone(order.courier_token)
+        self.assertEqual(order.delivery_fee_uzs, Decimal('30000'))
+
+    def test_location_without_fsm_state_fallback_for_single_active_order(self):
+        order, _ = self._create_courier_order()
+        # Simulate bot restart where FSM state is None
+        empty_state = make_fsm_context(user_id=self.tg_user.telegram_id)
+        fake_bot = SimpleNamespace(send_message=AsyncMock(), send_location=AsyncMock())
+        loc_msg = make_fake_bot_message(
+            user_id=self.tg_user.telegram_id,
+            location=SimpleNamespace(latitude=41.3500, longitude=69.2800),
+        )
+        with patch('bot.handlers.client.calculate_road_distance_km', return_value=(1.5, 'osrm')):
+            asyncio.run(process_courier_location_without_state(loc_msg, empty_state, fake_bot))
+
+        order.refresh_from_db()
+        self.assertEqual(order.status, 'new')
+        self.assertEqual(order.delivery_fee_uzs, Decimal('20000'))
+
+    def test_pending_courier_order_auto_cancels_after_1_hour(self):
+        order, _ = self._create_courier_order()
+        # Push expiry past 1 hour ago
+        ServiceOrder.objects.filter(pk=order.pk).update(
+            courier_token_expires_at=timezone.now() - timedelta(seconds=10)
+        )
+
+        # Reading /api/orders/my/ immediately auto-cancels expired pending_location order
+        my_orders = self.client.get('/api/orders/my/?page=1&lang=uz').json()
+        card = my_orders['orders'][0]
+        self.assertEqual(card['order_id'], order.order_id)
+        self.assertEqual(card['status'], 'cancelled')
+        self.assertEqual(card['bot_url'], '')
+
+        order.refresh_from_db()
+        self.assertEqual(order.status, 'cancelled')
+        self.assertIsNone(order.courier_token)
+
+        # Also test direct background sweeper leaves fresh orders untouched while cancelling stale ones
+        fresh_order, _ = self._create_courier_order()
+        stale_order = ServiceOrder.objects.create(
+            telegram_user=self.tg_user,
+            client_name=self.tg_user.full_name,
+            phone_number=self.tg_user.phone_number,
+            phone=self.phone,
+            comparison=self.comp,
+            service_type='courier',
+            status='pending_location',
+            courier_token='stale_tok_123456',
+            courier_token_expires_at=timezone.now() - timedelta(minutes=2),
+        )
+        expired_list = expire_stale_pending_courier_orders()
+        self.assertEqual(len(expired_list), 1)
+        self.assertEqual(expired_list[0]['order_id'], stale_order.order_id)
+
+        stale_order.refresh_from_db()
+        fresh_order.refresh_from_db()
+        self.assertEqual(stale_order.status, 'cancelled')
+        self.assertEqual(fresh_order.status, 'pending_location')
+
+
+class ServerMaintenanceAndBackupRotationTests(TestCase):
+    def test_backup_rotation_keeps_only_latest_2_and_cleans_temp_files(self):
+        import os
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            bdir = Path(tmp)
+            now_ts = time.time()
+            # Create 5 fake .gz backups with distinct mtimes + 2 leftover temp files
+            for idx in range(5):
+                f = bdir / f"mobiprice_db_2026100{idx}_000000.sqlite3.gz"
+                f.write_bytes(b"gzdata")
+                os.utime(f, (now_ts - (10 - idx) * 60, now_ts - (10 - idx) * 60))
+
+            (bdir / "leftover.sqlite3").write_bytes(b"raw")
+            (bdir / "partial.sqlite3.gz.tmp").write_bytes(b"tmp")
+
+            res = prune_old_backups(backup_dir=bdir, keep=2)
+            self.assertEqual(res['deleted_gz'], 3)
+            self.assertEqual(res['deleted_tmp'], 2)
+            self.assertEqual(res['kept'], 2)
+
+            remaining = sorted(p.name for p in bdir.iterdir())
+            self.assertEqual(
+                remaining,
+                [
+                    "mobiprice_db_20261003_000000.sqlite3.gz",
+                    "mobiprice_db_20261004_000000.sqlite3.gz",
+                ],
+            )
+
+    def test_cleanup_auth_tokens_sessions_excel_tmp_orphan_media_and_fsm_memory(self):
+        import os
+        import tempfile
+        from pathlib import Path
+        from django.contrib.sessions.models import Session
+
+        now = timezone.now()
+
+        # 1. Expired vs fresh AuthTokens
+        old_tok = AuthToken.objects.create(
+            token="old_expired_tok",
+            session_key="s1",
+            expires_at=now - timedelta(hours=3),
+        )
+        fresh_tok = AuthToken.objects.create(
+            token="fresh_valid_tok",
+            session_key="s2",
+            expires_at=now + timedelta(minutes=5),
+        )
+        deleted_toks = cleanup_expired_auth_tokens(grace_hours=1)
+        self.assertEqual(deleted_toks, 1)
+        self.assertFalse(AuthToken.objects.filter(pk=old_tok.pk).exists())
+        self.assertTrue(AuthToken.objects.filter(pk=fresh_tok.pk).exists())
+
+        # 2. Expired vs valid Django Sessions
+        Session.objects.create(session_key="expired_sess_1", session_data="abc", expire_date=now - timedelta(hours=2))
+        Session.objects.create(session_key="valid_sess_1", session_data="abc", expire_date=now + timedelta(days=1))
+        deleted_sess = cleanup_expired_sessions()
+        self.assertEqual(deleted_sess, 1)
+        self.assertTrue(Session.objects.filter(session_key="valid_sess_1").exists())
+
+        # 3. Temp Excel files & orphan media & model photo replacement signal
+        with tempfile.TemporaryDirectory() as media_tmp:
+            media_root = Path(media_tmp)
+            excel_dir = media_root / "excel_tmp"
+            masters_dir = media_root / "masters"
+            excel_dir.mkdir(parents=True)
+            masters_dir.mkdir(parents=True)
+
+            old_xlsx = excel_dir / "old_export.xlsx"
+            old_xlsx.write_bytes(b"xlsx")
+            old_ts = time.time() - 7200
+            os.utime(old_xlsx, (old_ts, old_ts))
+
+            fresh_xlsx = excel_dir / "fresh_export.xlsx"
+            fresh_xlsx.write_bytes(b"xlsx")
+
+            ref_photo = masters_dir / "master_active.jpg"
+            ref_photo.write_bytes(b"img")
+            old_orphan = masters_dir / "master_old_orphan.jpg"
+            old_orphan.write_bytes(b"img")
+            os.utime(old_orphan, (time.time() - 48 * 3600, time.time() - 48 * 3600))
+            fresh_orphan = masters_dir / "master_fresh_upload.jpg"
+            fresh_orphan.write_bytes(b"img")
+
+            with override_settings(MEDIA_ROOT=media_root):
+                master = TeamMember.objects.create(
+                    full_name="Test Master",
+                    role="Expert",
+                    photo="masters/master_active.jpg",
+                )
+                self.assertEqual(cleanup_excel_tmp(max_age_minutes=60), 1)
+                self.assertFalse(old_xlsx.exists())
+                self.assertTrue(fresh_xlsx.exists())
+
+                self.assertEqual(cleanup_orphan_media(min_age_hours=24), 1)
+                self.assertFalse(old_orphan.exists())
+                self.assertTrue(ref_photo.exists())
+                self.assertTrue(fresh_orphan.exists())
+
+                # Updating photo auto-deletes old file via pre_save signal
+                new_photo = masters_dir / "master_new.jpg"
+                new_photo.write_bytes(b"img2")
+                master.photo = "masters/master_new.jpg"
+                master.save()
+                self.assertFalse(ref_photo.exists())
+                self.assertTrue(new_photo.exists())
+
+                # Deleting master auto-deletes current photo via post_delete signal
+                master.delete()
+                self.assertFalse(new_photo.exists())
+
+        # 4. Aiogram MemoryStorage pruning removes empty entries and keeps active states
+        storage = MemoryStorage()
+        k_empty = StorageKey(bot_id=1, chat_id=10, user_id=10)
+        k_active = StorageKey(bot_id=1, chat_id=20, user_id=20)
+        asyncio.run(storage.set_state(k_empty, None))
+        asyncio.run(storage.set_data(k_empty, {}))
+        asyncio.run(storage.set_state(k_active, CourierLocationStates.waiting_for_location.state))
+        asyncio.run(storage.set_data(k_active, {'courier_order_pk': 1}))
+
+        pruned = prune_empty_fsm_memory(storage)
+        self.assertEqual(pruned, 1)
+        self.assertNotIn(k_empty, storage.storage)
+        self.assertIn(k_active, storage.storage)

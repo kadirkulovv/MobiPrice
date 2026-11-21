@@ -1,5 +1,7 @@
 import os
+import re
 from datetime import datetime
+from pathlib import Path
 from aiogram import Router, F, Bot
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, FSInputFile
 from aiogram.fsm.context import FSMContext
@@ -13,6 +15,15 @@ from core.excel_manager import export_prices_to_excel, import_prices_from_excel
 router = Router()
 EXCEL_TMP_DIR = BASE_DIR / 'media' / 'excel_tmp'
 os.makedirs(EXCEL_TMP_DIR, exist_ok=True)
+MAX_EXCEL_UPLOAD_BYTES = 15 * 1024 * 1024  # 15 MB
+
+
+def _safe_unlink(path: Path) -> None:
+    try:
+        if path and path.exists():
+            path.unlink()
+    except OSError:
+        pass
 
 
 def get_excel_menu() -> ReplyKeyboardMarkup:
@@ -57,7 +68,7 @@ async def export_excel_handler(message: Message):
 
     wait_msg = await message.answer("⏳ Excel jadvali tayyorlanmoqda, iltimos kuting...")
 
-    timestamp = datetime.now().strftime("%Y_%m_%d_%H%M")
+    timestamp = datetime.now().strftime("%Y_%m_%d_%H%M%S")
     filename = f"MobiPrice_Narxlar_{timestamp}.xlsx"
     filepath = EXCEL_TMP_DIR / filename
 
@@ -78,6 +89,8 @@ async def export_excel_handler(message: Message):
         await wait_msg.delete()
     except Exception as e:
         await wait_msg.edit_text(f"❌ Fayl yaratishda xatolik yuz berdi: {e}")
+    finally:
+        _safe_unlink(filepath)
 
 
 @router.message(F.text == "📄 Excel shablonini olish")
@@ -86,28 +99,31 @@ async def download_template_handler(message: Message):
     if not await require_site_admin(message):
         return
 
-    filepath = EXCEL_TMP_DIR / "MobiPrice_Namuna_Shablon.xlsx"
-    await sync_to_async(export_prices_to_excel)(str(filepath))
+    filepath = EXCEL_TMP_DIR / f"MobiPrice_Namuna_Shablon_{datetime.now().strftime('%H%M%S_%f')}.xlsx"
+    try:
+        await sync_to_async(export_prices_to_excel)(str(filepath))
 
-    input_file = FSInputFile(path=str(filepath), filename="MobiPrice_Namuna_Shablon.xlsx")
-    await message.answer_document(
-        document=input_file,
-        caption=(
-            "📄 <b>MobiPrice Excel Namuna Shablon</b>\n\n"
-            "Ustunlar tartibi:\n"
-            "1. <b>ID:</b> Mavjud narxni yangilash uchun ID (yangi qator bo'lsa bo'sh qoldiring)\n"
-            "2. <b>Brend:</b> Apple, Samsung, Xiaomi...\n"
-            "3. <b>Model Seriyasi:</b> Pro series, S series...\n"
-            "4. <b>Telefon Modeli:</b> iPhone 16 Pro Max...\n"
-            "5. <b>Muammo / Detal:</b> Ekran almashtirish...\n"
-            "6. <b>Sifat Turi:</b> original yoki copy\n"
-            "7. <b>Detal Narxi:</b> So'mda (faqat raqam)\n"
-            "8. <b>Usta Haqqi:</b> So'mda (faqat raqam)\n"
-            "9. <b>Ombordagi Soni:</b> 5, 10 yoki 0\n"
-            "10. <b>Kafolat:</b> 6 oy, 1 yil va h.k."
-        ),
-        parse_mode="HTML"
-    )
+        input_file = FSInputFile(path=str(filepath), filename="MobiPrice_Namuna_Shablon.xlsx")
+        await message.answer_document(
+            document=input_file,
+            caption=(
+                "📄 <b>MobiPrice Excel Namuna Shablon</b>\n\n"
+                "Ustunlar tartibi:\n"
+                "1. <b>ID:</b> Mavjud narxni yangilash uchun ID (yangi qator bo'lsa bo'sh qoldiring)\n"
+                "2. <b>Brend:</b> Apple, Samsung, Xiaomi...\n"
+                "3. <b>Model Seriyasi:</b> Pro series, S series...\n"
+                "4. <b>Telefon Modeli:</b> iPhone 16 Pro Max...\n"
+                "5. <b>Muammo / Detal:</b> Ekran almashtirish...\n"
+                "6. <b>Sifat Turi:</b> original yoki copy\n"
+                "7. <b>Detal Narxi:</b> So'mda (faqat raqam)\n"
+                "8. <b>Usta Haqqi:</b> So'mda (faqat raqam)\n"
+                "9. <b>Ombordagi Soni:</b> 5, 10 yoki 0\n"
+                "10. <b>Kafolat:</b> 6 oy, 1 yil va h.k."
+            ),
+            parse_mode="HTML"
+        )
+    finally:
+        _safe_unlink(filepath)
 
 
 @router.message(F.text == "📤 Excel faylni yuklash (Import)")
@@ -131,13 +147,18 @@ async def process_excel_upload(message: Message, state: FSMContext, bot: Bot):
     if not await require_site_admin(message):
         return
     doc = message.document
-    if not doc.file_name.lower().endswith(('.xlsx', '.xlsm')):
+    raw_name = Path(doc.file_name or "upload.xlsx").name
+    if not raw_name.lower().endswith(('.xlsx', '.xlsm')):
         await message.answer("⚠️ Iltimos, faqat <b>.xlsx</b> formatdagi Excel faylini yuboring!")
+        return
+    if doc.file_size and doc.file_size > MAX_EXCEL_UPLOAD_BYTES:
+        await message.answer("⚠️ Fayl hajmi juda katta (maksimum 15 MB). Iltimos, kichikroq fayl yuboring.")
         return
 
     wait_msg = await message.answer("⚙️ Fayl qabul qilindi, ma'lumotlar bazaga kiritilmoqda...")
 
-    dest_path = EXCEL_TMP_DIR / f"import_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{doc.file_name}"
+    safe_name = re.sub(r'[^A-Za-z0-9._-]+', '_', raw_name)[:80]
+    dest_path = EXCEL_TMP_DIR / f"import_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}_{safe_name}"
 
     try:
         file = await bot.get_file(doc.file_id)
@@ -165,3 +186,5 @@ async def process_excel_upload(message: Message, state: FSMContext, bot: Bot):
         )
     except Exception as e:
         await wait_msg.edit_text(f"❌ Faylni o‘qishda xatolik yuz berdi: {e}")
+    finally:
+        _safe_unlink(dest_path)

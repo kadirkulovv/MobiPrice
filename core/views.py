@@ -1,25 +1,41 @@
 import json
 import logging
 import secrets
-import threading
-import requests
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+
+import requests
+from django.conf import settings
+from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
-from django.http import JsonResponse, HttpResponse
-from django.views.decorators.http import require_POST, require_GET
+from django.utils import timezone
+from django.utils.html import escape
+from django.utils.translation import get_language
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.conf import settings
+from django.views.decorators.http import require_GET, require_POST
 
-from django.utils import timezone
-from django.utils.translation import get_language
-from django.core.cache import cache
-from django.utils.html import escape
+from .maintenance import (
+    PENDING_COURIER_TIMEOUT_MINUTES,
+    expire_stale_pending_courier_orders,
+    get_order_location_deadline,
+)
 from .models import (
-    Brand, DeviceSeries, DevicePhone, DeviceIssue, IssueComparison,
-    RepairFAQ, Review, ServiceOrder, TeamMember, BotAdmin, TelegramUser, AuthToken
+    AuthToken,
+    BotAdmin,
+    Brand,
+    DeviceIssue,
+    DevicePhone,
+    DeviceSeries,
+    IssueComparison,
+    RepairFAQ,
+    Review,
+    ServiceOrder,
+    TeamMember,
+    TelegramUser,
 )
 from .telegram_auth import (
     get_bot_username,
@@ -33,20 +49,25 @@ from .telegram_auth import (
 )
 
 logger = logging.getLogger(__name__)
+_NOTIFICATION_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="tg_notify")
+_TG_HTTP_SESSION = requests.Session()
 
 
 def _send_telegram_notifications_async(bot_token: str, admin_ids: list, payload_base: dict):
-    """Telegram xabarlarini asosiy HTTP javobni bloklamasdan orqa fonda yuborish"""
+    """Telegram xabarlarini asosiy HTTP javobni bloklamasdan cheklangan worker pool orqali yuborish"""
     def _worker():
         url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         for aid in admin_ids:
             try:
                 body = dict(payload_base, chat_id=aid)
-                requests.post(url, json=body, timeout=4)
+                _TG_HTTP_SESSION.post(url, json=body, timeout=4)
             except Exception as exc:
                 logger.warning(f"Telegram notification failed for {aid}: {exc}")
 
-    threading.Thread(target=_worker, daemon=True).start()
+    try:
+        _NOTIFICATION_EXECUTOR.submit(_worker)
+    except Exception as exc:
+        logger.warning(f"Telegram notification submit failed: {exc}")
 
 
 UI_TRANSLATIONS = {
@@ -535,7 +556,7 @@ def api_submit_order(request):
 
         if service_type == 'courier':
             courier_token = secrets.token_urlsafe(24)
-            expires_at = timezone.now() + timedelta(minutes=60)
+            expires_at = timezone.now() + timedelta(minutes=PENDING_COURIER_TIMEOUT_MINUTES)
             order = ServiceOrder.objects.create(
                 telegram_user=tg_user,
                 client_name=client_name,
@@ -550,10 +571,10 @@ def api_submit_order(request):
 
             bot_url = f"https://t.me/{bot_username}?start=courier_{courier_token}"
             courier_msg = {
-                'ru': "Заказ создан! Перейдите в Telegram-бот и отправьте геолокацию для расчета стоимости курьера.",
-                'en': "Order created! Open our Telegram bot and share your location to calculate the courier fee.",
-                'uz': "Buyurtma yaratildi! Kuryer narxini hisoblash uchun Telegram botga o'tib lokatsiyangizni yuboring.",
-            }.get(lang, "Buyurtma yaratildi! Telegram botga o'tib lokatsiyangizni yuboring.")
+                'ru': "Заказ создан! Перейдите в Telegram-бот и отправьте геолокацию в течение 1 часа (иначе заказ отменится автоматически).",
+                'en': "Order created! Open our Telegram bot and share your location within 1 hour (otherwise the order auto-cancels).",
+                'uz': "Buyurtma yaratildi! Kuryer narxini hisoblash uchun 1 soat ichida Telegram botga o'tib lokatsiyangizni yuboring (aks holda buyurtma avtomatik bekor qilinadi).",
+            }.get(lang, "Buyurtma yaratildi! 1 soat ichida Telegram botga o'tib lokatsiyangizni yuboring.")
 
             return JsonResponse({
                 'success': True,
@@ -562,6 +583,8 @@ def api_submit_order(request):
                 'status': order.status,
                 'phone_number': verified_phone,
                 'bot_url': bot_url,
+                'location_expires_at': expires_at.isoformat(),
+                'location_remaining_seconds': PENDING_COURIER_TIMEOUT_MINUTES * 60,
                 'message': courier_msg,
             })
 
@@ -775,13 +798,26 @@ def _serialize_order_status(order: ServiceOrder, lang: str = 'uz', bot_username:
         final_total_val = delivery_fee_val
 
     bot_url = ""
-    if (
-        order.status == 'pending_location'
-        and order.courier_token
-        and bot_username
-        and (not order.courier_token_expires_at or order.courier_token_expires_at > timezone.now())
-    ):
-        bot_url = f"https://t.me/{bot_username}?start=courier_{order.courier_token}"
+    location_expires_at = None
+    location_remaining_seconds = None
+    if order.status == 'pending_location':
+        now = timezone.now()
+        deadline = get_order_location_deadline(order)
+        remaining_sec = int((deadline - now).total_seconds())
+        if remaining_sec > 0:
+            # Agar token qandaydir sabab bilan bo'sh bo'lsa, muddat ichida tiklab beramiz
+            if not order.courier_token:
+                order.courier_token = secrets.token_urlsafe(24)
+                order.courier_token_expires_at = deadline
+                order.save(update_fields=['courier_token', 'courier_token_expires_at'])
+            elif not order.courier_token_expires_at:
+                order.courier_token_expires_at = deadline
+                order.save(update_fields=['courier_token_expires_at'])
+
+            location_expires_at = deadline.isoformat()
+            location_remaining_seconds = remaining_sec
+            if bot_username and order.courier_token:
+                bot_url = f"https://t.me/{bot_username}?start=courier_{order.courier_token}"
 
     local_created = timezone.localtime(order.created_at)
     return {
@@ -800,6 +836,8 @@ def _serialize_order_status(order: ServiceOrder, lang: str = 'uz', bot_username:
         'current_step': current_step,
         'master_name': order.master.full_name if order.master_id and order.master else '',
         'bot_url': bot_url,
+        'location_expires_at': location_expires_at,
+        'location_remaining_seconds': location_remaining_seconds,
         'created_at': local_created.strftime('%d.%m.%Y %H:%M'),
     }
 
@@ -825,6 +863,9 @@ def api_my_orders(request):
         }, status=401)
 
     try:
+        # 1 soatdan oshgan lokatsiya yuborilmagan buyurtmalarni darhol avtomatik bekor qilish
+        expire_stale_pending_courier_orders(telegram_user=tg_user)
+
         raw_page = request.GET.get('page', '1')
         try:
             page_num = int(raw_page)
@@ -901,6 +942,9 @@ def api_track_order(request):
         return api_my_orders(request)
 
     try:
+        # 1 soatdan oshgan lokatsiya yuborilmagan buyurtmalarni darhol avtomatik bekor qilish
+        expire_stale_pending_courier_orders(telegram_user=tg_user)
+
         order = (
             ServiceOrder.objects
             .filter(order_id__iexact=clean_code, telegram_user=tg_user)
@@ -1176,6 +1220,19 @@ def api_auth_deeplink_start(request):
             'uz': "Telegram bot nomi aniqlanmadi. Iltimos, birozdan so'ng qayta urinib ko'ring.",
         }.get(lang, "Telegram bot nomi aniqlanmadi.")
         return JsonResponse({'success': False, 'error': err}, status=503)
+
+    # Anti-flood rate limit (IP bo'yicha daqiqasiga maksimum 15 ta login havolasi)
+    client_ip = get_client_ip(request)
+    auth_rate_key = f"auth_dl_ratelimit_{client_ip}"
+    auth_attempts = cache.get(auth_rate_key, 0)
+    if auth_attempts >= 15:
+        rate_err = {
+            'ru': "Слишком много попыток входа. Пожалуйста, подождите минуту.",
+            'en': "Too many sign-in attempts. Please wait a minute.",
+            'uz': "Juda ko'p kirish urinishlari bo'ldi. Iltimos, 1 daqiqa kutib qayta urinib ko'ring.",
+        }.get(lang, "Juda ko'p kirish urinishlari bo'ldi. Biroz kuting.")
+        return JsonResponse({'success': False, 'error': rate_err}, status=429)
+    cache.set(auth_rate_key, auth_attempts + 1, 60)
 
     if not request.session.session_key:
         request.session.create()

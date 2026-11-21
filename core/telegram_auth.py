@@ -14,28 +14,48 @@ logger = logging.getLogger(__name__)
 
 SESSION_KEY_TG_USER_ID = 'telegram_user_id'
 BOT_USERNAME_CACHE_KEY = 'mobiprice_telegram_bot_username'
-BOT_USERNAME_CACHE_TTL = 3600
-BOT_USERNAME_ERROR_TTL = 60
+BOT_USERNAME_CACHE_TTL = 86400
+BOT_USERNAME_ERROR_TTL = 15
+_LAST_KNOWN_BOT_USERNAME = ''
+
+
+def cache_bot_username(username: str) -> str:
+    """Bot username ni kesh va jarayon xotirasida barqaror saqlash."""
+    global _LAST_KNOWN_BOT_USERNAME
+    clean = str(username or '').lstrip('@').strip()
+    if clean:
+        _LAST_KNOWN_BOT_USERNAME = clean
+        try:
+            cache.set(BOT_USERNAME_CACHE_KEY, clean, BOT_USERNAME_CACHE_TTL)
+        except Exception:
+            pass
+    return clean
 
 
 def get_bot_username() -> str:
     """
     Telegram bot username ni olish:
     1) settings.TELEGRAM_BOT_USERNAME (agar .env da ko'rsatilgan bo'lsa)
-    2) Aks holda TELEGRAM_BOT_TOKEN orqali Telegram API getMe ni 1 marta so'rab,
-       natijani django.core.cache da 1 soat keshlab saqlash.
+    2) django.core.cache (24 soat)
+    3) TELEGRAM_BOT_TOKEN orqali Telegram API getMe
+    4) Vaqtinchalik tarmoq uzilishida oxirgi ma'lum username fallback
     """
+    global _LAST_KNOWN_BOT_USERNAME
     configured = str(getattr(settings, 'TELEGRAM_BOT_USERNAME', '') or '').lstrip('@').strip()
     if configured:
+        _LAST_KNOWN_BOT_USERNAME = configured
         return configured
 
     cached = cache.get(BOT_USERNAME_CACHE_KEY, None)
-    if cached is not None:
-        return str(cached)
+    if cached:
+        _LAST_KNOWN_BOT_USERNAME = str(cached)
+        return _LAST_KNOWN_BOT_USERNAME
+    if cached == '':
+        return _LAST_KNOWN_BOT_USERNAME
 
     bot_token = str(getattr(settings, 'TELEGRAM_BOT_TOKEN', '') or '').strip()
     if not bot_token:
-        return ''
+        return _LAST_KNOWN_BOT_USERNAME
 
     try:
         resp = requests.get(
@@ -47,10 +67,12 @@ def get_bot_username() -> str:
             if payload.get('ok'):
                 username = str(payload.get('result', {}).get('username') or '').lstrip('@').strip()
                 if username:
-                    cache.set(BOT_USERNAME_CACHE_KEY, username, BOT_USERNAME_CACHE_TTL)
-                    return username
+                    return cache_bot_username(username)
     except Exception as exc:
         logger.warning("Failed to fetch Telegram bot username via getMe: %s", exc)
+
+    if _LAST_KNOWN_BOT_USERNAME:
+        return _LAST_KNOWN_BOT_USERNAME
 
     cache.set(BOT_USERNAME_CACHE_KEY, '', BOT_USERNAME_ERROR_TTL)
     return ''

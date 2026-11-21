@@ -323,12 +323,12 @@ class ServiceOrder(models.Model):
     comparison = models.ForeignKey(IssueComparison, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Tanlangan variant"))
 
     service_type = models.CharField(_("Xizmat turi"), max_length=50, choices=SERVICE_CHOICES, default='in_service')
-    status = models.CharField(_("Holati"), max_length=50, choices=STATUS_CHOICES, default='new')
+    status = models.CharField(_("Holati"), max_length=50, choices=STATUS_CHOICES, default='new', db_index=True)
     master = models.ForeignKey(TeamMember, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Biriktirilgan usta"))
 
     # Kuryer va lokatsiya maydonlari
     courier_token = models.CharField(_("Kuryer tokeni"), max_length=64, unique=True, null=True, blank=True, db_index=True)
-    courier_token_expires_at = models.DateTimeField(_("Kuryer tokeni muddati"), null=True, blank=True)
+    courier_token_expires_at = models.DateTimeField(_("Kuryer tokeni muddati"), null=True, blank=True, db_index=True)
     latitude = models.FloatField(_("Kenglik (Latitude)"), null=True, blank=True)
     longitude = models.FloatField(_("Uzunlik (Longitude)"), null=True, blank=True)
     distance_km = models.DecimalField(_("Masofa (km)"), max_digits=6, decimal_places=2, null=True, blank=True)
@@ -457,7 +457,7 @@ class AuthToken(models.Model):
     is_used = models.BooleanField(_("Ishlatilgan"), default=False)
     rejected_reason = models.CharField(_("Rad etilish sababi"), max_length=64, blank=True, default='')
     created_at = models.DateTimeField(_("Yaratilgan vaqt"), auto_now_add=True)
-    expires_at = models.DateTimeField(_("Amal qilish muddati"))
+    expires_at = models.DateTimeField(_("Amal qilish muddati"), db_index=True)
 
     class Meta:
         verbose_name = _("Auth token")

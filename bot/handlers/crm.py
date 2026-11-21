@@ -7,6 +7,7 @@ from aiogram.fsm.state import State, StatesGroup
 from bot.keyboards.main_menu import get_cancel_menu
 from bot.database import ServiceOrder, TeamMember, sync_to_async
 from bot.permissions import get_user_permissions
+from core.maintenance import expire_stale_pending_courier_orders
 
 router = Router()
 
@@ -183,6 +184,7 @@ async def crm_home(message: Message, state: FSMContext):
         return
 
     await state.clear()
+    await sync_to_async(expire_stale_pending_courier_orders)()
     pending_loc_cnt = await sync_to_async(ServiceOrder.objects.filter(status='pending_location').count)()
     new_cnt = await sync_to_async(ServiceOrder.objects.filter(status='new').count)()
     prog_cnt = await sync_to_async(ServiceOrder.objects.filter(status__in=['contacted', 'in_progress']).count)()
@@ -290,6 +292,7 @@ async def process_order_search(message: Message, state: FSMContext):
     query = message.text.replace('#', '').strip()
     username_query = query.lstrip('@').strip()
     await state.clear()
+    await sync_to_async(expire_stale_pending_courier_orders)()
 
     search_filter = (
         Q(order_id__icontains=query)

@@ -1,4 +1,4 @@
-.PHONY: run bot migrate makemigrations shell check
+.PHONY: run bot migrate makemigrations shell check cleanup
 
 run:
 	python3 manage.py runserver 0.0.0.0:8080
@@ -17,3 +17,6 @@ shell:
 
 check:
 	python3 manage.py check
+
+cleanup:
+	python3 manage.py server_cleanup

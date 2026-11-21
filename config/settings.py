@@ -68,11 +68,18 @@ if DEBUG:
         if _dev_origin not in CSRF_TRUSTED_ORIGINS:
             CSRF_TRUSTED_ORIGINS.append(_dev_origin)
 
+# Reverse proxy (Nginx / Cloudflare / Caddy) HTTPS header support in both dev and production
+if os.getenv('USE_PROXY_SSL_HEADER', 'True') == 'True':
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-# Session Cookie Security & Telegram Login Widget Popup Support
+# Session & CSRF Cookie Security + Upload Size Guards (Prevent OOM on VPS)
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_AGE = int(os.getenv('SESSION_COOKIE_AGE', str(60 * 60 * 24 * 14)))  # 14 days
+SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'False') == 'True'
+CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'False') == 'True'
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 5 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 5 MB
 # Allow cross-origin OAuth popups (oauth.telegram.org) to keep window.opener for postMessage
 SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
 
@@ -141,13 +148,34 @@ DATABASES = {
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
-        'LOCATION': '/tmp/mobiprice_cache',
+        'LOCATION': os.getenv('CACHE_DIR', '/tmp/mobiprice_cache'),
         'TIMEOUT': 300,  # 5 minutes default
         'OPTIONS': {
-            'MAX_ENTRIES': 10000,
+            'MAX_ENTRIES': 1500,
             'CULL_FREQUENCY': 3,
         }
     }
+}
+
+# Clean stdout logging (managed by systemd/journald or docker; no unbounded local log files)
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'concise': {
+            'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'concise',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': os.getenv('LOG_LEVEL', 'INFO'),
+    },
 }
 
 

@@ -1,61 +1,131 @@
-import os
-import gzip
-import sqlite3
 import asyncio
+import gzip
 import logging
-from pathlib import Path
+import os
+import sqlite3
 from datetime import datetime, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
+
 from aiogram import Bot
 from aiogram.types import FSInputFile
 from django.conf import settings
+
 from bot.database import BotAdmin, sync_to_async
 
 logger = logging.getLogger("mobiprice_backup")
 TZ_TASHKENT = ZoneInfo("Asia/Tashkent")
 
 
-def create_db_backup() -> tuple[Path, float]:
+def get_backup_keep_count() -> int:
+    """Server diskida saqlanadigan oxirgi zaxira nusxalari soni (standart: 2 ta)."""
+    raw = os.getenv("BACKUP_KEEP_COUNT", "2").strip()
+    try:
+        val = int(raw)
+    except (TypeError, ValueError):
+        val = 2
+    return max(1, val)
+
+
+def prune_old_backups(backup_dir: Path | None = None, keep: int | None = None) -> dict:
+    """
+    Server diskida ortiqcha joy egallamasligi uchun faqat oxirgi N (standart 2) ta
+    siqilgan .gz zaxira faylini qoldirib, qolgan barcha eski va vaqtinchalik fayllarni o'chirish.
+    """
+    target_dir = Path(backup_dir) if backup_dir is not None else (Path(settings.BASE_DIR) / "backups")
+    keep_count = max(1, int(keep)) if keep is not None else get_backup_keep_count()
+
+    if not target_dir.exists():
+        return {"deleted_gz": 0, "deleted_tmp": 0, "kept": 0}
+
+    deleted_tmp = 0
+    for pattern in ("*.sqlite3", "*.sqlite3-wal", "*.sqlite3-shm", "*.tmp"):
+        for tmp_file in target_dir.glob(pattern):
+            try:
+                if tmp_file.is_file():
+                    tmp_file.unlink()
+                    deleted_tmp += 1
+            except OSError as exc:
+                logger.warning("Vaqtinchalik backup faylini o'chirishda xatolik (%s): %s", tmp_file.name, exc)
+
+    gz_files = [p for p in target_dir.glob("*.gz") if p.is_file()]
+
+    def _sort_key(path: Path):
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            mtime = 0.0
+        return (mtime, path.name)
+
+    gz_files.sort(key=_sort_key, reverse=True)
+
+    deleted_gz = 0
+    for old_file in gz_files[keep_count:]:
+        try:
+            old_file.unlink()
+            deleted_gz += 1
+        except OSError as exc:
+            logger.warning("Eski backup faylini o'chirishda xatolik (%s): %s", old_file.name, exc)
+
+    kept_count = min(len(gz_files), keep_count)
+    if deleted_gz or deleted_tmp:
+        logger.info(
+            "Backups tozalandi: %d ta eski .gz va %d ta vaqtinchalik fayl o'chirildi (qolgani: %d ta).",
+            deleted_gz,
+            deleted_tmp,
+            kept_count,
+        )
+    return {"deleted_gz": deleted_gz, "deleted_tmp": deleted_tmp, "kept": kept_count}
+
+
+def create_db_backup(backup_dir: Path | None = None, keep: int | None = None) -> tuple[Path, float]:
     """
     SQLite ma'lumotlar bazasini xavfsiz (hot backup) usulida zaxiralash
     va gzip bilan siqish (sayt to'xtamaydi, jadvallar bloklanmaydi).
+    Faqat oxirgi N (standart 2) ta arxiv saqlanib qoladi, qolganlari avtomatik o'chiriladi.
     """
-    base_dir = settings.BASE_DIR
-    backup_dir = base_dir / "backups"
-    backup_dir.mkdir(parents=True, exist_ok=True)
+    base_dir = Path(settings.BASE_DIR)
+    target_backup_dir = Path(backup_dir) if backup_dir is not None else (base_dir / "backups")
+    target_backup_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now(TZ_TASHKENT).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(TZ_TASHKENT).strftime("%Y%m%d_%H%M%S_%f")[:19]
     db_file = base_dir / "db.sqlite3"
-    raw_backup_path = backup_dir / f"mobiprice_db_{timestamp}.sqlite3"
-    gz_backup_path = backup_dir / f"mobiprice_db_{timestamp}.sqlite3.gz"
+    raw_backup_path = target_backup_dir / f"mobiprice_db_{timestamp}.sqlite3"
+    tmp_gz_path = target_backup_dir / f"mobiprice_db_{timestamp}.sqlite3.gz.tmp"
+    gz_backup_path = target_backup_dir / f"mobiprice_db_{timestamp}.sqlite3.gz"
 
-    # 1. Native SQLite hot backup (WAL-safe with 30s busy timeout)
-    src_conn = sqlite3.connect(str(db_file), timeout=30)
-    dst_conn = sqlite3.connect(str(raw_backup_path), timeout=30)
     try:
-        src_conn.backup(dst_conn)
-    finally:
-        dst_conn.close()
-        src_conn.close()
-
-    # 2. Gzip compression
-    with open(raw_backup_path, "rb") as f_in, gzip.open(gz_backup_path, "wb", compresslevel=9) as f_out:
-        while chunk := f_in.read(64 * 1024):
-            f_out.write(chunk)
-
-    # Xom faylni o'chiramiz, faqat siqilgan .gz qoladi
-    if raw_backup_path.exists():
-        raw_backup_path.unlink()
-
-    # 3. 14 kundan eski arxivlarni avtomatik tozalash
-    retention_cutoff = datetime.now(TZ_TASHKENT) - timedelta(days=14)
-    for old_file in backup_dir.glob("*.gz"):
+        # 1. Native SQLite hot backup (WAL-safe with 30s busy timeout)
+        src_conn = sqlite3.connect(str(db_file), timeout=30)
+        dst_conn = sqlite3.connect(str(raw_backup_path), timeout=30)
         try:
-            mtime = datetime.fromtimestamp(old_file.stat().st_mtime, tz=TZ_TASHKENT)
-            if mtime < retention_cutoff:
-                old_file.unlink()
-        except Exception:
-            pass
+            src_conn.backup(dst_conn)
+        finally:
+            dst_conn.close()
+            src_conn.close()
+
+        # 2. Atomic Gzip compression
+        with open(raw_backup_path, "rb") as f_in, gzip.open(tmp_gz_path, "wb", compresslevel=9) as f_out:
+            while chunk := f_in.read(64 * 1024):
+                f_out.write(chunk)
+
+        tmp_gz_path.replace(gz_backup_path)
+    finally:
+        # Xom va vaqtinchalik fayllar xato bo'lganda ham albatta o'chiriladi
+        for leftover in (
+            raw_backup_path,
+            Path(f"{raw_backup_path}-wal"),
+            Path(f"{raw_backup_path}-shm"),
+            tmp_gz_path,
+        ):
+            try:
+                if leftover.exists():
+                    leftover.unlink()
+            except OSError:
+                pass
+
+    # 3. Faqat oxirgi N (standart 2) ta zaxira arxivini qoldirish, qolganlarini avtomatik o'chirish
+    prune_old_backups(backup_dir=target_backup_dir, keep=keep)
 
     size_kb = gz_backup_path.stat().st_size / 1024
     return gz_backup_path, size_kb
@@ -65,9 +135,12 @@ async def get_all_admin_ids() -> list[int]:
     """Konfiguratsiyadagi va ma'lumotlar bazasidagi barcha faol adminlar IDlari"""
     admin_ids: list[int] = []
 
-    # Config / settings dan
-    raw_env_ids = getattr(settings, 'TELEGRAM_ADMIN_CHAT_ID', '') or os.getenv('TELEGRAM_ADMIN_CHAT_ID', '') or os.getenv('TELEGRAM_ADMIN_IDS', '')
-    for item in str(raw_env_ids).split(','):
+    raw_env_ids = (
+        getattr(settings, "TELEGRAM_ADMIN_CHAT_ID", "")
+        or os.getenv("TELEGRAM_ADMIN_CHAT_ID", "")
+        or os.getenv("TELEGRAM_ADMIN_IDS", "")
+    )
+    for item in str(raw_env_ids).split(","):
         item = item.strip()
         if item.isdigit():
             admin_ids.append(int(item))
@@ -77,8 +150,8 @@ async def get_all_admin_ids() -> list[int]:
         db_admins = await sync_to_async(list)(
             BotAdmin.objects.filter(
                 is_active=True,
-                role__in=['admin', 'both']
-            ).exclude(telegram_id__isnull=True).values_list('telegram_id', flat=True)
+                role__in=["admin", "both"],
+            ).exclude(telegram_id__isnull=True).values_list("telegram_id", flat=True)
         )
         for tid in db_admins:
             if tid and tid not in admin_ids:
@@ -95,13 +168,14 @@ async def send_backup_to_admins(bot: Bot, trigger: str = "Avtomatik kunlik zaxir
         gz_path, size_kb = await asyncio.to_thread(create_db_backup)
     except Exception as e:
         logger.error(f"Zaxira faylini yaratishda xatolik: {e}")
-        return {'success': False, 'error': str(e)}
+        return {"success": False, "error": str(e)}
 
     admin_ids = await get_all_admin_ids()
     if not admin_ids:
         logger.warning("Zaxirani yuborish uchun birorta ham admin ID topilmadi.")
-        return {'success': False, 'error': "Admin IDlar topilmadi"}
+        return {"success": False, "error": "Admin IDlar topilmadi"}
 
+    keep_count = get_backup_keep_count()
     now_tashkent = datetime.now(TZ_TASHKENT).strftime("%d.%m.%Y %H:%M:%S")
     caption = (
         f"💾 <b>MobiPrice Ma'lumotlar Bazasi Zaxirasi</b>\n\n"
@@ -109,6 +183,7 @@ async def send_backup_to_admins(bot: Bot, trigger: str = "Avtomatik kunlik zaxir
         f"📦 <b>Turi:</b> SQLite3 (Gzip siqilgan .gz)\n"
         f"📁 <b>Hajmi:</b> {size_kb:.1f} KB\n"
         f"🚀 <b>Sabab:</b> {trigger}\n"
+        f"🧹 <b>Rotatsiya:</b> Serverda faqat oxirgi {keep_count} ta zaxira saqlanadi\n"
         f"🛡 <b>Xavfsizlik:</b> WAL-safe snapshot (to‘liq ma'lumot saqlangan)"
     )
 
@@ -121,14 +196,14 @@ async def send_backup_to_admins(bot: Bot, trigger: str = "Avtomatik kunlik zaxir
                 chat_id=aid,
                 document=doc_file,
                 caption=caption,
-                parse_mode="HTML"
+                parse_mode="HTML",
             )
             sent_count += 1
             logger.info(f"Zaxira fayli admin {aid} ga yuborildi.")
         except Exception as e:
             logger.error(f"Admin {aid} ga zaxira yuborilmadi: {e}")
 
-    return {'success': True, 'sent_count': sent_count, 'file': str(gz_path), 'size_kb': size_kb}
+    return {"success": True, "sent_count": sent_count, "file": str(gz_path), "size_kb": size_kb}
 
 
 async def daily_backup_scheduler_task(bot: Bot):
@@ -140,7 +215,6 @@ async def daily_backup_scheduler_task(bot: Bot):
     while True:
         try:
             now = datetime.now(TZ_TASHKENT)
-            # Ertangi kun 00:00:00 vaqti
             tomorrow = now.date() + timedelta(days=1)
             target = datetime(tomorrow.year, tomorrow.month, tomorrow.day, 0, 0, 0, tzinfo=TZ_TASHKENT)
             sleep_seconds = (target - now).total_seconds()
@@ -152,10 +226,8 @@ async def daily_backup_scheduler_task(bot: Bot):
 
             await asyncio.sleep(sleep_seconds)
 
-            # 00:00 da zaxirani barcha adminlarga yuboramiz
             await send_backup_to_admins(bot, trigger="Kunlik avtomatik reja (00:00 Asia/Tashkent)")
 
-            # Bir soniya kutamiz (qayta-qayta chaqirilmasligi uchun)
             await asyncio.sleep(5)
         except asyncio.CancelledError:
             logger.info("Zaxira rejalashtiruvchisi bekor qilindi.")

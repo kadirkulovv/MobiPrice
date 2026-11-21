@@ -1,9 +1,10 @@
 import html
 from aiogram import Router, F, Bot
 from aiogram.filters import CommandStart, Command, StateFilter
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 from bot.config import ADMIN_IDS
+from bot.handlers.client import _get_active_pending_courier_orders_for_user
 from bot.keyboards.main_menu import get_main_menu, get_section_crud_menu
 from bot.permissions import get_user_permissions, UserPermissions
 from bot.database import (
@@ -56,14 +57,37 @@ async def cmd_start(message: Message, state: FSMContext):
 
     perms: UserPermissions = await get_user_permissions(user_id, username)
     if not perms.has_any_access:
+        pending_orders = await sync_to_async(_get_active_pending_courier_orders_for_user)(user_id)
+        if pending_orders:
+            buttons = [
+                [
+                    InlineKeyboardButton(
+                        text=f"📍 #{o['order_id']} ({o['phone_str']}) — lokatsiya yuborish",
+                        callback_data=f"resume_courier:{o['courier_token']}",
+                    )
+                ]
+                for o in pending_orders[:5]
+                if o.get('courier_token')
+            ]
+            kb = InlineKeyboardMarkup(inline_keyboard=buttons) if buttons else None
+            await message.answer(
+                f"👋 Assalomu alaykum, <b>{html.escape(message.from_user.first_name or '')}</b>!\n\n"
+                f"🛵 Sizda lokatsiya kutilayotgan kuryer buyurtmasi mavjud.\n"
+                f"Davom etish uchun pastdagi tugmani bosing yoki saytdagi <b>«Mening buyurtmalarim»</b> "
+                f"bo'limidan <b>«📍 Botga lokatsiya yuborish»</b> tugmasini bosing:",
+                parse_mode="HTML",
+                reply_markup=kb or ReplyKeyboardRemove(),
+            )
+            return
+
         await message.answer(
-            f"⛔️ <b>Ruxsat yo‘q!</b>\n\n"
-            f"Assalomu alaykum, {html.escape(message.from_user.full_name or '')}!\n"
-            f"Ushbu bot faqat <b>MobiPrice</b> admin va menejerlari uchun mo‘ljallangan.\n\n"
+            f"👋 Assalomu alaykum, <b>{html.escape(message.from_user.full_name or '')}</b>!\n\n"
+            f"Ushbu bot <b>MobiPrice</b> saytida kirishni tasdiqlash, kuryer buyurtmasi uchun lokatsiya yuborish "
+            f"va xodimlar boshqaruvi uchun xizmat qiladi.\n\n"
             f"Sizning Telegram ID: <code>{user_id}</code>\n"
-            f"Username: @{html.escape(username or 'mavjud emas')}\n\n"
-            f"Botdan foydalanish uchun Telegram ID yoki username'ingizni Bosh Adminga yuboring.",
-            parse_mode="HTML"
+            f"Username: @{html.escape(username or 'mavjud emas')}",
+            parse_mode="HTML",
+            reply_markup=ReplyKeyboardRemove(),
         )
         return
 

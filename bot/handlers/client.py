@@ -1,24 +1,34 @@
 import asyncio
 import html
 import logging
+import math
 from decimal import Decimal
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command, CommandObject, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from aiogram.types import CallbackQuery, KeyboardButton, Message, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from django.db import transaction
 from django.utils import timezone
 
 from bot.config import ADMIN_IDS
 from bot.database import AuthToken, BotAdmin, ServiceOrder, sync_to_async
 from bot.handlers.crm import build_order_action_kb
+from bot.keyboards.main_menu import get_main_menu
+from bot.permissions import get_user_permissions
 from bot.states.client_states import CourierLocationStates, LoginAuthStates
 from core.distance import (
     build_google_maps_url,
     build_yandex_maps_url,
     calculate_courier_fee_uzs,
     calculate_road_distance_km,
+)
+from core.maintenance import (
+    AUTO_CANCEL_TIMEOUT_NOTE,
+    USER_CANCEL_BOT_NOTE,
+    expire_stale_pending_courier_orders,
+    get_order_location_deadline,
+    is_order_location_expired,
 )
 from core.telegram_auth import (
     is_uzbek_phone_number,
@@ -155,11 +165,96 @@ def validate_verified_own_contact(message: Message) -> tuple[bool, str, str]:
     return True, "ok", normalized_phone
 
 
+def _auto_cancel_if_expired(order: ServiceOrder, now=None) -> bool:
+    """Agar kuryer buyurtmasining 1 soatlik muddati o'tgan bo'lsa, darhol bazada bekor qilish."""
+    ref_now = now or timezone.now()
+    if order.status != 'pending_location' or not is_order_location_expired(order, now=ref_now):
+        return False
+    ServiceOrder.objects.filter(pk=order.pk, status='pending_location').update(
+        status='cancelled',
+        courier_token=None,
+        courier_token_expires_at=None,
+        admin_notes=AUTO_CANCEL_TIMEOUT_NOTE,
+    )
+    order.status = 'cancelled'
+    order.courier_token = None
+    order.courier_token_expires_at = None
+    return True
+
+
+def _cancel_pending_courier_order(
+    order_pk: int,
+    token_value: str,
+    telegram_id: int,
+    reason: str = USER_CANCEL_BOT_NOTE,
+) -> tuple[str, str]:
+    """Mijoz botda bekor qilganda 'pending_location' buyurtmani atomar tarzda 'cancelled' ga o'tkazish."""
+    with transaction.atomic():
+        order = (
+            ServiceOrder.objects
+            .select_for_update()
+            .select_related('telegram_user')
+            .filter(pk=order_pk)
+            .first()
+        )
+        if not order:
+            return "invalid", ""
+        if not order.telegram_user or order.telegram_user.telegram_id != telegram_id:
+            return "forbidden", order.order_id
+        if order.status == 'cancelled':
+            return "already_cancelled", order.order_id
+        if order.status != 'pending_location':
+            return "already_processed", order.order_id
+        if token_value and order.courier_token and order.courier_token != token_value:
+            return "invalid", order.order_id
+
+        order.status = 'cancelled'
+        order.courier_token = None
+        order.courier_token_expires_at = None
+        order.admin_notes = reason
+        order.save(update_fields=['status', 'courier_token', 'courier_token_expires_at', 'admin_notes'])
+        return "cancelled", order.order_id
+
+
+def _get_active_pending_courier_orders_for_user(telegram_id: int) -> list[dict]:
+    """Foydalanuvchining muddati tugamagan faol 'pending_location' kuryer buyurtmalarini qaytarish."""
+    now = timezone.now()
+    expire_stale_pending_courier_orders(now=now)
+    orders = list(
+        ServiceOrder.objects
+        .select_related('phone', 'comparison', 'comparison__issue')
+        .filter(
+            telegram_user__telegram_id=telegram_id,
+            status='pending_location',
+        )
+        .order_by('-created_at')
+    )
+    result = []
+    for order in orders:
+        if _auto_cancel_if_expired(order, now=now):
+            continue
+        deadline = get_order_location_deadline(order)
+        remaining_min = max(1, math.ceil((deadline - now).total_seconds() / 60))
+        result.append({
+            'order_pk': order.id,
+            'order_id': order.order_id,
+            'courier_token': order.courier_token or '',
+            'phone_str': order.phone.name if order.phone else "Smartfon",
+            'remaining_minutes': remaining_min,
+        })
+    return result
+
+
 def _validate_courier_token(token_value: str, telegram_id: int) -> tuple[str, dict]:
-    """Kuryer deep-link tokenini tekshirish va buyurtma qisqa ma'lumotlarini qaytarish"""
+    """
+    Kuryer deep-link tokenini tekshirish va buyurtma qisqa ma'lumotlarini qaytarish.
+    DIQQAT: Token bu yerda o'chirilmaydi — lokatsiya yuborilmaguncha yoki bekor bo'lmaguncha
+    saytdagi tugmani qayta-qayta bosish mumkin bo'lib qoladi.
+    """
     if not token_value:
         return "invalid", {}
 
+    now = timezone.now()
     order = (
         ServiceOrder.objects
         .select_related('telegram_user', 'phone', 'comparison', 'comparison__issue')
@@ -168,12 +263,14 @@ def _validate_courier_token(token_value: str, telegram_id: int) -> tuple[str, di
     )
     if not order:
         return "invalid", {}
-    if order.status != 'pending_location':
-        return "already_processed", {}
-    if order.courier_token_expires_at and order.courier_token_expires_at <= timezone.now():
-        return "expired", {}
     if not order.telegram_user or order.telegram_user.telegram_id != telegram_id:
-        return "forbidden", {}
+        return "forbidden", {'order_id': order.order_id}
+    if order.status == 'cancelled':
+        return "cancelled", {'order_id': order.order_id}
+    if order.status != 'pending_location':
+        return "already_processed", {'order_id': order.order_id}
+    if _auto_cancel_if_expired(order, now=now):
+        return "expired", {'order_id': order.order_id}
 
     phone_str = order.phone.name if order.phone else "Smartfon"
     if order.comparison:
@@ -184,17 +281,22 @@ def _validate_courier_token(token_value: str, telegram_id: int) -> tuple[str, di
         part_str = "Umumiy konsultatsiya"
         part_price_uzs = 0
 
+    deadline = get_order_location_deadline(order)
+    remaining_minutes = max(1, math.ceil((deadline - now).total_seconds() / 60))
+
     return "ok", {
         'order_pk': order.id,
         'order_id': order.order_id,
         'phone_str': phone_str,
         'part_str': part_str,
         'part_price_uzs': part_price_uzs,
+        'remaining_minutes': remaining_minutes,
     }
 
 
-def _check_pending_courier_order(order_pk: int, token_value: str, telegram_id: int) -> str:
-    """Lokatsiya hisoblashdan avval buyurtma hali ham yaroqli ekanligini tekshirish"""
+def _check_pending_courier_order(order_pk: int, token_value: str, telegram_id: int) -> tuple[str, dict]:
+    """Lokatsiya hisoblashdan avval buyurtma hali ham yaroqli ekanligini tekshirish."""
+    now = timezone.now()
     order = (
         ServiceOrder.objects
         .select_related('telegram_user')
@@ -202,16 +304,21 @@ def _check_pending_courier_order(order_pk: int, token_value: str, telegram_id: i
         .first()
     )
     if not order:
-        return "invalid"
-    if order.status != 'pending_location':
-        return "already_processed"
-    if token_value and order.courier_token != token_value:
-        return "invalid"
-    if order.courier_token_expires_at and order.courier_token_expires_at <= timezone.now():
-        return "expired"
+        return "invalid", {}
     if not order.telegram_user or order.telegram_user.telegram_id != telegram_id:
-        return "forbidden"
-    return "ok"
+        return "forbidden", {'order_id': order.order_id}
+    if order.status == 'cancelled':
+        return "cancelled", {'order_id': order.order_id}
+    if order.status != 'pending_location':
+        return "already_processed", {'order_id': order.order_id}
+    if token_value and order.courier_token != token_value:
+        return "invalid", {'order_id': order.order_id}
+    if _auto_cancel_if_expired(order, now=now):
+        return "expired", {'order_id': order.order_id}
+
+    deadline = get_order_location_deadline(order)
+    remaining_minutes = max(1, math.ceil((deadline - now).total_seconds() / 60))
+    return "ok", {'order_id': order.order_id, 'remaining_minutes': remaining_minutes}
 
 
 def _finalize_courier_order(
@@ -235,14 +342,21 @@ def _finalize_courier_order(
         )
         if not order:
             return "invalid", {}
-        if order.status != 'pending_location':
-            return "already_processed", {}
-        if token_value and order.courier_token != token_value:
-            return "invalid", {}
-        if order.courier_token_expires_at and order.courier_token_expires_at <= now:
-            return "expired", {}
         if not order.telegram_user or order.telegram_user.telegram_id != telegram_id:
-            return "forbidden", {}
+            return "forbidden", {'order_id': order.order_id}
+        if order.status == 'cancelled':
+            return "cancelled", {'order_id': order.order_id}
+        if order.status != 'pending_location':
+            return "already_processed", {'order_id': order.order_id}
+        if token_value and order.courier_token != token_value:
+            return "invalid", {'order_id': order.order_id}
+        if is_order_location_expired(order, now=now):
+            order.status = 'cancelled'
+            order.courier_token = None
+            order.courier_token_expires_at = None
+            order.admin_notes = AUTO_CANCEL_TIMEOUT_NOTE
+            order.save(update_fields=['status', 'courier_token', 'courier_token_expires_at', 'admin_notes'])
+            return "expired", {'order_id': order.order_id}
 
         part_price_total = int(order.comparison.total_price_uzs) if order.comparison else 0
         final_total = part_price_total + int(delivery_fee_uzs)
@@ -340,8 +454,22 @@ def _build_location_keyboard() -> ReplyKeyboardMarkup:
             [KeyboardButton(text="❌ Bekor qilish")],
         ],
         resize_keyboard=True,
-        one_time_keyboard=True,
+        one_time_keyboard=False,
+        input_field_placeholder="📍 Lokatsiyani yuboring yoki ❌ Bekor qilish ni bosing",
     )
+
+
+async def _get_post_flow_reply_markup(user):
+    """Admin/Menejerlar uchun asosiy menyuni tiklash, oddiy mijozlar uchun klaviaturani olib tashlash."""
+    if not user:
+        return ReplyKeyboardRemove()
+    try:
+        perms = await get_user_permissions(user.id, getattr(user, 'username', None))
+        if perms.has_any_access:
+            return get_main_menu(perms)
+    except Exception:
+        pass
+    return ReplyKeyboardRemove()
 
 
 @router.message(StateFilter("*"), CommandStart(deep_link=True, magic=F.args.startswith("login_")))
@@ -583,24 +711,40 @@ async def reject_manual_login_phone(message: Message, state: FSMContext):
     )
 
 
-@router.message(StateFilter("*"), CommandStart(deep_link=True, magic=F.args.startswith("courier_")))
-async def cmd_start_courier_deeplink(message: Message, command: CommandObject, state: FSMContext):
-    """Saytdan kelgan /start courier_<token> deep-link orqali mijozdan lokatsiya qabul qilishni boshlash"""
+async def _start_courier_location_prompt(
+    message: Message,
+    state: FSMContext,
+    token_value: str,
+    user,
+) -> None:
+    """Berilgan kuryer tokeni bo'yicha aniq buyurtma uchun lokatsiya so'rash jarayonini boshlash/tiklash."""
     await state.clear()
-    if not message.from_user:
+    if not user:
         return
 
-    raw_args = (command.args or "").strip()
-    token_value = raw_args[len("courier_"):].strip()
-
-    status, info = await sync_to_async(_validate_courier_token)(token_value, message.from_user.id)
+    status, info = await sync_to_async(_validate_courier_token)(token_value, user.id)
+    post_markup = await _get_post_flow_reply_markup(user)
 
     if status == "expired":
+        oid = html.escape(info.get('order_id') or '')
+        oid_part = f" (#{oid})" if oid else ""
         await message.answer(
-            "⏰ <b>Kuryer buyurtmasi havolasining muddati o'tgan.</b>\n\n"
-            "Iltimos, saytdan yangi buyurtma rasmiylashtiring.",
+            f"⏰ <b>Buyurtma{oid_part} muddati tugagan va avtomatik bekor qilingan.</b>\n\n"
+            f"1 soat ichida lokatsiya yuborilmagani sababli buyurtma bekor qilindi. "
+            f"Iltimos, saytdan yangi buyurtma rasmiylashtiring.",
             parse_mode="HTML",
-            reply_markup=ReplyKeyboardRemove(),
+            reply_markup=post_markup,
+        )
+        return
+
+    if status == "cancelled":
+        oid = html.escape(info.get('order_id') or '')
+        oid_part = f" (#{oid})" if oid else ""
+        await message.answer(
+            f"❌ <b>Bu buyurtma{oid_part} allaqachon bekor qilingan.</b>\n\n"
+            f"Agar kerak bo'lsa, saytdan yangi buyurtma rasmiylashtiring.",
+            parse_mode="HTML",
+            reply_markup=post_markup,
         )
         return
 
@@ -609,22 +753,34 @@ async def cmd_start_courier_deeplink(message: Message, command: CommandObject, s
             "⛔️ <b>Bu havola boshqa foydalanuvchining buyurtmasiga tegishli.</b>\n\n"
             "Iltimos, saytda o'z Telegram akkountingiz orqali buyurtma yarating.",
             parse_mode="HTML",
-            reply_markup=ReplyKeyboardRemove(),
+            reply_markup=post_markup,
+        )
+        return
+
+    if status == "already_processed":
+        oid = html.escape(info.get('order_id') or '')
+        oid_part = f" (#{oid})" if oid else ""
+        await message.answer(
+            f"✅ <b>Bu buyurtma{oid_part} uchun lokatsiya allaqachon qabul qilingan!</b>\n\n"
+            f"Buyurtmangiz holatini saytdagi «Mening buyurtmalarim» bo'limida kuzatishingiz mumkin.",
+            parse_mode="HTML",
+            reply_markup=post_markup,
         )
         return
 
     if status != "ok":
         await message.answer(
-            "⚠️ <b>Kuryer havolasi yaroqsiz yoki allaqachon tasdiqlangan.</b>\n\n"
+            "⚠️ <b>Kuryer havolasi yaroqsiz, muddati tugagan yoki allaqachon bekor qilingan.</b>\n\n"
             "Iltimos, kerak bo'lsa saytdan yangi buyurtma bering.",
             parse_mode="HTML",
-            reply_markup=ReplyKeyboardRemove(),
+            reply_markup=post_markup,
         )
         return
 
     await state.set_state(CourierLocationStates.waiting_for_location)
     await state.update_data(
         courier_order_pk=info['order_pk'],
+        courier_order_id=info['order_id'],
         courier_token=token_value,
     )
 
@@ -633,62 +789,114 @@ async def cmd_start_courier_deeplink(message: Message, command: CommandObject, s
         if info['part_price_uzs'] > 0
         else "💵 <b>Zapchast narxi:</b> Kelishiladi\n"
     )
+    rem_min = info.get('remaining_minutes', 60)
 
     await message.answer(
         f"🛵 <b>Kuryer orqali olib ketish — Buyurtma #{html.escape(info['order_id'])}</b>\n\n"
         f"📱 <b>Model:</b> {html.escape(info['phone_str'])}\n"
         f"🔧 <b>Muammo / Detal:</b> {html.escape(info['part_str'])}\n"
-        f"{price_line}\n"
+        f"{price_line}"
+        f"⏳ <b>Qolgan vaqt:</b> ~{rem_min} daqiqa <i>(1 soat ichida lokatsiya yuborilmasa buyurtma avtomatik bekor qilinadi)</i>\n\n"
         f"📍 <b>Kuryer xizmati narxini aniq hisoblash uchun</b> pastdagi tugmani bosib hozirgi lokatsiyangizni yuboring 👇",
         parse_mode="HTML",
         reply_markup=_build_location_keyboard(),
     )
 
 
+@router.message(StateFilter("*"), CommandStart(deep_link=True, magic=F.args.startswith("courier_")))
+async def cmd_start_courier_deeplink(message: Message, command: CommandObject, state: FSMContext):
+    """Saytdan kelgan /start courier_<token> deep-link orqali mijozdan lokatsiya qabul qilishni boshlash/tiklash"""
+    if not message.from_user:
+        return
+    raw_args = (command.args or "").strip()
+    token_value = raw_args[len("courier_"):].strip()
+    await _start_courier_location_prompt(message, state, token_value, message.from_user)
+
+
+@router.callback_query(StateFilter("*"), F.data.startswith("resume_courier:"))
+async def resume_courier_order_callback(call: CallbackQuery, state: FSMContext):
+    """Mijoz oddiy /start bosib qolganida aktiv kuryer buyurtmasiga tez qaytish tugmasi"""
+    if not call.from_user or not call.message:
+        return
+    token_value = call.data.split(":", 1)[1].strip()
+    await call.answer()
+    await _start_courier_location_prompt(call.message, state, token_value, call.from_user)
+
+
 @router.message(CourierLocationStates.waiting_for_location, F.text == "❌ Bekor qilish")
 @router.message(CourierLocationStates.waiting_for_location, Command("cancel"))
 async def cancel_courier_location(message: Message, state: FSMContext):
-    """Kuryer lokatsiya yuborish jarayonini bekor qilish"""
+    """Kuryer lokatsiya yuborish jarayonini va buyurtmaning o'zini bazada bekor qilish"""
+    data = await state.get_data()
+    order_pk = data.get('courier_order_pk')
+    token_value = str(data.get('courier_token') or '').strip()
     await state.clear()
+
+    post_markup = await _get_post_flow_reply_markup(message.from_user)
+
+    if order_pk and message.from_user:
+        cancel_status, order_code = await sync_to_async(_cancel_pending_courier_order)(
+            order_pk=int(order_pk),
+            token_value=token_value,
+            telegram_id=message.from_user.id,
+        )
+        if cancel_status == "cancelled":
+            await message.answer(
+                f"❌ <b>Buyurtma #{html.escape(order_code)} bekor qilindi.</b>\n\n"
+                f"Lokatsiya yuborish bekor qilingani sababli kuryer buyurtmangiz avtomatik bekor qilindi. "
+                f"Kerak bo'lsa, saytdan qaytadan buyurtma rasmiylashtirishingiz mumkin.",
+                parse_mode="HTML",
+                reply_markup=post_markup,
+            )
+            return
+        if cancel_status == "already_cancelled":
+            await message.answer(
+                f"❌ <b>Buyurtma #{html.escape(order_code)} allaqachon bekor qilingan.</b>",
+                parse_mode="HTML",
+                reply_markup=post_markup,
+            )
+            return
+        if cancel_status == "already_processed":
+            await message.answer(
+                f"ℹ️ <b>Buyurtma #{html.escape(order_code)} allaqachon tasdiqlangan</b> va bekor qilinmadi.",
+                parse_mode="HTML",
+                reply_markup=post_markup,
+            )
+            return
+
     await message.answer(
-        "❌ <b>Lokatsiya yuborish bekor qilindi.</b>\n\n"
-        "Xohlagan vaqtingizda saytdagi havola orqali qaytib lokatsiya yuborishingiz mumkin.",
+        "❌ <b>Lokatsiya yuborish jarayoni bekor qilindi.</b>",
         parse_mode="HTML",
-        reply_markup=ReplyKeyboardRemove(),
+        reply_markup=post_markup,
     )
 
 
-@router.message(CourierLocationStates.waiting_for_location, F.location)
-async def process_courier_location(message: Message, state: FSMContext, bot: Bot):
-    """Mijoz lokatsiyasini qabul qilish, masofa va kuryer narxini hisoblash, adminga va mijozga yuborish"""
-    if not message.from_user or not message.location:
-        return
+async def _complete_courier_location_for_order(
+    message: Message,
+    state: FSMContext,
+    bot: Bot,
+    order_pk: int,
+    token_value: str,
+) -> None:
+    """Aniq kuryer buyurtmasi uchun kelgan lokatsiyani hisoblash va buyurtmani tasdiqlash."""
+    post_markup = await _get_post_flow_reply_markup(message.from_user)
 
-    data = await state.get_data()
-    order_pk = data.get('courier_order_pk')
-    token_value = data.get('courier_token', '')
-
-    if not order_pk:
-        await state.clear()
-        await message.answer(
-            "⚠️ Buyurtma ma'lumoti topilmadi. Iltimos, saytdagi havolani qaytadan oching.",
-            reply_markup=ReplyKeyboardRemove(),
-        )
-        return
-
-    pre_status = await sync_to_async(_check_pending_courier_order)(
+    pre_status, pre_info = await sync_to_async(_check_pending_courier_order)(
         order_pk, token_value, message.from_user.id
     )
     if pre_status != "ok":
         await state.clear()
+        oid = html.escape(pre_info.get('order_id') or '')
+        oid_part = f" (#{oid})" if oid else ""
         err_map = {
-            "expired": "⏰ Buyurtma havolasining muddati o'tgan. Iltimos, saytdan qayta buyurtma bering.",
+            "expired": f"⏰ Buyurtma{oid_part} 1 soat ichida lokatsiya yuborilmagani uchun avtomatik bekor qilingan. Iltimos, saytdan qayta buyurtma bering.",
+            "cancelled": f"❌ Buyurtma{oid_part} bekor qilingan. Iltimos, kerak bo'lsa saytdan yangi buyurtma bering.",
             "forbidden": "⛔️ Bu buyurtma boshqa foydalanuvchiga tegishli.",
-            "already_processed": "✅ Bu buyurtma uchun lokatsiya allaqachon qabul qilingan.",
+            "already_processed": f"✅ Bu buyurtma{oid_part} uchun lokatsiya allaqachon qabul qilingan.",
         }
         await message.answer(
             err_map.get(pre_status, "⚠️ Buyurtma topilmadi yoki yaroqsiz."),
-            reply_markup=ReplyKeyboardRemove(),
+            reply_markup=post_markup,
         )
         return
 
@@ -711,9 +919,14 @@ async def process_courier_location(message: Message, state: FSMContext, bot: Bot
     await state.clear()
 
     if fin_status != "ok":
+        fin_err_map = {
+            "expired": "⏰ 1 soatlik muddat tugagani sababli buyurtma avtomatik bekor qilindi. Iltimos, saytdan qayta buyurtma bering.",
+            "cancelled": "❌ Buyurtma allaqachon bekor qilingan.",
+            "already_processed": "✅ Bu buyurtma uchun lokatsiya allaqachon tasdiqlangan.",
+        }
         await message.answer(
-            "⚠️ Buyurtmani yakunlab bo'lmadi (allaqachon tasdiqlangan yoki muddati tugagan).",
-            reply_markup=ReplyKeyboardRemove(),
+            fin_err_map.get(fin_status, "⚠️ Buyurtmani yakunlab bo'lmadi (allaqachon tasdiqlangan yoki muddati tugagan)."),
+            reply_markup=post_markup,
         )
         return
 
@@ -761,7 +974,6 @@ async def process_courier_location(message: Message, state: FSMContext, bot: Bot
         except Exception as exc:
             logger.warning("Failed to send courier order #%s to admin %s: %s", result['order_id'], aid, exc)
 
-    # Mijozga yakuniy chek
     receipt_lines = [
         "✅ <b>Buyurtmangiz qabul qilindi!</b>\n",
         f"🧾 <b>Buyurtma ID:</b> <code>#{html.escape(result['order_id'])}</code>",
@@ -779,15 +991,123 @@ async def process_courier_location(message: Message, state: FSMContext, bot: Bot
     await message.answer(
         "\n".join(receipt_lines),
         parse_mode="HTML",
-        reply_markup=ReplyKeyboardRemove(),
+        reply_markup=post_markup,
+    )
+
+
+@router.message(CourierLocationStates.waiting_for_location, F.location)
+async def process_courier_location(message: Message, state: FSMContext, bot: Bot):
+    """Mijoz lokatsiyasini qabul qilish, masofa va kuryer narxini hisoblash, adminga va mijozga yuborish"""
+    if not message.from_user or not message.location:
+        return
+
+    data = await state.get_data()
+    order_pk = data.get('courier_order_pk')
+    token_value = str(data.get('courier_token') or '').strip()
+
+    if not order_pk:
+        await state.clear()
+        post_markup = await _get_post_flow_reply_markup(message.from_user)
+        await message.answer(
+            "⚠️ Buyurtma ma'lumoti topilmadi. Iltimos, saytdagi «Botga lokatsiya yuborish» tugmasini qaytadan bosing.",
+            reply_markup=post_markup,
+        )
+        return
+
+    await _complete_courier_location_for_order(message, state, bot, int(order_pk), token_value)
+
+
+@router.message(StateFilter(None), F.location)
+async def process_courier_location_without_state(message: Message, state: FSMContext, bot: Bot):
+    """
+    Agar bot qayta ishga tushgani yoki state bexosdan tozalangani uchun mijoz
+    lokatsiya yuborsa va uning faqat 1 ta aktiv 'pending_location' buyurtmasi bo'lsa, uni avtomatik bog'lash.
+    """
+    if not message.from_user or not message.location:
+        return
+    if message.chat and message.chat.type != 'private':
+        return
+
+    active_orders = await sync_to_async(_get_active_pending_courier_orders_for_user)(message.from_user.id)
+    if not active_orders:
+        return
+
+    if len(active_orders) == 1:
+        item = active_orders[0]
+        await _complete_courier_location_for_order(
+            message,
+            state,
+            bot,
+            int(item['order_pk']),
+            str(item['courier_token'] or ''),
+        )
+        return
+
+    order_list = ", ".join(f"<code>#{html.escape(o['order_id'])}</code>" for o in active_orders[:5])
+    await message.answer(
+        f"📦 Sizda bir nechta lokatsiya kutilayotgan buyurtmalar bor: {order_list}\n\n"
+        f"Qaysi buyurtma uchun lokatsiya yuborayotganingizni aniq bilishimiz uchun saytdagi "
+        f"<b>«Mening buyurtmalarim»</b> bo'limidan kerakli buyurtma ostidagi "
+        f"<b>«📍 Botga lokatsiya yuborish»</b> tugmasini bosing.",
+        parse_mode="HTML",
     )
 
 
 @router.message(CourierLocationStates.waiting_for_location, ~CommandStart(), ~Command("menu"))
-async def prompt_location_again(message: Message):
-    """Lokatsiya kutilayotgan vaqtda matn yoki boshqa xabar yuborilsa eslatma berish"""
+async def prompt_location_again(message: Message, state: FSMContext):
+    """Lokatsiya kutilayotgan vaqtda matn yoki boshqa xabar yuborilsa muddatni tekshirib eslatma berish"""
+    data = await state.get_data()
+    order_pk = data.get('courier_order_pk')
+    token_value = str(data.get('courier_token') or '').strip()
+    order_code = str(data.get('courier_order_id') or '').strip()
+
+    if order_pk and message.from_user:
+        pre_status, pre_info = await sync_to_async(_check_pending_courier_order)(
+            int(order_pk), token_value, message.from_user.id
+        )
+        if pre_status != "ok":
+            await state.clear()
+            post_markup = await _get_post_flow_reply_markup(message.from_user)
+            oid = html.escape(pre_info.get('order_id') or order_code)
+            oid_part = f" (#{oid})" if oid else ""
+            if pre_status == "expired":
+                await message.answer(
+                    f"⏰ <b>Buyurtma{oid_part} 1 soat ichida lokatsiya yuborilmagani uchun avtomatik bekor qilindi.</b>\n\n"
+                    f"Kerak bo'lsa, saytdan yangi buyurtma rasmiylashtiring.",
+                    parse_mode="HTML",
+                    reply_markup=post_markup,
+                )
+            elif pre_status == "cancelled":
+                await message.answer(
+                    f"❌ <b>Buyurtma{oid_part} allaqachon bekor qilingan.</b>",
+                    parse_mode="HTML",
+                    reply_markup=post_markup,
+                )
+            elif pre_status == "already_processed":
+                await message.answer(
+                    f"✅ <b>Buyurtma{oid_part} uchun lokatsiya allaqachon qabul qilingan.</b>",
+                    parse_mode="HTML",
+                    reply_markup=post_markup,
+                )
+            else:
+                await message.answer(
+                    "⚠️ Buyurtma holati o'zgargan. Iltimos, saytdan buyurtmalaringizni tekshiring.",
+                    reply_markup=post_markup,
+                )
+            return
+
+        order_code = pre_info.get('order_id') or order_code
+        rem_min = pre_info.get('remaining_minutes')
+    else:
+        rem_min = None
+
+    order_label = f" (<b>#{html.escape(order_code)}</b>)" if order_code else ""
+    rem_line = f"\n⏳ Qolgan vaqt: ~{rem_min} daqiqa." if rem_min else ""
+
     await message.answer(
-        "📍 Iltimos, pastdagi <b>\"📍 Hozirgi lokatsiyangizni yuborish\"</b> tugmasini bosing yoki jarayonni bekor qilish uchun <b>\"❌ Bekor qilish\"</b> ni tanlang.",
+        f"📍 Buyurtma{order_label} uchun lokatsiya kutilmoqda.{rem_line}\n\n"
+        f"Iltimos, pastdagi <b>\"📍 Hozirgi lokatsiyangizni yuborish\"</b> tugmasini bosing "
+        f"yoki buyurtmani bekor qilish uchun <b>\"❌ Bekor qilish\"</b> ni tanlang.",
         parse_mode="HTML",
         reply_markup=_build_location_keyboard(),
     )

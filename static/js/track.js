@@ -31,7 +31,9 @@ document.addEventListener('DOMContentLoaded', () => {
       serviceCourier: "🛵 Kuryer orqali",
       priceLabel: "Summa",
       masterLabel: "Usta",
-      sendLocationBtn: "📍 Botda lokatsiya yuborish →",
+      sendLocationBtn: "📍 Botga lokatsiya yuborish →",
+      pendingExpiryHint: (mins) => `⏳ ${mins} daqiqa ichida lokatsiya yuborilmasa avtomatik bekor qilinadi`,
+      pendingReopenHint: "Botda holat o'zgarib qolsa ham, shu tugmani qayta bosib davom ettirishingiz mumkin.",
       loadError: "Buyurtmalarni yuklashda xatolik yuz berdi.",
       step1: "Qabul",
       step2: "Diagnostika",
@@ -47,6 +49,8 @@ document.addEventListener('DOMContentLoaded', () => {
       priceLabel: "Сумма",
       masterLabel: "Мастер",
       sendLocationBtn: "📍 Отправить геолокацию в бот →",
+      pendingExpiryHint: (mins) => `⏳ Если не отправить локацию за ${mins} мин., заказ отменится автоматически`,
+      pendingReopenHint: "Даже если в боте переключился раздел, нажмите кнопку снова для этого заказа.",
       loadError: "Не удалось загрузить список заказов.",
       step1: "Принято",
       step2: "Диагностика",
@@ -61,7 +65,9 @@ document.addEventListener('DOMContentLoaded', () => {
       serviceCourier: "🛵 Courier pickup",
       priceLabel: "Total",
       masterLabel: "Technician",
-      sendLocationBtn: "📍 Send location in bot →",
+      sendLocationBtn: "📍 Send location to bot →",
+      pendingExpiryHint: (mins) => `⏳ Auto-cancels if location is not sent within ${mins} min`,
+      pendingReopenHint: "If your bot state changes accidentally, tap this button again anytime to resume.",
       loadError: "Failed to load your orders.",
       step1: "Received",
       step2: "Diagnostic",
@@ -75,6 +81,45 @@ document.addEventListener('DOMContentLoaded', () => {
   let totalPages = 1;
   let isLoading = false;
   let highlightOrderCode = '';
+  let hasPendingLocationOrders = false;
+  let expiryRefreshTimer = null;
+  let lastAutoRefreshAt = 0;
+
+  function clearExpiryTimer() {
+    if (expiryRefreshTimer) {
+      clearTimeout(expiryRefreshTimer);
+      expiryRefreshTimer = null;
+    }
+  }
+
+  function schedulePendingExpiryRefresh(orders) {
+    clearExpiryTimer();
+    hasPendingLocationOrders = false;
+    if (!Array.isArray(orders)) return;
+
+    let minRemainingSec = null;
+    orders.forEach((order) => {
+      if (order && order.status === 'pending_location') {
+        hasPendingLocationOrders = true;
+        if (typeof order.location_remaining_seconds === 'number' && order.location_remaining_seconds >= 0) {
+          if (minRemainingSec === null || order.location_remaining_seconds < minRemainingSec) {
+            minRemainingSec = order.location_remaining_seconds;
+          }
+        }
+      }
+    });
+
+    if (hasPendingLocationOrders && minRemainingSec !== null && trackModal.classList.contains('is-open')) {
+      const delayMs = Math.max(1500, (minRemainingSec + 2) * 1000);
+      if (delayMs <= 3700000) {
+        expiryRefreshTimer = setTimeout(() => {
+          if (trackModal.classList.contains('is-open')) {
+            loadMyOrders(currentPage, { silent: true });
+          }
+        }, delayMs);
+      }
+    }
+  }
 
   function escapeHtml(str) {
     return String(str ?? '')
@@ -117,6 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function closeTrackModal() {
+    clearExpiryTimer();
     trackModal.classList.remove('is-open');
     trackModal.setAttribute('aria-hidden', 'true');
     if (!document.querySelector('.modal-backdrop.is-open, .modal-overlay.is-open')) {
@@ -178,9 +224,20 @@ document.addEventListener('DOMContentLoaded', () => {
       stepperHtml = `<div class="track-stepper track-stepper-compact">${parts.join('')}</div>`;
     }
 
-    const pendingBotHtml = order.status === 'pending_location' && order.bot_url
-      ? `<a href="${escapeHtml(order.bot_url)}" target="_blank" rel="noopener noreferrer" class="btn-order-pending-bot">${escapeHtml(t.sendLocationBtn)}</a>`
-      : '';
+    let pendingBotHtml = '';
+    if (order.status === 'pending_location' && order.bot_url) {
+      const remSec = typeof order.location_remaining_seconds === 'number'
+        ? order.location_remaining_seconds
+        : null;
+      const remMin = remSec !== null ? Math.max(1, Math.ceil(remSec / 60)) : 60;
+      pendingBotHtml = `
+        <div class="my-order-pending-box">
+          <div class="my-order-pending-meta">${escapeHtml(t.pendingExpiryHint(remMin))}</div>
+          <a href="${escapeHtml(order.bot_url)}" target="_blank" rel="noopener noreferrer" class="btn-order-pending-bot">${escapeHtml(t.sendLocationBtn)}</a>
+          <div class="my-order-pending-hint">${escapeHtml(t.pendingReopenHint)}</div>
+        </div>
+      `;
+    }
 
     return `
       <article class="my-order-card${isHighlighted ? ' is-highlighted' : ''}">
@@ -280,12 +337,15 @@ document.addEventListener('DOMContentLoaded', () => {
     paginationEl.classList.remove('hidden');
   }
 
-  async function loadMyOrders(pageNum) {
+  async function loadMyOrders(pageNum, options) {
     if (isLoading) return;
     isLoading = true;
 
+    const silent = Boolean(options && options.silent);
     const safePage = Math.max(1, parseInt(pageNum, 10) || 1);
-    setSectionVisibility('loading');
+    if (!silent) {
+      setSectionVisibility('loading');
+    }
     if (btnRefresh) btnRefresh.classList.add('is-spinning');
 
     try {
@@ -327,6 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (!Array.isArray(data.orders) || data.orders.length === 0) {
+        schedulePendingExpiryRefresh([]);
         setSectionVisibility('empty');
         return;
       }
@@ -336,21 +397,41 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       setSectionVisibility('list');
       renderPagination(data);
+      schedulePendingExpiryRefresh(data.orders);
 
-      if (modalCard) {
+      if (!silent && modalCard) {
         modalCard.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } catch (err) {
-      setSectionVisibility('error');
-      if (errorBox) {
-        errorBox.textContent = err.message || t.loadError;
-        errorBox.classList.remove('hidden');
+      if (!silent) {
+        setSectionVisibility('error');
+        if (errorBox) {
+          errorBox.textContent = err.message || t.loadError;
+          errorBox.classList.remove('hidden');
+        }
       }
     } finally {
       isLoading = false;
       if (btnRefresh) btnRefresh.classList.remove('is-spinning');
     }
   }
+
+  function triggerSilentReturnRefresh() {
+    if (!trackModal.classList.contains('is-open') || !hasPendingLocationOrders || isLoading) {
+      return;
+    }
+    const nowMs = Date.now();
+    if (nowMs - lastAutoRefreshAt < 2000) return;
+    lastAutoRefreshAt = nowMs;
+    loadMyOrders(currentPage, { silent: true });
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      triggerSilentReturnRefresh();
+    }
+  });
+  window.addEventListener('focus', triggerSilentReturnRefresh);
 
   if (btnOpenDesktop) {
     btnOpenDesktop.addEventListener('click', () => {
